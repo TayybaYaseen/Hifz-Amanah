@@ -1,0 +1,19 @@
+# F01 · Identity and authentication — mobile E2E (docs/specs/01-f01-identity-authentication/; decision review 2026-10-30, SRS §17)
+# Covers: F01-AC24, F01-AC26, F01-AC27, F01-AC28, F01-AC30
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F01 profile, User ID rules, Admin reset, and Owner/Admin two-factor sign-in
+tags:
+  - pending
+  - F01
+  - US-003
+  - US-002
+  - US-071
+  - US-072
+---
+- launchApp:
+    clearState: true
+# 1. Given an Admin creating an account, when the User ID field opens, then it suggests the madrasa-code prefix. An ID that differs from an existing one only in letter case is rejected as "User ID already in use", and an ID outside 3–32 letters, digits, and hyphens is rejected. (F01-AC24)
+# 2. Given an Owner or Admin, when they set a new password for a Teacher, Student, or Parent account, then the password changes, that user's sessions are revoked, and the action is audited. An Admin cannot reset another Admin's or the Owner's password; the Owner can reset an Admin's. (F01-AC26)
+# 3. Given a signed-in user, when they open My profile, then they see their display name, optional email, User ID, role, and madrasa, and can edit only the display name and email. (F01-AC27)
+# 4. Given a signed-in user changing their password, when they enter the correct current password and a new password that meets the policy, then the password changes, their other sessions are revoked, and the change is audited. A wrong current password is rejected and nothing changes. (F01-AC28)
+# 5. Given an Owner or Admin signing in for the first time, when the password is accepted, then they must set up an authenticator app and are shown 10 one-time recovery codes before any madrasa data is shown. (F01-AC30)

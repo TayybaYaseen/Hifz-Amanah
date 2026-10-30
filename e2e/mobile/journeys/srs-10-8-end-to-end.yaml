@@ -1,0 +1,22 @@
+# Cross-feature journey — SRS §10.8 end-to-end scenario (steps 1–9)
+# Covers: SRS-10.8-1…9 (F03, F05, F06, F07, F08, F09, F10)
+# Step 1 follows SRS §10.8 as corrected on 2026-10-30 (DEC-B04): the Admin creates the class and assigns the Teacher,
+# and the Teacher adds the student.
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: JOURNEY SRS 10.8 — class to guardian view
+tags:
+  - pending
+  - APP
+---
+- launchApp:
+    clearState: true
+# 1. admin.a creates class "Hifz J1" (teacher.a1); teacher.a1 adds student J1; admin.a links parent.p1 (verified). (SRS-10.8-1)
+# 2. teacher.a1 records J1: Sabaq Para 2 Salasah; Sabqi Para 1 Half; Manzil Para 29 and 30.            (SRS-10.8-2)
+# 3. Sabaq completed Half, Partial, one Tajweed Minor, quality 3; Sabqi Completed; Manzil 29 Partial; Manzil 30 Not Remembered. (SRS-10.8-3)
+# 4. Remaining shows Sabaq 1/4 Para; Homework → Suggested has Sabaq 1/4, Manzil 29, Manzil 30.         (SRS-10.8-4)
+# 5. Review and confirm → Confirmed with teacher.a1 and time.                                          (SRS-10.8-5)
+# 6. Next class: record attempts on the homework portions; each links to its homework portion.        (SRS-10.8-6)
+# 7. Weekly and monthly reports show both days from source data.                                       (SRS-10.8-7)
+# 8. Correct day 1 Sabaq to Completed → report totals change; draft suggestions rebuild;
+#    confirmed homework unchanged with the Revise notice.                                              (SRS-10.8-8)
+# 9. admin.a publishes the week; parent.p1 sees J1's published report only, with no private notes.     (SRS-10.8-9)

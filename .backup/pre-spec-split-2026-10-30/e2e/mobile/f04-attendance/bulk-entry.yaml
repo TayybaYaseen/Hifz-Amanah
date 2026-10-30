@@ -1,0 +1,17 @@
+# F04 · Calendar and attendance — mobile E2E (docs/specs/F04-calendar-attendance.md; design.md §4.8)
+# Covers: F04-AC6, F04-AC7, F04-AC8, F04-AC9, F04-AC11
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F04 bulk entry — attendance only, Mark all Present, unmarked, partial save
+tags:
+  - pending
+  - F04
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1 → Bulk Entry → A1, a scheduled date.
+# 2. Each student has only Present/Absent; no Sabaq, Sabqi, Manzil, mistake, quality, or excused field;
+#    the "Attendance only" note and a "Record Hifz" link per student are shown.                        (F04-AC6)
+# 3. Mark S2 Absent; tap "Mark all Present" → S2 stays Absent.                                          (F04-AC7)
+# 4. Clear S1's mark; save → S1 counted "not marked", not absent.                                       (F04-AC8)
+# 5. Test control makes one row fail → summary shows saved, needs correction, not marked; valid rows kept. (F04-AC9)
+# 6. Open S2's Daily Entry for that date → Absent, no portions, no quality.                             (F04-AC11)

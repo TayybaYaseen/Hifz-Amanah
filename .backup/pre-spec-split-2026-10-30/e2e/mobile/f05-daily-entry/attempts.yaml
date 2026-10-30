@@ -1,0 +1,16 @@
+# F05 · Daily Hifz entry — mobile E2E (docs/specs/F05-daily-hifz-entry.md; design.md §13 US-023)
+# Covers: F05-AC15, F05-AC16, F05-AC2
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F05 attempts — second attempt keeps the first; history; late sync keeps the date
+tags:
+  - pending
+  - F05
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1 → S1 record → Sabqi Para 4 (Partial) → Add attempt → Completed, quality 1 → save. (F05-AC15)
+# 2. View history → two attempts with their own time, recorder, quantity, status, mistakes, quality;
+#    the latest is labelled current.                                                                   (F05-AC15)
+# 3. Weekly report: Para 4 Completed; assigned quantity counted once.                                 (F05-AC16)
+# 4. Go offline; record S2 for today; test control advances the device clock one day; go online.
+# 5. The S2 record still shows the original date.                                                     (F05-AC2)

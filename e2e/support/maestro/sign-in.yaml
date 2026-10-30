@@ -1,0 +1,18 @@
+# Subflow: sign in as a seeded persona.
+# Usage:
+#   - runFlow:
+#       file: ../../support/maestro/sign-in.yaml
+#       env: { USER_ID: teacher.a1 }
+# Selectors use the testID contract in e2e/README.md.
+appId: ${APP_ID}
+---
+- tapOn:
+    id: "signin.userId"
+- inputText: ${USER_ID}
+- tapOn:
+    id: "signin.password"
+- inputText: ${PASSWORD || 'E2e-Test-Pass-1'}
+- tapOn:
+    id: "signin.submit"
+- assertVisible:
+    id: "home.screen"

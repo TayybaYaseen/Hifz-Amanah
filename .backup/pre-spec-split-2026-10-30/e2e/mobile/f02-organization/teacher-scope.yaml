@@ -1,0 +1,14 @@
+# F02 · Organization and roles — mobile E2E (docs/specs/F02-organization-roles.md; design.md §3.3)
+# Covers: F02-AC6, F02-AC7, F02-AC8
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F02 scope — Teacher sees only assigned classes; removal hides class data
+tags:
+  - pending
+  - F02
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1 → Students lists S1 and S2 only; Daily Entry class picker lists A1 only.   (F02-AC6)
+# 2. Open a deep link to S3's profile → permission-denied state that does not reveal whether S3 exists. (F02-AC7)
+# 3. Test control: admin.a removes teacher.a1 from A1; pull to refresh.
+# 4. Students shows the "no assigned classes" empty state.                                             (F02-AC8)

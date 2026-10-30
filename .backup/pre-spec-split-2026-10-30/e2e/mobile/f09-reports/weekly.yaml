@@ -1,0 +1,19 @@
+# F09 · Weekly and monthly reports — mobile E2E (docs/specs/F09-weekly-monthly-reports.md; design.md §4.10)
+# Covers: F09-AC1, F09-AC3, F09-AC4, F09-AC5, F09-AC6, F09-AC7, F09-AC14
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F09 weekly report — range, units, latest attempt, homework, quality, correction
+tags:
+  - pending
+  - F09
+---
+- launchApp:
+    clearState: true
+# Precondition: test control seeds a synthetic week for S1 (lines and Para portions; two attempts on one
+# portion; quality 1, 3 and two blank; one confirmed homework and two drafts; Manzil Para 1/5/10 on one day).
+# 1. Sign in as teacher.a1 → Reports → Weekly → S1: range Monday–Sunday and "Asia/Karachi" shown.      (F09-AC1)
+# 2. Totals: one Lines total and one Para total.                                                       (F09-AC4)
+# 3. The two-attempt portion shows its latest status; assigned counted once.                          (F09-AC5)
+# 4. Homework: Confirmed 1, Suggestions 2.                                                             (F09-AC6)
+# 5. Average quality "2.0 · Good (2 ratings)".                                                         (F09-AC7)
+# 6. Daily detail for the Manzil day: three lines with their own status and quantity.                  (F09-AC14)
+# 7. Correct one record; reopen the report → totals updated.                                          (F09-AC3)

@@ -1,0 +1,15 @@
+# F11 · Localization and accessibility — mobile E2E (docs/specs/F11-localization-accessibility.md; design.md §2.3, §6)
+# Covers: F11-AC8, F11-AC9, F11-AC10
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F11 Arabic — Surah names unchanged; mixed ranges readable both directions
+tags:
+  - pending
+  - F11
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1; S1 record has a range "البقرة 2:255–260".
+# 2. English, Urdu, Roman Urdu: the Surah name text equals the stored value.                           (F11-AC8)
+# 3. In an English sentence and in an Urdu sentence the range reads Surah, then 2:255–260 in order;
+#    compare screenshots with approved goldens.                                                        (F11-AC9)
+# 4. Export the report PDF and open it → the Arabic matches the screen.                               (F11-AC10)

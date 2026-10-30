@@ -1,0 +1,16 @@
+# F15 · Analytics and AI recommendations — mobile E2E (docs/specs/F15-analytics-ai.md; design.md §13 US-064…065)
+# Covers: F15-AC9, F15-AC10, F15-AC11, F15-AC12, F15-AC14
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F15 AI settings — provider, on/off, limits, data categories; no AI for Student or Parent
+tags:
+  - pending
+  - F15
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as admin.a → Settings → AI: choose a provider, limit 1, attendance sharing off; contact details
+#    and notes shown as excluded by default; save.                                                     (F15-AC10, F15-AC14)
+# 2. Limit 0 or negative → field error.
+# 3. Sign in as teacher.a1 → get one recommendation; the second → "AI limit reached for this period".  (F15-AC12)
+# 4. Sign in as admin.a → turn AI off; teacher.a1 Analytics → no AI button.                            (F15-AC11)
+# 5. Sign in as student.s1 and parent.p1 → no Analytics AI anywhere.                                   (F15-AC9)

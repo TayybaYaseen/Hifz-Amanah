@@ -1,0 +1,14 @@
+# App-wide — phone and tablet layouts (design.md §4.8, §6.3, §12 items 8–9)
+# Covers: APP-LAYOUT-01…03
+# Run on the NFR-COMP-001 device matrix: 5" 2 GB phone, 6.5" mid-range phone, 10" tablet (emulators), plus one real low-end device before release.
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: APP layouts — small phone cards, tablet grid, long names
+tags:
+  - pending
+  - APP
+---
+- launchApp:
+    clearState: true
+# 1. Small phone: Bulk Entry shows one student card with previous/next, not a tiny grid.               (APP-LAYOUT-01)
+# 2. Tablet: Bulk Entry shows a grid with the student name always visible.                             (APP-LAYOUT-02)
+# 3. A 60-character synthetic name in English and Urdu wraps without clipping on Students, Daily Entry, Reports. (APP-LAYOUT-03)

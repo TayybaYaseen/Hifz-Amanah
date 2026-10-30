@@ -1,0 +1,18 @@
+# F12 · Offline and synchronization — mobile E2E (docs/specs/04-f12-offline-sync/; design.md §4.13)
+# Covers: F12-AC14, F12-AC15, F12-AC16, F12-AC7
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F12 sync edges — access revoked, upgrade required, local DB upgrade keeps outbox
+tags:
+  - pending
+  - F12
+  - US-051
+  - US-052
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1; go offline; save an entry; admin.a removes teacher.a1 (API); go online.
+# 2. "Access revoked": syncing stops, cached data is locked, the pending item stays visible.          (F12-AC14)
+# 3. Install the previous app build (E2E_PREVIOUS_APK), sign in, go offline, save 2 entries.
+# 4. Test control raises the minimum protocol version; go online → "Upgrade required"; items kept.     (F12-AC15)
+# 5. Install the current build over it (local migration runs) → 2 pending items present; they sync.   (F12-AC16)
+# 6. teacher.a2 edits S3 (API); teacher.a1 pull → S3 never appears on this device.                    (F12-AC7)

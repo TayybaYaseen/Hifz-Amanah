@@ -1,0 +1,14 @@
+# F10 · Student and Parent access — mobile E2E (docs/specs/F10-student-parent-access.md; design.md §4.12)
+# Covers: F10-AC5, F10-AC6, F10-AC7, F10-AC8
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F10 parent — switch linked children, no search, revoked link
+tags:
+  - pending
+  - F10
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as parent.p1 → the switcher lists S1 and S2 only; no student search anywhere.             (F10-AC5, F10-AC6)
+# 2. Sign in as admin.a → revoke parent.p1's link to S2 → Audit history shows the revoke.              (F10-AC8)
+# 3. Sign in as parent.p1 → the switcher lists S1 only; a deep link to S2 → permission-revoked state.  (F10-AC7)
+# 4. Sign in as a Parent with no links → "No student linked yet".

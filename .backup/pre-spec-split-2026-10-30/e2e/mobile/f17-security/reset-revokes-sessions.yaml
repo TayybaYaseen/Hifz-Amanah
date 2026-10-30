@@ -1,0 +1,14 @@
+# F17 · Security, audit, and administration — mobile E2E (docs/specs/F17-security-audit-admin.md)
+# Covers: F17-AC12, F17-AC4
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F17 reset — other sessions signed out; removed member refused
+tags:
+  - pending
+  - F17
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1 on this device.
+# 2. Reset teacher.a1's password via OTP through the API (another device).
+# 3. The next action on this device shows the sign-in prompt.                                          (F17-AC12)
+# 4. admin.a removes teacher.a2 (API); teacher.a2 signs in on this device → refused.                   (F17-AC4)

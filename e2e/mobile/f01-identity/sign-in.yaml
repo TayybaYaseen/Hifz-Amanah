@@ -1,0 +1,19 @@
+# F01 · Identity — mobile E2E (docs/specs/01-f01-identity-authentication/; design.md §4.2)
+# Covers: F01-AC1, F01-AC2, F01-AC3, F01-AC17
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F01 sign-in — role home, neutral errors, no forced password change
+tags:
+  - pending
+  - F01
+  - US-001
+  - US-004
+---
+- launchApp:
+    clearState: true
+# 1. Sign-in screen shows User ID, password with show/hide, Sign in, Forgot password, language picker; no sign-up.
+# 2. Enter teacher.a1's email as User ID with the right password → "User ID or password is incorrect".  (F01-AC2)
+# 3. Enter teacher.a1 with a wrong password → the same message; User ID stays filled.                   (F01-AC3)
+# 4. Enter no.such.user → the same message.                                                             (F01-AC3)
+# 5. Sign in as teacher.a1 → Teacher Home; no change-password prompt.                                   (F01-AC1, F01-AC17)
+# 6. Students lists only Madrasa A students of Class A1.                                                (F01-AC1)
+# 7. Sign out; sign in as admin.a → Admin home; as student.s1 → read-only Student home; as parent.p1 → Parent home. (F01-AC1)

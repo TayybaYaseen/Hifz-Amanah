@@ -1,0 +1,19 @@
+# F11 · Localization and accessibility — mobile E2E (docs/specs/02-f11-localization-accessibility/; design.md §6)
+# Covers: F11-AC1, F11-AC2, F11-AC3, F11-AC7
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F11 locales — English LTR, Urdu RTL, Roman Urdu LTR, glossary terms
+tags:
+  - pending
+  - F11
+  - US-047
+  - US-048
+  - US-049
+---
+- launchApp:
+    clearState: true
+# For each locale, visit: Sign-in, Teacher Home, Students, Daily Entry, Bulk Entry, Homework, Reports, Sync queue, Settings.
+# 1. English: all text English; layout left to right; a validation message and an empty state in English. (F11-AC1)
+# 2. Urdu: all text Urdu script; layout right to left; validation and empty state in Urdu.             (F11-AC2)
+# 3. Roman Urdu: key strings in Roman Urdu; layout left to right.                                      (F11-AC3)
+# 4. Roman Urdu: Sabaq, Sabqi, Manzil, Para, Rubu, Salasah use the glossary spelling on every screen.  (F11-AC7)
+# Each step captures a screenshot for RTL review.

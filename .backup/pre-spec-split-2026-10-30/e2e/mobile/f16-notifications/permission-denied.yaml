@@ -1,0 +1,14 @@
+# F16 · Notifications — mobile E2E (docs/specs/F16-notifications.md; design.md §13 US-066…067)
+# Covers: F16-AC10
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F16 push — Android permission denied
+tags:
+  - pending
+  - F16
+---
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: deny
+# 1. Sign in as parent.p1 → Settings → Notifications.
+# 2. "Notifications are off in Android settings" with a button; tap → Android app settings open.      (F16-AC10)

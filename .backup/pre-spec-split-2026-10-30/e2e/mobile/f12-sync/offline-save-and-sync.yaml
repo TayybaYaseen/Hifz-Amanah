@@ -1,0 +1,16 @@
+# F12 · Offline and synchronization — mobile E2E (docs/specs/F12-offline-sync.md; design.md §4.13)
+# Covers: F12-AC1, F12-AC2, F12-AC3, F12-AC4, F12-AC5, F12-AC9
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F12 offline — save, kill app, reopen, reconnect, synced once
+tags:
+  - pending
+  - F12
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1; go offline.
+# 2. Daily Entry S1 with Sabaq + Sabqi + an extra attempt; save → "Saved on this device — waiting to sync";
+#    nothing shows Synced.                                                                             (F12-AC1, F12-AC9)
+# 3. stopApp; launchApp → the record and its pending items are still there.                            (F12-AC2)
+# 4. Go online → items move to Synced in order: record, then portions and attempts.                    (F12-AC4)
+# 5. API check: exactly one record, its portions, and attempts; the record ID equals the device ID.    (F12-AC3, F12-AC5)

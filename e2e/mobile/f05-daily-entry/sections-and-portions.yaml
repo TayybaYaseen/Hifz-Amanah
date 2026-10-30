@@ -1,0 +1,22 @@
+# F05 · Daily Hifz entry — mobile E2E (docs/specs/09-f05-daily-hifz-entry/; design.md §4.7, §5.4)
+# Covers: F05-AC1, F05-AC10, F05-AC11, F05-AC12, F05-AC13
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F05 daily entry — Sabaq, two Sabqi, three Manzil with separate outcomes
+tags:
+  - pending
+  - F05
+  - US-018
+  - US-020
+  - US-021
+  - US-022
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1 → Daily Entry → date yesterday, class A1, student S1, Present.             (F05-AC1)
+# 2. Sabaq · Portion 1: Para 5, Surah/Ayat range, assigned Half, completed Half, Completed,
+#    one Tajweed mistake, quality 2 · Good, remarks.                                                   (F05-AC10)
+# 3. Sabqi → Add portion: Para 5 is the default; change to Para 3, Completed.                         (F05-AC12)
+# 4. Sabqi · Portion 2: Para 4, Partial.                                                               (F05-AC11)
+# 5. Manzil: Para 1 Completed; Para 5 Partial 1/2; Para 10 Not Remembered.                             (F05-AC13)
+# 6. Save → record shows date yesterday and six portions, each with its own status chip (icon + text).
+# 7. Change Sabqi Para 4 to Completed → Sabqi Para 3 unchanged.                                        (F05-AC11)

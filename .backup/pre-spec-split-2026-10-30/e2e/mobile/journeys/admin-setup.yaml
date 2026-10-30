@@ -1,0 +1,16 @@
+# Cross-feature journey — a new madrasa from first sign-in to the first report
+# Covers: APP-JOURNEY-SETUP (F01, F02, F03, F04, F06, F13)
+# OPEN: design.md §11 D1 — how a new workspace and its first Admin are created.
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: JOURNEY admin setup — settings, accounts, classes, students, timetable, template
+tags:
+  - pending
+  - APP
+---
+- launchApp:
+    clearState: true
+# 1. The new Admin signs in; settings show Asia/Karachi, Monday, one report per student/date.
+# 2. Creates a Teacher, two Students, and a Parent (shared email with one Student).
+# 3. Creates a class, assigns the Teacher, enrolls both Students; sets Monday–Saturday and one holiday.
+# 4. Adds Quran metadata for one Surah; uploads a report logo.
+# 5. The Teacher signs in, records one day; the Admin opens the weekly report and exports a PDF.

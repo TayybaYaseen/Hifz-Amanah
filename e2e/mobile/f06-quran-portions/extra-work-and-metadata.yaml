@@ -1,0 +1,14 @@
+# F06 · Quran portions and metadata — mobile E2E (docs/specs/07-f06-quran-portions-metadata/; decision review 2026-10-30, SRS §17)
+# Covers: F06-AC16, F06-AC19
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F06 Extra portion and metadata corrections
+tags:
+  - pending
+  - F06
+  - US-027
+  - US-024
+---
+- launchApp:
+    clearState: true
+# 1. Given 1/2 Para assigned and 3/4 Para recited, when the Teacher records completed 1/2 and adds an Extra portion of 1/4, then both portions are saved with completed ≤ assigned, and reports show the 1/4 as extra work. Entering completed 3/4 on the original portion is refused. (F06-AC16)
+# 2. Given records that use a Para boundary, when the Admin corrects that boundary, then the records keep their stored ranges, any range that is no longer valid is listed for Admin review, and the edit is audited. (F06-AC19)

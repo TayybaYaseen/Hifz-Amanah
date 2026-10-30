@@ -1,0 +1,18 @@
+# F08 · Homework and carry forward — mobile E2E (docs/specs/F08-homework-carry-forward.md; design.md §4.9)
+# Covers: F08-AC1, F08-AC2, F08-AC10, F08-AC11, F08-AC13, F08-AC14, F08-AC15, F08-AC16
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F08 confirm — explicit confirm, next class, correction, revise
+tags:
+  - pending
+  - F08
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1 → Homework → New: Sabaq Para 5 Half, Sabqi Para 3 Rubu, Sabqi Para 4 Complete,
+#    instructions, due date → save draft; reopen → all fields kept.                                     (F08-AC1, F08-AC2)
+# 2. Test control advances the clock past the due date → still in Suggested.                           (F08-AC11)
+# 3. Confirm homework → summary → accept → in Confirmed with teacher name and time.                    (F08-AC10)
+# 4. Next class: Daily Entry S1 shows the due homework portions; record an attempt on one → linked.     (F08-AC16)
+# 5. Confirm a second assignment → the first is unchanged in the Homework tab.                         (F08-AC13)
+# 6. Correct the source attempt → "Confirmed homework was not changed — Revise?"; confirmed unchanged.  (F08-AC14)
+# 7. Revise → confirm → new assignment in Confirmed; the old one labelled "Superseded".                 (F08-AC15)

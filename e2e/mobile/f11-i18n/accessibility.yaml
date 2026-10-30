@@ -1,0 +1,16 @@
+# F11 · Localization and accessibility — mobile E2E (docs/specs/02-f11-localization-accessibility/; design.md §6.3)
+# Covers: F11-AC12, F11-AC13
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F11 accessibility — largest font, touch targets, status text and icon
+tags:
+  - pending
+  - F11
+  - US-047
+---
+- launchApp:
+    clearState: true
+# Precondition: device font scale set to the largest (adb shell settings put system font_scale 2.0).
+# 1. Sign in as teacher.a1; visit Teacher Home, Students, Daily Entry, Bulk Entry, Homework, Reports in all three locales.
+# 2. No text is clipped or truncated without a way to read it; long synthetic names wrap.              (F11-AC12)
+# 3. Every control's bounds are at least 44 dp (read from the view hierarchy).                         (F11-AC12)
+# 4. Every status chip, sync state, and attendance mark has a text label and an icon.                  (F11-AC13)

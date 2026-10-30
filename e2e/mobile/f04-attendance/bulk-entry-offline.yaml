@@ -1,0 +1,15 @@
+# F04 · Calendar and attendance — mobile E2E (docs/specs/08-f04-calendar-attendance/; design.md §4.8, §4.13)
+# Covers: F04-AC10, F04-AC12
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F04 bulk entry offline — saved on device, synced once
+tags:
+  - pending
+  - F04
+  - US-015
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1; go offline (support/maestro/go-offline.yaml).
+# 2. Bulk Entry A1: mark all; save → "Saved on this device — waiting to sync"; queue shows pending.    (F04-AC12)
+# 3. Test control drops the server acknowledgement once; go online; the app retries.
+# 4. Items reach Synced; API check: one attendance record per student.                                 (F04-AC10)

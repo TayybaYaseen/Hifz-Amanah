@@ -1,0 +1,16 @@
+# F04 · Calendar and attendance — mobile E2E (docs/specs/F04-calendar-attendance.md; design.md §4.7, §4.14)
+# Covers: F04-AC13, F04-AC14, F04-AC15, F04-AC16, F04-AC17
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F04 excused absence — Teacher requests, Admin approves and rejects
+tags:
+  - pending
+  - F04
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1 → Daily Entry S2 (Absent) → "Mark as excused" with a reason → "Excused — awaiting approval". (F04-AC13)
+# 2. Daily Entry S1 (Present) → no "Mark as excused" option.                                          (F04-AC14)
+# 3. No approve/reject control is visible to teacher.a1.                                               (F04-AC17)
+# 4. Mark S1 Absent on another date and request an excuse.
+# 5. Sign in as admin.a → Excused absences: two items → approve S2 (confirm), reject S1 (confirm).      (F04-AC15, F04-AC16)
+# 6. Weekly report: 1 excused absence and 1 normal absence; teacher.a1 sees "Excuse rejected" on S1.   (F04-AC15, F04-AC16)

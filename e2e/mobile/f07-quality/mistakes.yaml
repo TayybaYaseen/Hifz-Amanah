@@ -1,0 +1,17 @@
+# F07 · Mistakes and quality — mobile E2E (docs/specs/10-f07-mistakes-quality/; design.md §4.7, §5.4)
+# Covers: F07-AC1, F07-AC2, F07-AC3, F07-AC4, F07-AC5
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F07 mistakes — categories, severity, repeated flag, weekly counts
+tags:
+  - pending
+  - F07
+  - US-028
+  - US-029
+  - US-030
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1; switch to Urdu → Daily Entry S1 → Sabaq → Add mistake: Tajweed, Major.     (F07-AC1, F07-AC4)
+# 2. Add mistake: Lafzi, Minor, Repeated on → severity still Minor with a separate Repeated marker.     (F07-AC1, F07-AC5)
+# 3. Save; switch to English → categories read "Tajweed" and "Lafzi".                                  (F07-AC2)
+# 4. Weekly report → mistake counts: Tajweed 1, Lafzi 1.                                               (F07-AC3)

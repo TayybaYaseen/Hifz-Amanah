@@ -1,0 +1,14 @@
+# F06 · Quran portions and metadata — mobile E2E (docs/specs/F06-quran-portions-metadata.md; design.md §13 US-024)
+# Covers: F06-AC1, F06-AC2, F06-AC3, F06-AC4
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F06 metadata — Admin edits, Arabic preserved, boundary validation, no Teacher controls
+tags:
+  - pending
+  - F06
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as admin.a → Settings → Quran metadata → add Surah: number, Arabic name "الفاتحة", 7 Ayat → saved. (F06-AC1)
+# 2. Switch to Urdu and Roman Urdu → the Arabic name is shown exactly as entered in the Quranic font.  (F06-AC3)
+# 3. Edit a Para boundary with end before start → field error.                                         (F06-AC4)
+# 4. Sign in as teacher.a1 → Settings has no Quran metadata edit controls.                             (F06-AC2)

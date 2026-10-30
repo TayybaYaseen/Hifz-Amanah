@@ -1,0 +1,16 @@
+# Cross-feature journey — a full teacher day with no connection, synced in the evening
+# Covers: APP-JOURNEY-OFFLINE (F04, F05, F07, F08, F09, F12)
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: JOURNEY offline day — attendance, entries, homework drafts, sync
+tags:
+  - pending
+  - APP
+---
+- launchApp:
+    clearState: true
+# 1. teacher.a1 signs in online, then goes offline.
+# 2. Bulk Entry A1: S1 Present, S2 Absent → saved on device.
+# 3. Daily Entry S1: full Sabaq/Sabqi/Manzil with mistakes and quality → saved on device.
+# 4. Homework → Suggested shows S1's draft built locally; confirming offline follows OPEN design.md §11 D2.
+# 5. Reports → Weekly → "Provisional" with the pending count.
+# 6. Go online → every item Synced once; report no longer provisional; totals equal the API report.

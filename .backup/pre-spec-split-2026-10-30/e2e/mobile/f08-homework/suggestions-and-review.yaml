@@ -1,0 +1,19 @@
+# F08 · Homework and carry forward — mobile E2E (docs/specs/F08-homework-carry-forward.md; design.md §4.9, §5.7)
+# Covers: F08-AC3, F08-AC4, F08-AC5, F08-AC6, F08-AC7, F08-AC8, F08-AC9
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F08 suggestions — eligible portions, draft label, review edits, reject
+tags:
+  - pending
+  - F08
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1 → Daily Entry S1: Sabaq Salasah/Half Partial; Sabqi Para 3 Not Remembered;
+#    Manzil Para 1 Completed; Manzil Para 2 Pending; Manzil Para 3 Not Assigned; save.
+# 2. Homework → Suggested: Sabaq 1/4 Para and Sabqi Para 3 only, each with its source attempt date.    (F08-AC3, F08-AC5, F08-AC6)
+# 3. Each card shows "Suggestion — not confirmed" and is not styled as confirmed.                      (F08-AC7)
+# 4. Seed a portion with assigned Half and completed 6 lines → its suggestion shows no remaining
+#    and a "Review units" flag.                                                                        (F08-AC4)
+# 5. Review: edit a quantity, remove one portion, add Manzil Para 4, change the due date; save draft;
+#    reopen → changes kept; portions labelled Suggested / Edited / Added.                              (F08-AC8)
+# 6. For S2, reject the draft → it leaves Suggested and is not counted as homework.                    (F08-AC9)

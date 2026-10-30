@@ -1,0 +1,17 @@
+# F03 · Classes and students — mobile E2E (docs/specs/06-f03-classes-students/; design.md §4.5, §4.6)
+# Covers: F03-AC6, F03-AC7, F03-AC8, F03-AC9, F03-AC10
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F03 students — add, duplicate external ID, search and filter, deactivate and reactivate
+tags:
+  - pending
+  - F03
+  - US-011
+---
+- launchApp:
+    clearState: true
+# Precondition: more than one page of synthetic students in Madrasa A.
+# 1. Sign in as admin.a → Students → Add: name, External Student ID EXT-A-900, admission date → saved. (F03-AC6)
+# 2. Add another with EXT-A-001 → External Student ID field error.                                     (F03-AC7)
+# 3. Search "EXT-A-002" → only S2; search by name → only matches; filter class A2 and Inactive → only matches; scroll loads the next page. (F03-AC8)
+# 4. Deactivate S2 → Daily Entry picker excludes S2; S2's earlier report still opens with records.    (F03-AC9)
+# 5. Reactivate S2 → picker includes S2; Daily History shows the same records.                        (F03-AC10)

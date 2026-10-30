@@ -1,0 +1,13 @@
+# F03 · Classes and students — mobile E2E (docs/specs/F03-classes-students.md; design.md §4.6)
+# Covers: F03-AC11, F03-AC12, F03-AC13
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F03 enrollment — move a student and keep history
+tags:
+  - pending
+  - F03
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as admin.a → S2 profile → Change class → A2 from a chosen date D.                        (F03-AC11)
+# 2. Details tab lists A1 (ends D−1) and A2 (from D).                                                  (F03-AC13)
+# 3. Open a report for a week before D → S2 shown under A1.                                            (F03-AC12)

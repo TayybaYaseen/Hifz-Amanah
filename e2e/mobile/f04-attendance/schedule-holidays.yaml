@@ -1,0 +1,17 @@
+# F04 · Calendar and attendance — mobile E2E (docs/specs/08-f04-calendar-attendance/; design.md §4.14)
+# Covers: F04-AC1, F04-AC3, F04-AC4, F04-AC5
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F04 calendar — schedule, holiday, class exception, holiday notice in Bulk Entry
+tags:
+  - pending
+  - F04
+  - US-013
+  - US-014
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as admin.a → Timetable: A1 Monday–Saturday.
+# 2. Holidays → add a madrasa holiday on date H; add a no-class exception for A1 on date X.
+# 3. Weekly report for A1: Sunday shown as no class; H shown as holiday; nobody absent on H.           (F04-AC1, F04-AC3)
+# 4. On X, A1 students show "no class"; A2 students do not.                                            (F04-AC4)
+# 5. Sign in as teacher.a1 → Bulk Entry for H → notice: holiday, no absence is recorded automatically. (F04-AC5)

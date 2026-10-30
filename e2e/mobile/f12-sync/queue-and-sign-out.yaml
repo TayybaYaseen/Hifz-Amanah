@@ -1,0 +1,17 @@
+# F12 · Offline and synchronization — mobile E2E (docs/specs/04-f12-offline-sync/; design.md §4.13, §5.9)
+# Covers: F12-AC6, F12-AC8, F12-AC10
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F12 sync queue — states, retry, sign-out warning
+tags:
+  - pending
+  - F12
+  - US-052
+  - US-053
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1; test control makes the server return temporary errors.
+# 2. Save an entry → the queue item shows Pending, then Failed with a reason and Retry; it stays queued. (F12-AC6, F12-AC8)
+# 3. Test control restores the server; tap Retry → Syncing → Synced.                                   (F12-AC8)
+# 4. Go offline; save two entries; Sign out → warning shows 2 unsynced changes with
+#    "Sync now", "Cancel", "Sign out anyway"; tap Cancel → still signed in.                            (F12-AC10)

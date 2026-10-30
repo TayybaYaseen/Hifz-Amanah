@@ -1,0 +1,18 @@
+# App-wide — required screen states (design.md §8 matrix; AGENTS.md §11)
+# Covers: APP-STATE-01…06
+# Run for each main screen: Teacher Home, Students, Student profile, Daily Entry, Bulk Entry, Homework, Reports,
+# Sync queue, Settings, Student home, Parent home.
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: APP screen states — loading, empty, success, error, offline, permission revoked
+tags:
+  - pending
+  - APP
+---
+- launchApp:
+    clearState: true
+# 1. Slow server (test control) → loading indicator; no fabricated data.                               (APP-STATE-01)
+# 2. No data → empty state that says what is empty, why, and what to do next.                         (APP-STATE-02)
+# 3. Successful action → success state; "Synced" only after acknowledgement.                          (APP-STATE-03)
+# 4. Server error (test control) → specific error with retry; user input kept.                        (APP-STATE-04)
+# 5. Offline → neutral offline banner; changes stay on device.                                         (APP-STATE-05)
+# 6. Membership revoked → access-revoked state; future server access blocked.                         (APP-STATE-06)

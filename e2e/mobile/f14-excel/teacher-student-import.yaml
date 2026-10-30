@@ -1,0 +1,12 @@
+# F14 · Excel import and export — mobile E2E (docs/specs/14-f14-excel-import-export/; decision review 2026-10-30, SRS §17)
+# Covers: F14-AC21
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F14 Teacher imports students into assigned classes
+tags:
+  - pending
+  - F14
+  - US-058
+---
+- launchApp:
+    clearState: true
+# 1. Given a Teacher assigned to Class A, when they import a Students workbook with rows for Class A and Class B, then the preview marks the Class B rows invalid ("Not your class"), and confirming creates only the Class A students, with no login accounts. (F14-AC21)

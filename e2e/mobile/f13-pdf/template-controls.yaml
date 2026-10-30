@@ -1,0 +1,12 @@
+# F13 · PDF and print — mobile E2E (docs/specs/16-f13-pdf-print/; decision review 2026-10-30, SRS §17)
+# Covers: F13-AC13
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F13 report template controls
+tags:
+  - pending
+  - F13
+  - US-056
+---
+- launchApp:
+    clearState: true
+# 1. Given the report template settings, when the Admin opens them, then they can choose portrait or landscape, show or hide each optional section, set heading text per language, and pick colours from presets that pass a contrast check. There is no control to reorder sections. (F13-AC13)

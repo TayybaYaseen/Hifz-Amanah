@@ -1,0 +1,17 @@
+# F05 · Daily Hifz entry — mobile E2E (docs/specs/09-f05-daily-hifz-entry/; design.md §4.7 Step 1)
+# Covers: F05-AC6, F05-AC7, F05-AC8, F05-AC9
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F05 report mode — single report, sessions, blocked switch, Teacher has no control
+tags:
+  - pending
+  - F05
+  - US-019
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1; S1 already has a record today; start a new one → warning; the existing record opens. (F05-AC6)
+# 2. Settings has no daily-report mode control for teacher.a1.                                         (F05-AC9)
+# 3. Sign in as admin.a → set multiple sessions.
+# 4. Sign in as teacher.a1 → Daily Entry shows a required Session label; save without it → error;
+#    save "Fajr" and "Asr" for S1 today → both exist.                                                  (F05-AC7)
+# 5. Sign in as admin.a → set one report per student/date → blocked; message lists S1 and today.      (F05-AC8)
