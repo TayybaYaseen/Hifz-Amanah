@@ -1,0 +1,20 @@
+# F16 · Notifications — mobile E2E (docs/specs/17-f16-notifications/; design.md §4.16)
+# Covers: F16-AC1, F16-AC2, F16-AC4, F16-AC7, F16-AC8, F16-AC9
+# Events are triggered through the API; pushes go through the test push provider.
+# "Report published" is the only MVP push event (FR-NOT-004).
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F16 push — register, preferences, deep link, sign-out removes token
+tags:
+  - pending
+  - F16
+  - US-066
+  - US-067
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as parent.p1; allow notifications → token registered (API check).                        (F16-AC1)
+# 2. Settings → Notifications: only Android push options; no email, SMS, or WhatsApp.                  (F16-AC9)
+# 3. Turn "report published" off; publish S1's report → no push.                                       (F16-AC8)
+# 4. Turn it on; publish again → one push with generic text.                                           (F16-AC2)
+# 5. Tap the push → the app opens S1's report after authentication.                                    (F16-AC4)
+# 6. Sign out; publish again → no push to this device.                                                 (F16-AC7)

@@ -1,0 +1,16 @@
+# Subflow: sign out from any screen, accepting the unsynced-changes warning if shown.
+appId: ${APP_ID}
+---
+- tapOn:
+    id: "nav.more"
+- tapOn:
+    id: "settings.signOut"
+- runFlow:
+    when:
+      visible:
+        id: "signout.unsyncedWarning"
+    commands:
+      - tapOn:
+          id: "signout.signOutAnyway"
+- assertVisible:
+    id: "signin.screen"

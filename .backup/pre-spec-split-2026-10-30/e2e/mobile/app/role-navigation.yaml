@@ -1,0 +1,17 @@
+# App-wide — role-aware navigation (design.md §3.1–§3.3, §10 Roles and privacy)
+# Covers: APP-NAV-01…05
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: APP navigation — each role sees exactly its navigation
+tags:
+  - pending
+  - APP
+---
+- launchApp:
+    clearState: true
+# 1. teacher.a1: bottom nav Home, Students, Daily Entry (prominent), Homework, Reports; More has Classes view,
+#    Timetable, Holidays, Attendance history, Import/export, Sync queue, Settings, Language, Help.     (APP-NAV-01)
+# 2. admin.a: organization overview, Members and roles, Classes, Students, Schedule, Excused absences,
+#    Import/export, Reports, Audit history, Madrasa settings.                                          (APP-NAV-02)
+# 3. owner.a: everything admin.a has.                                                                  (APP-NAV-03)
+# 4. student.s1: read-only Home and Reports; no Daily Entry, Homework edit, Sync queue, or Settings beyond language/profile. (APP-NAV-04)
+# 5. parent.p1: child switcher, Home, Reports; no search, no edit controls.                            (APP-NAV-05)

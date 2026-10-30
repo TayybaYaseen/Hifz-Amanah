@@ -1,0 +1,12 @@
+# F07 · Mistakes and quality — mobile E2E (docs/specs/10-f07-mistakes-quality/; decision review 2026-10-30, SRS §17)
+# Covers: F07-AC14
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F07 explicit No mistakes
+tags:
+  - pending
+  - F07
+  - US-028
+---
+- launchApp:
+    clearState: true
+# 1. Given a portion attempt, when the Teacher chooses "No mistakes", then a mistake count of 0 is stored. An attempt with no mistakes entered and no "No mistakes" choice is shown and counted as "Not recorded". (F07-AC14)

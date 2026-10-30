@@ -1,0 +1,17 @@
+# F13 · PDF and print — mobile E2E (docs/specs/16-f13-pdf-print/; design.md §4.10 actions)
+# Covers: F13-AC1, F13-AC2, F13-AC4, F13-AC11
+# Content and layout are verified on the API side (e2e/api/f13-pdf.spec.ts); this flow checks the user path.
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F13 PDF — export weekly and Urdu monthly PDFs from Reports
+tags:
+  - pending
+  - F13
+  - US-055
+  - US-057
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1 → Reports → Weekly → S1 → PDF → the file opens in the viewer.              (F13-AC1)
+# 2. Switch to Urdu → Monthly → PDF → the file opens; screenshot is right to left; quality shows "۲ · اچھا". (F13-AC2, F13-AC4)
+# 3. Go offline → PDF action says it needs a connection.
+# 4. Deep link to S3's report PDF → permission-denied state.                                           (F13-AC11)

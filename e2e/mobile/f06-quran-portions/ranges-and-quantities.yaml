@@ -1,0 +1,22 @@
+# F06 · Quran portions and metadata — mobile E2E (docs/specs/07-f06-quran-portions-metadata/; design.md §5.3)
+# Covers: F06-AC5, F06-AC6, F06-AC7, F06-AC8, F06-AC9, F06-AC10, F06-AC11, F06-AC12, F06-AC13, F06-AC14, F06-AC15
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F06 portions — Para and Ayat validation, presets, remaining, units never mixed
+tags:
+  - pending
+  - F06
+  - US-025
+  - US-026
+  - US-027
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1 → Daily Entry S1 → Sabaq.
+# 2. Para 31 → field error; Para 30 → accepted.                                                        (F06-AC5)
+# 3. 7-Ayat Surah, Ayat 3–9 → error naming 7; Ayat 5–2 → range error.                                  (F06-AC6, F06-AC7)
+# 4. Unit picker shows Rubu (1/4), Half (1/2), Salasah (3/4), Complete, Lines, Ayat, Pages.            (F06-AC11)
+# 5. Assigned Salasah → shown "Salasah (3/4 Para)"; completed Half → remaining 1/4 Para.               (F06-AC10, F06-AC12)
+# 6. Completed Complete → error on completed.                                                          (F06-AC14)
+# 7. Sabqi: Lines, assigned 10, completed 6 → remaining 4 lines; 2.5 lines is not accepted.            (F06-AC8, F06-AC9)
+# 8. Type 6 then change the unit from Lines to Pages → prompt to keep or clear the value.              (F06-AC15)
+# 9. Save; weekly report shows one Lines total and one Para total, never combined.                     (F06-AC13)

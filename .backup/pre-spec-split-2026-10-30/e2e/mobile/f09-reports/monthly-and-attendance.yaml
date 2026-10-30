@@ -1,0 +1,18 @@
+# F09 · Weekly and monthly reports — mobile E2E (docs/specs/F09-weekly-monthly-reports.md; design.md §4.10, §4.14)
+# Covers: F09-AC2, F09-AC8, F09-AC9, F09-AC10, F09-AC11, F09-AC12, F09-AC13
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F09 monthly report — sections, homework measures, difficulty, attendance categories
+tags:
+  - pending
+  - F09
+---
+- launchApp:
+    clearState: true
+# Precondition: a seeded synthetic month for S1 with known expected totals.
+# 1. Sign in as admin.a → Reports → Monthly → S1: every shown total equals the seed's expected value.   (F09-AC2)
+# 2. Sabaq, Sabqi, Manzil summaries are separate with Para-wise progress and pending portions.         (F09-AC8)
+# 3. Homework: assigned, attempted, completed, carried forward shown separately.                       (F09-AC9)
+# 4. Recurring difficulty lists Para 7 with counts by category.                                        (F09-AC10)
+# 5. Attendance: 2 absences; performance lists only recited days, no failed or zero entries.           (F09-AC11)
+# 6. Holiday and Sunday shown as holiday and no class, not absences.                                   (F09-AC12)
+# 7. 1 excused absence and 2 normal absences shown separately.                                         (F09-AC13)

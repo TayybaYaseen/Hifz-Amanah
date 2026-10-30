@@ -1,0 +1,12 @@
+# F02 · Organization and roles — mobile E2E (docs/specs/03-f02-organization-roles/; decision review 2026-10-30, SRS §17)
+# Covers: F02-AC16
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F02 no self sign-up or in-app workspace creation
+tags:
+  - pending
+  - F02
+  - US-007
+---
+- launchApp:
+    clearState: true
+# 1. Given the app and the public API, when a person who has no account looks for a way to create a workspace, then there is no sign-up or create-workspace action or endpoint. A workspace and its first Owner exist only after the platform operator creates them. (F02-AC16)

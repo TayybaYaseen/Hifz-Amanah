@@ -1,0 +1,16 @@
+# F01 · Identity — mobile E2E (docs/specs/F01-identity-authentication.md; design.md §13 US-003…005)
+# Covers: F01-AC12, F01-AC13, F01-AC14, F01-AC16, F01-AC18
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F01 accounts — Admin creates Teacher, Student, Parent with shared email
+tags:
+  - pending
+  - F01
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as admin.a → More → Accounts → Add.
+# 2. Create a Teacher with User ID teacher.new → saved.                                                (F01-AC12)
+# 3. Create another account with User ID teacher.a1 → "User ID already in use".                        (F01-AC14)
+# 4. Enter a password that breaks the policy → field error; nothing saved.                              (F01-AC16)
+# 5. Create Student student.new and Parent parent.new with the same email → both saved.                 (F01-AC18)
+# 6. Sign out; sign in as teacher.a1 → More has no Accounts entry.                                      (F01-AC13)

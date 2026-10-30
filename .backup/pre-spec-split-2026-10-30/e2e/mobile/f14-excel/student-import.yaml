@@ -1,0 +1,18 @@
+# F14 · Excel import and export — mobile E2E (docs/specs/F14-excel-import-export.md; design.md §4.15)
+# Covers: F14-AC1, F14-AC2, F14-AC3, F14-AC4, F14-AC5, F14-AC11, F14-AC12
+# Workbooks are pushed to the device from e2e/fixtures/workbooks (built by the test; see workbooks.md).
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F14 student import — preview, confirm, re-import, rejections
+tags:
+  - pending
+  - F14
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as admin.a → More → Import → Students → explains the template version.
+# 2. Pick students-1001.xlsx → "Maximum 1,000 rows per file — split into several files".               (F14-AC2)
+# 3. Pick students-missing-name.xlsx → names the expected version and the missing column.              (F14-AC3)
+# 4. Pick students-mixed.xlsx (Urdu UI) → counts per row class; errors on their row and field in Urdu;
+#    the name-only row is a suspected duplicate.                                                       (F14-AC11, F14-AC12, F14-AC5)
+# 5. Pick students-50.xlsx → 50 new → Confirm → results: 50 created.                                   (F14-AC1)
+# 6. Pick students-50.xlsx again → 50 exact matches, 0 new.                                            (F14-AC4)

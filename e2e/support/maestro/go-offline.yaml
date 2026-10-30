@@ -1,0 +1,4 @@
+# Subflow: turn on airplane mode so the app has no connection.
+appId: ${APP_ID}
+---
+- setAirplaneMode: enabled

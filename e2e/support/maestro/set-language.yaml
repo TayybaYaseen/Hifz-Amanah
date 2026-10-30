@@ -1,0 +1,8 @@
+# Subflow: switch the interface language.
+# env: LOCALE = en | ur | ur-Latn
+appId: ${APP_ID}
+---
+- tapOn:
+    id: "language.picker"
+- tapOn:
+    id: "language.option.${LOCALE}"

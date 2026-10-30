@@ -1,0 +1,13 @@
+# F05 · Daily Hifz entry — mobile E2E (docs/specs/09-f05-daily-hifz-entry/; decision review 2026-10-30, SRS §17)
+# Covers: F05-AC17, F05-AC18
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F05 no future dates; no portions while Absent or on Leave
+tags:
+  - pending
+  - F05
+  - US-018
+---
+- launchApp:
+    clearState: true
+# 1. Given the date tomorrow in the madrasa timezone, when a Teacher tries to create a daily record for it, then it is refused. A record for an earlier date is accepted. (F05-AC17)
+# 2. Given a student marked Absent or on Leave for the date, when the Teacher tries to add a portion in Daily Entry, then it is refused, and the app offers "Change to Late". (F05-AC18)

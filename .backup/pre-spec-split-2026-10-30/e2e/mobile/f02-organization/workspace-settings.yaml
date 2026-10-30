@@ -1,0 +1,15 @@
+# F02 · Organization and roles — mobile E2E (docs/specs/F02-organization-roles.md; design.md §4.16)
+# Covers: F02-AC1, F02-AC2, F02-AC3, F02-AC4
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F02 settings — defaults, Admin edits, empty name, no controls for others
+tags:
+  - pending
+  - F02
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as admin.a → Settings → Madrasa: Asia/Karachi, Monday, one report per student/date.     (F02-AC1)
+# 2. Clear the name and save → name field error; nothing saved.                                        (F02-AC3)
+# 3. Change the timezone and save → saved; the weekly report header shows the new timezone.            (F02-AC2)
+# 4. Sign out; sign in as teacher.a1 → Settings shows no Madrasa edit controls.                        (F02-AC4)
+# 5. Repeat step 4 as student.s1 and parent.p1.                                                        (F02-AC4)

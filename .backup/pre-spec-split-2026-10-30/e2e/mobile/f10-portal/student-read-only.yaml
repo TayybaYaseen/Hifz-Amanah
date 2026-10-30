@@ -1,0 +1,15 @@
+# F10 · Student and Parent access — mobile E2E (docs/specs/F10-student-parent-access.md; design.md §4.11)
+# Covers: F10-AC1, F10-AC2, F10-AC3, F10-AC4
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F10 student — own published reports, read-only, offline state
+tags:
+  - pending
+  - F10
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as student.s1 → Reports lists only S1's published periods; no edit control on any screen. (F10-AC1)
+# 2. An unpublished period is not listed.                                                              (F10-AC3)
+# 3. Open a deep link to S2's report → permission-denied state, same as a missing report.             (F10-AC2)
+# 4. Go offline; relaunch → "network unavailable" state with no cached report data.                    (F10-AC4)
+# 5. With no published data (fresh student) → "No report is available yet", no empty chart.

@@ -1,0 +1,16 @@
+# F17 · Security, audit, and administration — mobile E2E (docs/specs/05-f17-security-audit-admin/)
+# Covers: F17-AC12, F17-AC4
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F17 reset — other sessions signed out; removed member refused
+tags:
+  - pending
+  - F17
+  - US-068
+  - US-070
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1 on this device.
+# 2. Reset teacher.a1's password via OTP through the API (another device).
+# 3. The next action on this device shows the sign-in prompt.                                          (F17-AC12)
+# 4. admin.a removes teacher.a2 (API); teacher.a2 signs in on this device → refused.                   (F17-AC4)

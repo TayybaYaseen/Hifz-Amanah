@@ -1,0 +1,13 @@
+# F03 · Classes and students — mobile E2E (docs/specs/06-f03-classes-students/; decision review 2026-10-30, SRS §17)
+# Covers: F03-AC15, F03-AC17
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F03 Teacher adds students in assigned classes; minimal student form
+tags:
+  - pending
+  - F03
+  - US-011
+---
+- launchApp:
+    clearState: true
+# 1. Given a Teacher assigned to Class A, when they add or edit a student in Class A, then it is saved and audited. Adding or editing a student in a class they are not assigned to is refused. (F03-AC15)
+# 2. Given the add-student form, when it opens, then only name and class are required; roll number / External Student ID, admission date, and private notes are optional; and there is no date of birth, address, phone, or photo field. (F03-AC17)

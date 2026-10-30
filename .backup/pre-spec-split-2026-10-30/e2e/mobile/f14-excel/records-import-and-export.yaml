@@ -1,0 +1,17 @@
+# F14 · Excel import and export — mobile E2E (docs/specs/F14-excel-import-export.md; design.md §4.15)
+# Covers: F14-AC6, F14-AC7, F14-AC13, F14-AC14, F14-AC16, F14-AC17
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F14 records import, update mode, and export
+tags:
+  - pending
+  - F14
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as admin.a → Import → DailyRecords → daily-records-s1.xlsx → preview → confirm;
+#    S1's weekly report includes the imported portions.                                                (F14-AC6)
+# 2. A row with an unknown student shows "Student not found in this madrasa".                         (F14-AC7)
+# 3. Import students-renamed.xlsx in the default mode → S1's name unchanged.                           (F14-AC13)
+# 4. Choose update mode → before/after per field; Cancel → nothing changed; Confirm → changed.        (F14-AC14)
+# 5. Sign in as teacher.a1 → Export daily records for this week → file lists only S1, S2.             (F14-AC16)
+# 6. Export with private notes → a warning appears first; a guardian-audience export has no private notes. (F14-AC17)

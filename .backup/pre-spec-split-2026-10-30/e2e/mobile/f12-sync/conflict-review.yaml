@@ -1,0 +1,17 @@
+# F12 · Offline and synchronization — mobile E2E (docs/specs/F12-offline-sync.md; design.md §4.13)
+# Covers: F12-AC11, F12-AC12, F12-AC13
+# Maestro drives one device; the second device's edit is made through the API from the same base version.
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F12 conflict — two edits from one base version, review, resolve
+tags:
+  - pending
+  - F12
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1; open a synced Sabqi portion for S1; go offline.
+# 2. Change status to Partial and the portion display order; save.
+# 3. API: change the same portion to Completed and the display order from the same base version.
+# 4. Go online → the record shows "Action required"; display order merged without a conflict.          (F12-AC11, F12-AC13)
+# 5. Conflict review compares both versions in plain language; choose the device version.
+# 6. The conflict closes; Audit history ("View history") shows the resolution.                         (F12-AC12)

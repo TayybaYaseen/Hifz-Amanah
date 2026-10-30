@@ -1,0 +1,15 @@
+# F17 · Security, audit, and administration — mobile E2E (docs/specs/F17-security-audit-admin.md; design.md §3.2)
+# Covers: F17-AC6, F17-AC7, F17-AC8, F17-AC9
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F17 audit — Admin history, record history, other roles refused
+tags:
+  - pending
+  - F17
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as admin.a → change teacher.a2's class assignment.
+# 2. More → Audit history → the entry with actor, action, target, time, summary; filter by actor and date. (F17-AC6)
+# 3. Reset teacher.a1's password (test control) → entry says a reset happened; no OTP or password.     (F17-AC9)
+# 4. Open S1's daily record → View history → changes in time order.                                    (F17-AC7)
+# 5. Sign in as teacher.a1, student.s1, parent.p1 → no Audit history entry; deep link → permission denied. (F17-AC8)

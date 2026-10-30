@@ -1,0 +1,15 @@
+# F10 · Student and Parent access — mobile E2E (docs/specs/F10-student-parent-access.md; design.md §4.6, §5.4)
+# Covers: F10-AC9, F10-AC10, F10-AC11, F10-AC12
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F10 notes — private by default; Parent and Student see only shared notes
+tags:
+  - pending
+  - F10
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1 → S1 record → write note A; visibility shows "Private to staff".             (F10-AC9)
+# 2. Write note B; set "Visible to student/guardian"; save.                                            (F10-AC12)
+# 3. Admin publishes the period (test control).
+# 4. Sign in as parent.p1 → S1 report shows note B, not note A.                                        (F10-AC10, F10-AC11)
+# 5. Sign in as student.s1 → the same.                                                                 (F10-AC10, F10-AC11)

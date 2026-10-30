@@ -1,0 +1,17 @@
+# F05 · Daily Hifz entry — mobile E2E (docs/specs/F05-daily-hifz-entry.md; design.md §4.7, §5.11)
+# Covers: F05-AC3, F05-AC4, F05-AC5, F05-AC14
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F05 daily entry — portion errors, edit notice, Absent, Not Remembered default
+tags:
+  - pending
+  - F05
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1 → Daily Entry S1; add Sabqi · Portion 2 without a unit; save.
+# 2. Error "Sabqi · Portion 2: unit is required"; every entered value is still there.                  (F05-AC3)
+# 3. Manzil Para 10 Not Remembered, assigned Half, no completed → saved; remaining shows 1/2 Para.     (F05-AC14)
+# 4. Correct completed to Rubu → remaining 1/4 Para.                                                   (F05-AC14)
+# 5. With a confirmed homework from this record (test control), edit a portion →
+#    notice "Confirmed homework was not changed"; the draft suggestion updates.                        (F05-AC4)
+# 6. Daily Entry S2 marked Absent → no portion shows as failed; no quality control is enabled.        (F05-AC5)

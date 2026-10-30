@@ -1,0 +1,20 @@
+# F07 · Mistakes and quality — mobile E2E (docs/specs/10-f07-mistakes-quality/; design.md §4.7, §4.10)
+# Covers: F07-AC6, F07-AC7, F07-AC8, F07-AC9, F07-AC10, F07-AC12, F07-AC13
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F07 quality — scale order, not recorded, averages, separate overall label
+tags:
+  - pending
+  - F07
+  - US-031
+  - US-032
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1 → Daily Entry S1 → Sabaq quality selector:
+#    "Not assessed" selected; options "1 · Excellent" … "5 · Weak" in order.                           (F07-AC6)
+# 2. Switch to Urdu → "۱ · ممتاز" … "۵ · کمزور"; to Roman Urdu → "1 · Mumtaz" … "5 · Kamzor".           (F07-AC6)
+# 3. Leave Sabqi quality blank; save → Sabqi shows "Not recorded".                                     (F07-AC7)
+# 4. Set a Manzil portion to Pending → quality selector disabled.                                      (F07-AC10)
+# 5. Choose overall performance "Good" (captioned "Overall performance"); portion scores unchanged.     (F07-AC12, F07-AC13)
+# 6. Seed scores 1, 2, 2 and one blank this week → report shows "1.7 · Good (3 ratings)".              (F07-AC8)
+# 7. Seed scores 1 and 2 for S2 → report shows "1.5 · Good (2 ratings)".                               (F07-AC9)

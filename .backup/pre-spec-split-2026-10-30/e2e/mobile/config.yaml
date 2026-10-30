@@ -1,0 +1,9 @@
+# Maestro workspace config for HifzAmanah mobile E2E.
+# Run all:        npm run e2e:mobile -- -e APP_ID=<android application id>
+# Run one spec:   npm run e2e:mobile -- --include-tags F05 -e APP_ID=...
+# Flows tagged "pending" are written ahead of implementation and are skipped.
+# A spec cannot pass its gate while any of its flows is still pending (e2e/README.md).
+flows:
+  - "*/*"
+excludeTags:
+  - pending

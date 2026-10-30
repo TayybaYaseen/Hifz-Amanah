@@ -1,0 +1,14 @@
+# F08 · Homework and carry forward — mobile E2E (docs/specs/11-f08-homework-carry-forward/; decision review 2026-10-30, SRS §17)
+# Covers: F08-AC19, F08-AC20
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F08 offline confirmation and carried-over homework
+tags:
+  - pending
+  - F08
+  - US-038
+  - US-037
+---
+- launchApp:
+    clearState: true
+# 1. Given confirmed homework due on a day the student is Absent or on Leave, or that becomes a holiday, when the next class day comes, then the same homework is shown as outstanding and labelled "carried over — absent/holiday". It is not counted as failed, and the confirmed assignment is unchanged. (F08-AC19)
+# 2. Given no internet connection, when the Teacher confirms a draft, then it shows "Confirmed on device — waiting to sync", and after sync it becomes Confirmed with the Teacher and the original confirmation time. (F08-AC20)

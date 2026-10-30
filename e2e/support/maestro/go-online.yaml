@@ -1,0 +1,8 @@
+# Subflow: turn off airplane mode and wait for the sync banner to settle.
+appId: ${APP_ID}
+---
+- setAirplaneMode: disabled
+- extendedWaitUntil:
+    visible:
+      id: "sync.banner.synced"
+    timeout: 60000

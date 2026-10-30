@@ -1,0 +1,17 @@
+# F04 · Calendar and attendance — mobile E2E (docs/specs/08-f04-calendar-attendance/; decision review 2026-10-30, SRS §17)
+# Covers: F04-AC18, F04-AC19, F04-AC20, F04-AC21
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F04 Late, Half day, Leave in Bulk Entry; Absent after reciting; late holiday
+tags:
+  - pending
+  - F04
+  - US-015
+  - US-014
+  - US-016
+---
+- launchApp:
+    clearState: true
+# 1. Given a student already saved as Absent, when the Teacher changes them to Late, or changes a Present student to Half day, then the record changes, the change is audited, and Hifz portions can be recorded for that student that day. (F04-AC18)
+# 2. Given a student who already has recited portions saved for the date, when the Teacher marks them Absent in Bulk Entry, then the row suggests "Mark Late instead". If the Teacher keeps Absent, the row cannot save until an internal note with the reason is entered, and the recited portions are unchanged. (F04-AC19)
+# 3. Given attendance or daily records already saved for a date, when the Admin declares a holiday on it, then the Admin is warned with the number of records and must confirm. After confirming, the date is not a working day, those records are excluded from reports and homework suggestions but kept in history, and new entries for that date are refused. (F04-AC20)
+# 4. Given Bulk Entry, when the Teacher chooses Leave for a student, then a reason is required on that row, and after saving the row shows "Leave — awaiting approval". (F04-AC21)

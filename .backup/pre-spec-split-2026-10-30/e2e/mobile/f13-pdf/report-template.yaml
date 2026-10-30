@@ -1,0 +1,14 @@
+# F13 · PDF and print — mobile E2E (docs/specs/F13-pdf-print.md; design.md §13 US-056)
+# Covers: F13-AC6, F13-AC7, F13-AC9, F13-AC10
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: F13 template — Admin logo and headings; validation; Teacher has no controls; Parent PDF
+tags:
+  - pending
+  - F13
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as admin.a → Settings → Report template → upload a synthetic logo, set heading → preview in all three languages. (F13-AC6)
+# 2. Upload a text file and an oversized image → field errors.                                         (F13-AC9)
+# 3. Sign in as teacher.a1 → Settings has no Report template controls.                                 (F13-AC7)
+# 4. Sign in as parent.p1 → S1 report → PDF → opens with the logo; no private note.                    (F13-AC6, F13-AC10)

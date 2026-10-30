@@ -1,0 +1,16 @@
+# F09 · Weekly and monthly reports — mobile E2E (docs/specs/12-f09-weekly-monthly-reports/; design.md §4.10 states)
+# Covers: F09-AC16, F09-AC15
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F09 reports — provisional offline label; private notes only for staff
+tags:
+  - pending
+  - F09
+  - US-039
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1; go offline; save two entries for S1.
+# 2. Reports → Weekly → S1: "Provisional", last successful sync time, 2 pending changes.                (F09-AC16)
+# 3. Go online; the label clears after sync.
+# 4. A private note is visible to teacher.a1 labelled "Private to staff".
+# 5. Sign in as parent.p1 → the same report has no private note.                                        (F09-AC15)

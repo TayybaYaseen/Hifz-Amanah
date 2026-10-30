@@ -1,0 +1,12 @@
+# F09 · Weekly and monthly reports — mobile E2E (docs/specs/12-f09-weekly-monthly-reports/; decision review 2026-10-30, SRS §17)
+# Covers: F09-AC18
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F09 class summary report
+tags:
+  - pending
+  - F09
+  - US-073
+---
+- launchApp:
+    clearState: true
+# 1. Given a class and a week or month, when the class summary opens, then it has one row per student enrolled during the period with attendance counts (Present, Late, Half day, Leave, Absent), portions completed per section by unit, average quality with the number of ratings, and outstanding confirmed homework, all derived from source records. (F09-AC18)

@@ -1,0 +1,12 @@
+# F11 · Localization and accessibility — mobile E2E (docs/specs/02-f11-localization-accessibility/; decision review 2026-10-30, SRS §17)
+# Covers: F11-AC14
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F11 Western digits in the Urdu interface
+tags:
+  - pending
+  - F11
+  - US-048
+---
+- launchApp:
+    clearState: true
+# 1. Given the Urdu interface, when quantities, dates, and quality scores are shown, then they use Western digits (0–9). (F11-AC14)

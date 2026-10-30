@@ -1,0 +1,18 @@
+# F04 · Calendar and attendance — mobile E2E (docs/specs/08-f04-calendar-attendance/; design.md §4.7, §4.14)
+# Covers: F04-AC13, F04-AC14, F04-AC15, F04-AC16, F04-AC17
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F04 Leave — Teacher marks Leave with a reason, Admin approves and rejects
+tags:
+  - pending
+  - F04
+  - US-016
+  - US-017
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1 → Daily Entry S2 → choose Leave, enter a reason → "Leave — awaiting approval".   (F04-AC13)
+# 2. Choose Leave for S1 with an empty reason → the reason field shows an error; nothing saved.             (F04-AC14)
+# 3. No approve/reject control is visible to teacher.a1.                                                     (F04-AC17)
+# 4. Mark Leave for S1 on another date with a reason.
+# 5. Sign in as admin.a → Leave approvals: two items → approve S2 (confirm), reject S1 (confirm).           (F04-AC15, F04-AC16)
+# 6. Weekly report: 1 Leave and 1 normal absence; teacher.a1 sees "Leave rejected" on S1.                    (F04-AC15, F04-AC16)

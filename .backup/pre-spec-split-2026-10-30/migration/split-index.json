@@ -1,0 +1,884 @@
+[
+  {
+    "feature": "F01",
+    "featureTitle": "F01 · Identity and authentication",
+    "us": "US-001",
+    "file": "f01-identity-authentication/us-001-sign-in-with-user-id.md",
+    "title": "Sign in with User ID",
+    "acIds": [
+      "F01-AC1",
+      "F01-AC2",
+      "F01-AC3",
+      "F01-AC4",
+      "F01-AC5",
+      "F01-AC6"
+    ]
+  },
+  {
+    "feature": "F01",
+    "featureTitle": "F01 · Identity and authentication",
+    "us": "US-002",
+    "file": "f01-identity-authentication/us-002-recover-password-by-email-otp.md",
+    "title": "Recover password by email OTP",
+    "acIds": [
+      "F01-AC7",
+      "F01-AC8",
+      "F01-AC9",
+      "F01-AC10",
+      "F01-AC11"
+    ]
+  },
+  {
+    "feature": "F01",
+    "featureTitle": "F01 · Identity and authentication",
+    "us": "US-003",
+    "file": "f01-identity-authentication/us-003-admin-creates-accounts.md",
+    "title": "Admin creates accounts",
+    "acIds": [
+      "F01-AC12",
+      "F01-AC13",
+      "F01-AC14"
+    ]
+  },
+  {
+    "feature": "F01",
+    "featureTitle": "F01 · Identity and authentication",
+    "us": "US-004",
+    "file": "f01-identity-authentication/us-004-admin-sets-initial-passwords.md",
+    "title": "Admin sets initial passwords",
+    "acIds": [
+      "F01-AC15",
+      "F01-AC16",
+      "F01-AC17"
+    ]
+  },
+  {
+    "feature": "F01",
+    "featureTitle": "F01 · Identity and authentication",
+    "us": "US-005",
+    "file": "f01-identity-authentication/us-005-use-shared-email-safely.md",
+    "title": "Use shared email safely",
+    "acIds": [
+      "F01-AC18",
+      "F01-AC19"
+    ]
+  },
+  {
+    "feature": "F01",
+    "featureTitle": "F01 · Identity and authentication",
+    "us": "US-006",
+    "file": "f01-identity-authentication/us-006-separate-accounts-per-madrasa.md",
+    "title": "Separate accounts per madrasa",
+    "acIds": [
+      "F01-AC20",
+      "F01-AC21",
+      "F01-AC22"
+    ]
+  },
+  {
+    "feature": "F02",
+    "featureTitle": "F02 · Organization and roles",
+    "us": "US-007",
+    "file": "f02-organization-roles/us-007-create-madrasa-workspace.md",
+    "title": "Create madrasa workspace",
+    "acIds": [
+      "F02-AC1",
+      "F02-AC2",
+      "F02-AC3",
+      "F02-AC4",
+      "F02-AC5"
+    ]
+  },
+  {
+    "feature": "F02",
+    "featureTitle": "F02 · Organization and roles",
+    "us": "US-008",
+    "file": "f02-organization-roles/us-008-restrict-teacher-scope.md",
+    "title": "Restrict teacher scope",
+    "acIds": [
+      "F02-AC6",
+      "F02-AC7",
+      "F02-AC8",
+      "F02-AC9"
+    ]
+  },
+  {
+    "feature": "F02",
+    "featureTitle": "F02 · Organization and roles",
+    "us": "US-009",
+    "file": "f02-organization-roles/us-009-audit-sensitive-changes.md",
+    "title": "Audit sensitive changes",
+    "acIds": [
+      "F02-AC10",
+      "F02-AC11",
+      "F02-AC12",
+      "F02-AC13"
+    ]
+  },
+  {
+    "feature": "F03",
+    "featureTitle": "F03 · Classes and students",
+    "us": "US-010",
+    "file": "f03-classes-students/us-010-create-and-maintain-classes.md",
+    "title": "Create and maintain classes",
+    "acIds": [
+      "F03-AC1",
+      "F03-AC2",
+      "F03-AC3",
+      "F03-AC4",
+      "F03-AC5"
+    ]
+  },
+  {
+    "feature": "F03",
+    "featureTitle": "F03 · Classes and students",
+    "us": "US-011",
+    "file": "f03-classes-students/us-011-create-student-profiles.md",
+    "title": "Create student profiles",
+    "acIds": [
+      "F03-AC6",
+      "F03-AC7",
+      "F03-AC8",
+      "F03-AC9",
+      "F03-AC10"
+    ]
+  },
+  {
+    "feature": "F03",
+    "featureTitle": "F03 · Classes and students",
+    "us": "US-012",
+    "file": "f03-classes-students/us-012-enroll-students.md",
+    "title": "Enroll students",
+    "acIds": [
+      "F03-AC11",
+      "F03-AC12",
+      "F03-AC13"
+    ]
+  },
+  {
+    "feature": "F04",
+    "featureTitle": "F04 · Calendar and attendance",
+    "us": "US-013",
+    "file": "f04-calendar-attendance/us-013-configure-class-timetable.md",
+    "title": "Configure class timetable",
+    "acIds": [
+      "F04-AC1",
+      "F04-AC2"
+    ]
+  },
+  {
+    "feature": "F04",
+    "featureTitle": "F04 · Calendar and attendance",
+    "us": "US-014",
+    "file": "f04-calendar-attendance/us-014-manage-holidays-and-closures.md",
+    "title": "Manage holidays and closures",
+    "acIds": [
+      "F04-AC3",
+      "F04-AC4",
+      "F04-AC5"
+    ]
+  },
+  {
+    "feature": "F04",
+    "featureTitle": "F04 · Calendar and attendance",
+    "us": "US-015",
+    "file": "f04-calendar-attendance/us-015-record-attendance-in-bulk.md",
+    "title": "Record attendance in bulk",
+    "acIds": [
+      "F04-AC6",
+      "F04-AC7",
+      "F04-AC8",
+      "F04-AC9",
+      "F04-AC10",
+      "F04-AC11",
+      "F04-AC12"
+    ]
+  },
+  {
+    "feature": "F04",
+    "featureTitle": "F04 · Calendar and attendance",
+    "us": "US-016",
+    "file": "f04-calendar-attendance/us-016-request-excused-absence.md",
+    "title": "Request excused absence",
+    "acIds": [
+      "F04-AC13",
+      "F04-AC14"
+    ]
+  },
+  {
+    "feature": "F04",
+    "featureTitle": "F04 · Calendar and attendance",
+    "us": "US-017",
+    "file": "f04-calendar-attendance/us-017-approve-excused-absence.md",
+    "title": "Approve excused absence",
+    "acIds": [
+      "F04-AC15",
+      "F04-AC16",
+      "F04-AC17"
+    ]
+  },
+  {
+    "feature": "F05",
+    "featureTitle": "F05 · Daily Hifz entry",
+    "us": "US-018",
+    "file": "f05-daily-hifz-entry/us-018-create-individual-daily-report.md",
+    "title": "Create individual daily report",
+    "acIds": [
+      "F05-AC1",
+      "F05-AC2",
+      "F05-AC3",
+      "F05-AC4",
+      "F05-AC5"
+    ]
+  },
+  {
+    "feature": "F05",
+    "featureTitle": "F05 · Daily Hifz entry",
+    "us": "US-019",
+    "file": "f05-daily-hifz-entry/us-019-choose-daily-report-mode.md",
+    "title": "Choose daily report mode",
+    "acIds": [
+      "F05-AC6",
+      "F05-AC7",
+      "F05-AC8",
+      "F05-AC9"
+    ]
+  },
+  {
+    "feature": "F05",
+    "featureTitle": "F05 · Daily Hifz entry",
+    "us": "US-020",
+    "file": "f05-daily-hifz-entry/us-020-record-sabaq.md",
+    "title": "Record Sabaq",
+    "acIds": [
+      "F05-AC10"
+    ]
+  },
+  {
+    "feature": "F05",
+    "featureTitle": "F05 · Daily Hifz entry",
+    "us": "US-021",
+    "file": "f05-daily-hifz-entry/us-021-record-sabqi-portions.md",
+    "title": "Record Sabqi portions",
+    "acIds": [
+      "F05-AC11",
+      "F05-AC12"
+    ]
+  },
+  {
+    "feature": "F05",
+    "featureTitle": "F05 · Daily Hifz entry",
+    "us": "US-022",
+    "file": "f05-daily-hifz-entry/us-022-record-manzil-portions.md",
+    "title": "Record Manzil portions",
+    "acIds": [
+      "F05-AC13",
+      "F05-AC14"
+    ]
+  },
+  {
+    "feature": "F05",
+    "featureTitle": "F05 · Daily Hifz entry",
+    "us": "US-023",
+    "file": "f05-daily-hifz-entry/us-023-record-repeated-attempts.md",
+    "title": "Record repeated attempts",
+    "acIds": [
+      "F05-AC15",
+      "F05-AC16"
+    ]
+  },
+  {
+    "feature": "F06",
+    "featureTitle": "F06 · Quran portions and metadata",
+    "us": "US-024",
+    "file": "f06-quran-portions-metadata/us-024-maintain-quran-metadata.md",
+    "title": "Maintain Quran metadata",
+    "acIds": [
+      "F06-AC1",
+      "F06-AC2",
+      "F06-AC3",
+      "F06-AC4"
+    ]
+  },
+  {
+    "feature": "F06",
+    "featureTitle": "F06 · Quran portions and metadata",
+    "us": "US-025",
+    "file": "f06-quran-portions-metadata/us-025-select-para-and-ayat-range.md",
+    "title": "Select Para and Ayat range",
+    "acIds": [
+      "F06-AC5",
+      "F06-AC6",
+      "F06-AC7"
+    ]
+  },
+  {
+    "feature": "F06",
+    "featureTitle": "F06 · Quran portions and metadata",
+    "us": "US-026",
+    "file": "f06-quran-portions-metadata/us-026-use-15-line-mushaf.md",
+    "title": "Use 15-line Mushaf",
+    "acIds": [
+      "F06-AC8",
+      "F06-AC9"
+    ]
+  },
+  {
+    "feature": "F06",
+    "featureTitle": "F06 · Quran portions and metadata",
+    "us": "US-027",
+    "file": "f06-quran-portions-metadata/us-027-select-portion-quantities.md",
+    "title": "Select portion quantities",
+    "acIds": [
+      "F06-AC10",
+      "F06-AC11",
+      "F06-AC12",
+      "F06-AC13",
+      "F06-AC14",
+      "F06-AC15"
+    ]
+  },
+  {
+    "feature": "F07",
+    "featureTitle": "F07 · Mistakes and quality",
+    "us": "US-028",
+    "file": "f07-mistakes-quality/us-028-record-mistake-categories.md",
+    "title": "Record mistake categories",
+    "acIds": [
+      "F07-AC1",
+      "F07-AC2",
+      "F07-AC3"
+    ]
+  },
+  {
+    "feature": "F07",
+    "featureTitle": "F07 · Mistakes and quality",
+    "us": "US-029",
+    "file": "f07-mistakes-quality/us-029-set-mistake-severity.md",
+    "title": "Set mistake severity",
+    "acIds": [
+      "F07-AC4"
+    ]
+  },
+  {
+    "feature": "F07",
+    "featureTitle": "F07 · Mistakes and quality",
+    "us": "US-030",
+    "file": "f07-mistakes-quality/us-030-flag-repeated-mistakes.md",
+    "title": "Flag repeated mistakes",
+    "acIds": [
+      "F07-AC5"
+    ]
+  },
+  {
+    "feature": "F07",
+    "featureTitle": "F07 · Mistakes and quality",
+    "us": "US-031",
+    "file": "f07-mistakes-quality/us-031-rate-quality-1-5.md",
+    "title": "Rate quality 1–5",
+    "acIds": [
+      "F07-AC6",
+      "F07-AC7",
+      "F07-AC8",
+      "F07-AC9",
+      "F07-AC10",
+      "F07-AC11"
+    ]
+  },
+  {
+    "feature": "F07",
+    "featureTitle": "F07 · Mistakes and quality",
+    "us": "US-032",
+    "file": "f07-mistakes-quality/us-032-set-overall-performance-label.md",
+    "title": "Set overall performance label",
+    "acIds": [
+      "F07-AC12",
+      "F07-AC13"
+    ]
+  },
+  {
+    "feature": "F08",
+    "featureTitle": "F08 · Homework and carry forward",
+    "us": "US-033",
+    "file": "f08-homework-carry-forward/us-033-create-structured-homework.md",
+    "title": "Create structured homework",
+    "acIds": [
+      "F08-AC1",
+      "F08-AC2"
+    ]
+  },
+  {
+    "feature": "F08",
+    "featureTitle": "F08 · Homework and carry forward",
+    "us": "US-034",
+    "file": "f08-homework-carry-forward/us-034-calculate-remaining-work.md",
+    "title": "Calculate remaining work",
+    "acIds": [
+      "F08-AC3",
+      "F08-AC4"
+    ]
+  },
+  {
+    "feature": "F08",
+    "featureTitle": "F08 · Homework and carry forward",
+    "us": "US-035",
+    "file": "f08-homework-carry-forward/us-035-suggest-carry-forward.md",
+    "title": "Suggest carry-forward",
+    "acIds": [
+      "F08-AC5",
+      "F08-AC6",
+      "F08-AC7"
+    ]
+  },
+  {
+    "feature": "F08",
+    "featureTitle": "F08 · Homework and carry forward",
+    "us": "US-036",
+    "file": "f08-homework-carry-forward/us-036-review-homework-suggestion.md",
+    "title": "Review homework suggestion",
+    "acIds": [
+      "F08-AC8",
+      "F08-AC9"
+    ]
+  },
+  {
+    "feature": "F08",
+    "featureTitle": "F08 · Homework and carry forward",
+    "us": "US-037",
+    "file": "f08-homework-carry-forward/us-037-confirm-next-assignment.md",
+    "title": "Confirm next assignment",
+    "acIds": [
+      "F08-AC10",
+      "F08-AC11",
+      "F08-AC12"
+    ]
+  },
+  {
+    "feature": "F08",
+    "featureTitle": "F08 · Homework and carry forward",
+    "us": "US-038",
+    "file": "f08-homework-carry-forward/us-038-preserve-homework-history.md",
+    "title": "Preserve homework history",
+    "acIds": [
+      "F08-AC13",
+      "F08-AC14",
+      "F08-AC15",
+      "F08-AC16"
+    ]
+  },
+  {
+    "feature": "F09",
+    "featureTitle": "F09 · Weekly and monthly reports",
+    "us": "US-039",
+    "file": "f09-weekly-monthly-reports/us-039-view-weekly-report.md",
+    "title": "View weekly report",
+    "acIds": [
+      "F09-AC1",
+      "F09-AC2",
+      "F09-AC3",
+      "F09-AC4",
+      "F09-AC5",
+      "F09-AC6",
+      "F09-AC7",
+      "F09-AC15",
+      "F09-AC16"
+    ]
+  },
+  {
+    "feature": "F09",
+    "featureTitle": "F09 · Weekly and monthly reports",
+    "us": "US-040",
+    "file": "f09-weekly-monthly-reports/us-040-view-monthly-report.md",
+    "title": "View monthly report",
+    "acIds": [
+      "F09-AC8",
+      "F09-AC9",
+      "F09-AC10"
+    ]
+  },
+  {
+    "feature": "F09",
+    "featureTitle": "F09 · Weekly and monthly reports",
+    "us": "US-041",
+    "file": "f09-weekly-monthly-reports/us-041-separate-attendance-and-performance.md",
+    "title": "Separate attendance and performance",
+    "acIds": [
+      "F09-AC11",
+      "F09-AC12"
+    ]
+  },
+  {
+    "feature": "F09",
+    "featureTitle": "F09 · Weekly and monthly reports",
+    "us": "US-042",
+    "file": "f09-weekly-monthly-reports/us-042-show-excused-and-normal-absence.md",
+    "title": "Show excused and normal absence",
+    "acIds": [
+      "F09-AC13"
+    ]
+  },
+  {
+    "feature": "F09",
+    "featureTitle": "F09 · Weekly and monthly reports",
+    "us": "US-043",
+    "file": "f09-weekly-monthly-reports/us-043-show-portion-level-outcomes.md",
+    "title": "Show portion-level outcomes",
+    "acIds": [
+      "F09-AC14"
+    ]
+  },
+  {
+    "feature": "F10",
+    "featureTitle": "F10 · Student and Parent access",
+    "us": "US-044",
+    "file": "f10-student-parent-access/us-044-student-views-own-reports.md",
+    "title": "Student views own reports",
+    "acIds": [
+      "F10-AC1",
+      "F10-AC2",
+      "F10-AC3",
+      "F10-AC4"
+    ]
+  },
+  {
+    "feature": "F10",
+    "featureTitle": "F10 · Student and Parent access",
+    "us": "US-045",
+    "file": "f10-student-parent-access/us-045-parent-views-linked-student-reports.md",
+    "title": "Parent views linked student reports",
+    "acIds": [
+      "F10-AC5",
+      "F10-AC6",
+      "F10-AC7",
+      "F10-AC8"
+    ]
+  },
+  {
+    "feature": "F10",
+    "featureTitle": "F10 · Student and Parent access",
+    "us": "US-046",
+    "file": "f10-student-parent-access/us-046-protect-private-teacher-notes.md",
+    "title": "Protect private teacher notes",
+    "acIds": [
+      "F10-AC9",
+      "F10-AC10",
+      "F10-AC11",
+      "F10-AC12"
+    ]
+  },
+  {
+    "feature": "F11",
+    "featureTitle": "F11 · Localization and accessibility",
+    "us": "US-047",
+    "file": "f11-localization-accessibility/us-047-use-english-interface.md",
+    "title": "Use English interface",
+    "acIds": [
+      "F11-AC1",
+      "F11-AC4",
+      "F11-AC11",
+      "F11-AC12",
+      "F11-AC13"
+    ]
+  },
+  {
+    "feature": "F11",
+    "featureTitle": "F11 · Localization and accessibility",
+    "us": "US-048",
+    "file": "f11-localization-accessibility/us-048-use-urdu-interface.md",
+    "title": "Use Urdu interface",
+    "acIds": [
+      "F11-AC2",
+      "F11-AC5",
+      "F11-AC6"
+    ]
+  },
+  {
+    "feature": "F11",
+    "featureTitle": "F11 · Localization and accessibility",
+    "us": "US-049",
+    "file": "f11-localization-accessibility/us-049-use-roman-urdu-interface.md",
+    "title": "Use Roman Urdu interface",
+    "acIds": [
+      "F11-AC3",
+      "F11-AC7"
+    ]
+  },
+  {
+    "feature": "F11",
+    "featureTitle": "F11 · Localization and accessibility",
+    "us": "US-050",
+    "file": "f11-localization-accessibility/us-050-preserve-quran-arabic-text.md",
+    "title": "Preserve Quran Arabic text",
+    "acIds": [
+      "F11-AC8",
+      "F11-AC9",
+      "F11-AC10"
+    ]
+  },
+  {
+    "feature": "F12",
+    "featureTitle": "F12 · Offline and synchronization",
+    "us": "US-051",
+    "file": "f12-offline-sync/us-051-save-daily-work-offline.md",
+    "title": "Save daily work offline",
+    "acIds": [
+      "F12-AC1",
+      "F12-AC2",
+      "F12-AC3",
+      "F12-AC16"
+    ]
+  },
+  {
+    "feature": "F12",
+    "featureTitle": "F12 · Offline and synchronization",
+    "us": "US-052",
+    "file": "f12-offline-sync/us-052-sync-queued-changes.md",
+    "title": "Sync queued changes",
+    "acIds": [
+      "F12-AC4",
+      "F12-AC5",
+      "F12-AC6",
+      "F12-AC7",
+      "F12-AC14",
+      "F12-AC15"
+    ]
+  },
+  {
+    "feature": "F12",
+    "featureTitle": "F12 · Offline and synchronization",
+    "us": "US-053",
+    "file": "f12-offline-sync/us-053-see-sync-status.md",
+    "title": "See sync status",
+    "acIds": [
+      "F12-AC8",
+      "F12-AC9",
+      "F12-AC10"
+    ]
+  },
+  {
+    "feature": "F12",
+    "featureTitle": "F12 · Offline and synchronization",
+    "us": "US-054",
+    "file": "f12-offline-sync/us-054-resolve-conflicting-edits.md",
+    "title": "Resolve conflicting edits",
+    "acIds": [
+      "F12-AC11",
+      "F12-AC12",
+      "F12-AC13"
+    ]
+  },
+  {
+    "feature": "F13",
+    "featureTitle": "F13 · PDF and print",
+    "us": "US-055",
+    "file": "f13-pdf-print/us-055-generate-professional-pdf.md",
+    "title": "Generate professional PDF",
+    "acIds": [
+      "F13-AC1",
+      "F13-AC2",
+      "F13-AC3",
+      "F13-AC4",
+      "F13-AC5"
+    ]
+  },
+  {
+    "feature": "F13",
+    "featureTitle": "F13 · PDF and print",
+    "us": "US-056",
+    "file": "f13-pdf-print/us-056-customize-report-template.md",
+    "title": "Customize report template",
+    "acIds": [
+      "F13-AC6",
+      "F13-AC7",
+      "F13-AC8",
+      "F13-AC9"
+    ]
+  },
+  {
+    "feature": "F13",
+    "featureTitle": "F13 · PDF and print",
+    "us": "US-057",
+    "file": "f13-pdf-print/us-057-apply-report-permissions-to-pdf.md",
+    "title": "Apply report permissions to PDF",
+    "acIds": [
+      "F13-AC10",
+      "F13-AC11",
+      "F13-AC12"
+    ]
+  },
+  {
+    "feature": "F14",
+    "featureTitle": "F14 · Excel import and export",
+    "us": "US-058",
+    "file": "f14-excel-import-export/us-058-import-student-workbook.md",
+    "title": "Import student workbook",
+    "acIds": [
+      "F14-AC1",
+      "F14-AC2",
+      "F14-AC3",
+      "F14-AC4",
+      "F14-AC5",
+      "F14-AC20"
+    ]
+  },
+  {
+    "feature": "F14",
+    "featureTitle": "F14 · Excel import and export",
+    "us": "US-059",
+    "file": "f14-excel-import-export/us-059-import-daily-records.md",
+    "title": "Import daily records",
+    "acIds": [
+      "F14-AC6",
+      "F14-AC7",
+      "F14-AC8",
+      "F14-AC9",
+      "F14-AC10"
+    ]
+  },
+  {
+    "feature": "F14",
+    "featureTitle": "F14 · Excel import and export",
+    "us": "US-060",
+    "file": "f14-excel-import-export/us-060-preview-import-changes.md",
+    "title": "Preview import changes",
+    "acIds": [
+      "F14-AC11",
+      "F14-AC12",
+      "F14-AC13",
+      "F14-AC14",
+      "F14-AC15"
+    ]
+  },
+  {
+    "feature": "F14",
+    "featureTitle": "F14 · Excel import and export",
+    "us": "US-061",
+    "file": "f14-excel-import-export/us-061-export-authorized-data.md",
+    "title": "Export authorized data",
+    "acIds": [
+      "F14-AC16",
+      "F14-AC17",
+      "F14-AC18",
+      "F14-AC19"
+    ]
+  },
+  {
+    "feature": "F15",
+    "featureTitle": "F15 · Analytics and AI recommendations",
+    "us": "US-062",
+    "file": "f15-analytics-ai/us-062-view-deterministic-analytics.md",
+    "title": "View deterministic analytics",
+    "acIds": [
+      "F15-AC1",
+      "F15-AC2",
+      "F15-AC3"
+    ]
+  },
+  {
+    "feature": "F15",
+    "featureTitle": "F15 · Analytics and AI recommendations",
+    "us": "US-063",
+    "file": "f15-analytics-ai/us-063-receive-ai-recommendations.md",
+    "title": "Receive AI recommendations",
+    "acIds": [
+      "F15-AC4",
+      "F15-AC5",
+      "F15-AC6",
+      "F15-AC7",
+      "F15-AC8",
+      "F15-AC9"
+    ]
+  },
+  {
+    "feature": "F15",
+    "featureTitle": "F15 · Analytics and AI recommendations",
+    "us": "US-064",
+    "file": "f15-analytics-ai/us-064-configure-ai-provider-and-limits.md",
+    "title": "Configure AI provider and limits",
+    "acIds": [
+      "F15-AC10",
+      "F15-AC11",
+      "F15-AC12"
+    ]
+  },
+  {
+    "feature": "F15",
+    "featureTitle": "F15 · Analytics and AI recommendations",
+    "us": "US-065",
+    "file": "f15-analytics-ai/us-065-control-ai-data-sharing.md",
+    "title": "Control AI data sharing",
+    "acIds": [
+      "F15-AC13",
+      "F15-AC14",
+      "F15-AC15"
+    ]
+  },
+  {
+    "feature": "F16",
+    "featureTitle": "F16 · Notifications",
+    "us": "US-066",
+    "file": "f16-notifications/us-066-receive-android-push-notifications.md",
+    "title": "Receive Android push notifications",
+    "acIds": [
+      "F16-AC1",
+      "F16-AC2",
+      "F16-AC3",
+      "F16-AC4",
+      "F16-AC5",
+      "F16-AC6",
+      "F16-AC7"
+    ]
+  },
+  {
+    "feature": "F16",
+    "featureTitle": "F16 · Notifications",
+    "us": "US-067",
+    "file": "f16-notifications/us-067-manage-notification-preferences.md",
+    "title": "Manage notification preferences",
+    "acIds": [
+      "F16-AC8",
+      "F16-AC9",
+      "F16-AC10"
+    ]
+  },
+  {
+    "feature": "F17",
+    "featureTitle": "F17 · Security, audit, and administration",
+    "us": "US-068",
+    "file": "f17-security-audit-admin/us-068-enforce-tenant-isolation.md",
+    "title": "Enforce tenant isolation",
+    "acIds": [
+      "F17-AC1",
+      "F17-AC2",
+      "F17-AC3",
+      "F17-AC4",
+      "F17-AC5"
+    ]
+  },
+  {
+    "feature": "F17",
+    "featureTitle": "F17 · Security, audit, and administration",
+    "us": "US-069",
+    "file": "f17-security-audit-admin/us-069-review-audit-history.md",
+    "title": "Review audit history",
+    "acIds": [
+      "F17-AC6",
+      "F17-AC7",
+      "F17-AC8",
+      "F17-AC9"
+    ]
+  },
+  {
+    "feature": "F17",
+    "featureTitle": "F17 · Security, audit, and administration",
+    "us": "US-070",
+    "file": "f17-security-audit-admin/us-070-protect-account-recovery.md",
+    "title": "Protect account recovery",
+    "acIds": [
+      "F17-AC10",
+      "F17-AC11",
+      "F17-AC12",
+      "F17-AC13"
+    ]
+  }
+]

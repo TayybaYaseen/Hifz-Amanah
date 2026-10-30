@@ -1,0 +1,17 @@
+# Cross-feature journey — a new madrasa from first sign-in to the first report
+# Covers: APP-JOURNEY-SETUP (F01, F02, F03, F04, F06, F13)
+# The platform operator creates the madrasa and its first Owner beforehand (FR-ORG-001; test control does this).
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: JOURNEY admin setup — settings, accounts, classes, students, timetable, template
+tags:
+  - pending
+  - APP
+---
+- launchApp:
+    clearState: true
+# 1. The new Owner signs in, sets up the authenticator app, saves the recovery codes, and sets the app lock;
+#    settings show Asia/Karachi, Monday, one report per student/date.
+# 2. Creates a Teacher, two Students, and a Parent (shared email with one Student).
+# 3. Creates a class, assigns the Teacher, enrolls both Students; sets Monday–Saturday and one holiday.
+# 4. Adds Quran metadata for one Surah; uploads a report logo.
+# 5. The Teacher signs in, records one day; the Admin opens the weekly report and exports a PDF.

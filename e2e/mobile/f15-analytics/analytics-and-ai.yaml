@@ -1,0 +1,21 @@
+# F15 · Analytics and AI recommendations — mobile E2E (docs/specs/15-f15-analytics-ai/; design.md §13 US-062…063)
+# Covers: F15-AC1, F15-AC2, F15-AC3, F15-AC4, F15-AC5, F15-AC6
+# The API runs with the AI provider stub.
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F15 analytics — offline provisional, AI online, AI failure
+tags:
+  - pending
+  - F15
+  - US-062
+  - US-063
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1; go offline; save one entry for S1 → Analytics S1:
+#    metrics shown, "Provisional", last sync time, 1 pending change.                                   (F15-AC1, F15-AC2)
+# 2. Quality trend: 1 · Excellent at the top, 5 · Weak at the bottom, gaps for missing ratings;
+#    a falling average is described as improvement.                                                    (F15-AC3)
+# 3. AI button says "AI needs a connection"; no AI text shown.                                         (F15-AC5)
+# 4. Go online → Get AI recommendations → area labelled "AI suggestion — review required"
+#    with date range and metrics, styled apart from metrics.                                           (F15-AC4)
+# 5. Stub set to timeout → "AI unavailable — try again later"; save a Daily Entry and open a report → both work. (F15-AC6)

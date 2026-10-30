@@ -1,0 +1,15 @@
+# App-wide — Teacher Home (design.md §4.4; §13 note: card counts equal the lists they open)
+# Covers: APP-HOME-01…04
+appId: ${APP_ID} # OPEN: Android application ID not yet decided
+name: APP Teacher Home — real counts, drill-down, empty states, offline label
+tags:
+  - pending
+  - APP
+---
+- launchApp:
+    clearState: true
+# 1. Fresh teacher with no data → empty states with a next action; no zero metrics.                    (APP-HOME-01)
+# 2. Seeded teacher.a1 → cards: today's classes, entries not completed, homework drafts, pending sync.
+#    Tap each card → the list it opens has exactly the card's count.                                   (APP-HOME-02)
+# 3. Record Daily Hifz, Bulk Class Entry, Students shortcuts open their screens.                       (APP-HOME-03)
+# 4. Offline → cards labelled provisional/local; the sync banner opens the Sync queue.                 (APP-HOME-04)

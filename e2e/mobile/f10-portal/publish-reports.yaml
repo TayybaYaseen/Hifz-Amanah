@@ -1,0 +1,12 @@
+# F10 · Student and Parent access — mobile E2E (docs/specs/13-f10-student-parent-access/; decision review 2026-10-30, SRS §17)
+# Covers: F10-AC13
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F10 Teacher publishes reports for a class
+tags:
+  - pending
+  - F10
+  - US-044
+---
+- launchApp:
+    clearState: true
+# 1. Given a week whose records are all synced, when the Teacher of that class or an Admin publishes it for the class, then every student's weekly report becomes visible to that student and their linked Parents, and the publish action is audited. (F10-AC13)

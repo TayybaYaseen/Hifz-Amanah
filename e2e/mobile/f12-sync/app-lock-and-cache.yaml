@@ -1,0 +1,15 @@
+# F12 · Offline and synchronization — mobile E2E (docs/specs/04-f12-offline-sync/; decision review 2026-10-30, SRS §17)
+# Covers: F12-AC18, F12-AC19, F12-AC20
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F12 app lock, cache retention, and revocation purge
+tags:
+  - pending
+  - F12
+  - US-051
+  - US-052
+---
+- launchApp:
+    clearState: true
+# 1. Given an Owner or Admin, when they first sign in on a device, then they must set a PIN or fingerprint app lock. A Teacher may skip it. The app locks after 5 minutes in the background. (F12-AC18)
+# 2. Given synced daily records older than 120 days on a device, when the app cleans its cache, then they are removed from the device and still load from the server when online. Unsynced records are never removed. (F12-AC19)
+# 3. Given a device that learns its access was revoked, when the workspace locks, then synced data is purged at once, and unsynced changes stay locked and visible until sign-out or 30 days, then are purged. (F12-AC20)
