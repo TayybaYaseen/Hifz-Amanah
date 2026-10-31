@@ -1,4 +1,4 @@
-// F03 · Classes and students — API E2E (docs/specs/06-f03-classes-students/)
+// F03 · Classes and students — API E2E (docs/specs/06-f03-classes-students.md)
 // Screen journeys: e2e/mobile/f03-roster/.
 import { test } from './support/fixtures';
 

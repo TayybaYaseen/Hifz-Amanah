@@ -1,4 +1,4 @@
-// F10 · Student and Parent access — API E2E (docs/specs/13-f10-student-parent-access/)
+// F10 · Student and Parent access — API E2E (docs/specs/13-f10-student-parent-access.md)
 // Screen journeys: e2e/mobile/f10-portal/.
 import { test } from './support/fixtures';
 

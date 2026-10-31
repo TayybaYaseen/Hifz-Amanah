@@ -1,4 +1,4 @@
-# F07 · Mistakes and quality — mobile E2E (docs/specs/10-f07-mistakes-quality/; design.md §4.7, §4.10)
+# F07 · Mistakes and quality — mobile E2E (docs/specs/10-f07-mistakes-quality.md; design.md §4.7, §4.10)
 # Covers: F07-AC6, F07-AC7, F07-AC8, F07-AC9, F07-AC10, F07-AC12, F07-AC13
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F07 quality — scale order, not recorded, averages, separate overall label

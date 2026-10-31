@@ -1,4 +1,4 @@
-// F03 · Classes and students — unit: enrollment date ranges (docs/specs/06-f03-classes-students/)
+// F03 · Classes and students — unit: enrollment date ranges (docs/specs/06-f03-classes-students.md)
 import { describe, it } from 'vitest';
 
 describe('F03 · enrollment moves', () => {

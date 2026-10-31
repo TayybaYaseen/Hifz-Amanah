@@ -1,4 +1,4 @@
-// F17 · Security, audit, and administration — API E2E (docs/specs/05-f17-security-audit-admin/)
+// F17 · Security, audit, and administration — API E2E (docs/specs/05-f17-security-audit-admin.md)
 // Screen journeys: e2e/mobile/f17-security/. App-wide isolation sweep: e2e/api/journeys/tenant-isolation.spec.ts.
 import { test } from './support/fixtures';
 

@@ -1,4 +1,4 @@
-// F15 · Analytics and AI recommendations — API E2E (docs/specs/15-f15-analytics-ai/)
+// F15 · Analytics and AI recommendations — API E2E (docs/specs/15-f15-analytics-ai.md)
 // The AI provider is a controllable stub; no real provider is called (the launch provider is Deferred to Phase 7, SRS §17 DEC-B45).
 // Screen journeys: e2e/mobile/f15-analytics/.
 import { test } from './support/fixtures';

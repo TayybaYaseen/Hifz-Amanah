@@ -1,4 +1,4 @@
-// F16 · Notifications — unit (docs/specs/17-f16-notifications/)
+// F16 · Notifications — unit (docs/specs/17-f16-notifications.md)
 import { describe, it } from 'vitest';
 
 describe('F16 · payload builder', () => {

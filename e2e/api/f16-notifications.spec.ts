@@ -1,4 +1,4 @@
-// F16 · Notifications — API E2E (docs/specs/17-f16-notifications/)
+// F16 · Notifications — API E2E (docs/specs/17-f16-notifications.md)
 // Pushes go to a test push provider read through control.pushesFor(). The only MVP event is "Report published" (FR-NOT-004).
 // Screen journeys: e2e/mobile/f16-notifications/.
 import { test } from './support/fixtures';

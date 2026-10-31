@@ -1,4 +1,4 @@
-# F12 · Offline and synchronization — mobile E2E (docs/specs/04-f12-offline-sync/; decision review 2026-10-30, SRS §17)
+# F12 · Offline and synchronization — mobile E2E (docs/specs/04-f12-offline-sync.md; decision review 2026-10-30, SRS §17)
 # Covers: F12-AC18, F12-AC19, F12-AC20
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F12 app lock, cache retention, and revocation purge

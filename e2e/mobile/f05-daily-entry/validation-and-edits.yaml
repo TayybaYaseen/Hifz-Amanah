@@ -1,4 +1,4 @@
-# F05 · Daily Hifz entry — mobile E2E (docs/specs/09-f05-daily-hifz-entry/; design.md §4.7, §5.11)
+# F05 · Daily Hifz entry — mobile E2E (docs/specs/09-f05-daily-hifz-entry.md; design.md §4.7, §5.11)
 # Covers: F05-AC3, F05-AC4, F05-AC5, F05-AC14
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F05 daily entry — portion errors, edit notice, Absent, Not Remembered default

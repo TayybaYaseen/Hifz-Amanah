@@ -1,4 +1,4 @@
-// F12 · Offline and synchronization — API E2E (docs/specs/04-f12-offline-sync/)
+// F12 · Offline and synchronization — API E2E (docs/specs/04-f12-offline-sync.md)
 // Sync protocol checks against the server. Device journeys: e2e/mobile/f12-sync/.
 import { test } from './support/fixtures';
 

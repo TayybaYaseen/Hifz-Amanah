@@ -1,4 +1,4 @@
-// F06 · Quran portions and metadata — API E2E (docs/specs/07-f06-quran-portions-metadata/)
+// F06 · Quran portions and metadata — API E2E (docs/specs/07-f06-quran-portions-metadata.md)
 // Screen journeys: e2e/mobile/f06-quran-portions/.
 import { test } from './support/fixtures';
 

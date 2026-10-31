@@ -1,4 +1,4 @@
-# F02 · Organization and roles — mobile E2E (docs/specs/03-f02-organization-roles/; design.md §4.16)
+# F02 · Organization and roles — mobile E2E (docs/specs/03-f02-organization-roles.md; design.md §4.16)
 # Covers: F02-AC1, F02-AC2, F02-AC3, F02-AC4
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F02 settings — defaults, Admin edits, empty name, no controls for others

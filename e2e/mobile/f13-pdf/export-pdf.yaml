@@ -1,4 +1,4 @@
-# F13 · PDF and print — mobile E2E (docs/specs/16-f13-pdf-print/; design.md §4.10 actions)
+# F13 · PDF and print — mobile E2E (docs/specs/16-f13-pdf-print.md; design.md §4.10 actions)
 # Covers: F13-AC1, F13-AC2, F13-AC4, F13-AC11
 # Content and layout are verified on the API side (e2e/api/f13-pdf.spec.ts); this flow checks the user path.
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)

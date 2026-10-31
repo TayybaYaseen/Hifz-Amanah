@@ -1,4 +1,4 @@
-// F08 · Homework and carry forward — API E2E (docs/specs/11-f08-homework-carry-forward/)
+// F08 · Homework and carry forward — API E2E (docs/specs/11-f08-homework-carry-forward.md)
 // Screen journeys: e2e/mobile/f08-homework/.
 import { test } from './support/fixtures';
 

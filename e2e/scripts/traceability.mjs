@@ -1,4 +1,4 @@
-// Checks that every detailed acceptance criterion in the story specs (docs/specs/<feature>/us-*.md)
+// Checks that every detailed acceptance criterion in the story specs (docs/specs/<NN>-us-*.md)
 // has at least one E2E test, and that no E2E test cites a criterion that does not exist.
 // Usage: node e2e/scripts/traceability.mjs [US-022 | F05]
 import { loadSpecs, loadTests, selectSpecs } from './lib.mjs';

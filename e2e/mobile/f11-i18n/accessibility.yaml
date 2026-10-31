@@ -1,4 +1,4 @@
-# F11 · Localization and accessibility — mobile E2E (docs/specs/02-f11-localization-accessibility/; design.md §6.3)
+# F11 · Localization and accessibility — mobile E2E (docs/specs/02-f11-localization-accessibility.md; design.md §6.3)
 # Covers: F11-AC12, F11-AC13
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F11 accessibility — largest font, touch targets, status text and icon

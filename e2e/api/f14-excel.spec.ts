@@ -1,4 +1,4 @@
-// F14 · Excel import and export — API E2E (docs/specs/14-f14-excel-import-export/)
+// F14 · Excel import and export — API E2E (docs/specs/14-f14-excel-import-export.md)
 // Workbooks are built by the test from synthetic data (see e2e/fixtures/workbooks.md).
 // Screen journeys: e2e/mobile/f14-excel/.
 import { test } from './support/fixtures';

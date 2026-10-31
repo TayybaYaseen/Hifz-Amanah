@@ -1,4 +1,4 @@
-# F16 · Notifications — mobile E2E (docs/specs/17-f16-notifications/; design.md §4.16)
+# F16 · Notifications — mobile E2E (docs/specs/17-f16-notifications.md; design.md §4.16)
 # Covers: F16-AC1, F16-AC2, F16-AC4, F16-AC7, F16-AC8, F16-AC9
 # Events are triggered through the API; pushes go through the test push provider.
 # "Report published" is the only MVP push event (FR-NOT-004).

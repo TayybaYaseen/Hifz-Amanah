@@ -54,7 +54,10 @@ Only test commands exist so far. **Update this section when the project is scaff
 | Mobile E2E (Maestro; needs the Maestro CLI and an emulator) | `npm run e2e:mobile -- -e APP_ID=<android application id>` |
 | Docs traceability (one story per spec, verbatim criteria, requirement IDs, links) | `npm run docs:check` |
 
-**Specs are one per user story:** `docs/specs/<order>-<feature>/us-<nnn>-<title>.md`, indexed in `docs/specs/README.md`. Folders are numbered in dependency order (parents first), for example `09-f05-daily-hifz-entry`. Each feature folder's README holds feature-wide context, edge cases, and open questions.
+**Specs are one per user story,** all directly in `docs/specs/` (no subfolders), indexed in `docs/specs/README.md`. Sorted by name, they list in implementation order:
+- `<NN>-f<nn>-<feature>.md` is a feature page holding feature-wide context, edge cases, and open questions, e.g. `09-f05-daily-hifz-entry.md`.
+- `<NN>-us-<nnn>-<title>.md` is a story spec, e.g. `09-us-022-record-manzil-portions.md`.
+- `<NN>` is the feature's build order (parents first). A new story takes its feature's prefix.
 
 Unit tests and E2E tests were written ahead of implementation and cite their spec acceptance criterion (`F<nn>-AC<k> (US-xxx)`). Unit tests are `it.todo`. API E2E tests are `test.fixme`, and mobile flows are tagged `pending`.
 

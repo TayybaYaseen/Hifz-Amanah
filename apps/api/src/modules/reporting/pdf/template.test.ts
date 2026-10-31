@@ -1,4 +1,4 @@
-// F13 · PDF and print — unit: template rendering (docs/specs/16-f13-pdf-print/)
+// F13 · PDF and print — unit: template rendering (docs/specs/16-f13-pdf-print.md)
 import { describe, it } from 'vitest';
 
 describe('F13 · content', () => {

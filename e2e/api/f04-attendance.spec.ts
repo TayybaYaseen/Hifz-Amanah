@@ -1,4 +1,4 @@
-// F04 · Calendar and attendance — API E2E (docs/specs/08-f04-calendar-attendance/)
+// F04 · Calendar and attendance — API E2E (docs/specs/08-f04-calendar-attendance.md)
 // Screen journeys: e2e/mobile/f04-attendance/.
 import { test } from './support/fixtures';
 

@@ -1,4 +1,4 @@
-# F08 · Homework and carry forward — mobile E2E (docs/specs/11-f08-homework-carry-forward/; design.md §4.9)
+# F08 · Homework and carry forward — mobile E2E (docs/specs/11-f08-homework-carry-forward.md; design.md §4.9)
 # Covers: F08-AC1, F08-AC2, F08-AC10, F08-AC11, F08-AC13, F08-AC14, F08-AC15, F08-AC16
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F08 confirm — explicit confirm, next class, correction, revise

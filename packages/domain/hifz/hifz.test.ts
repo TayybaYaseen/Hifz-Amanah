@@ -1,4 +1,4 @@
-// F05 · Daily Hifz entry — unit (docs/specs/09-f05-daily-hifz-entry/)
+// F05 · Daily Hifz entry — unit (docs/specs/09-f05-daily-hifz-entry.md)
 import { describe, it } from 'vitest';
 
 describe('F05 · status semantics', () => {

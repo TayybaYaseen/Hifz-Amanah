@@ -1,4 +1,4 @@
-// F15 · Analytics and AI recommendations — unit: AI request and response guards (docs/specs/15-f15-analytics-ai/)
+// F15 · Analytics and AI recommendations — unit: AI request and response guards (docs/specs/15-f15-analytics-ai.md)
 import { describe, it } from 'vitest';
 
 describe('F15 · payload minimizer', () => {

@@ -1,4 +1,4 @@
-// F08 · Homework and carry forward — unit (docs/specs/11-f08-homework-carry-forward/)
+// F08 · Homework and carry forward — unit (docs/specs/11-f08-homework-carry-forward.md)
 import { describe, it } from 'vitest';
 
 describe('F08 · suggest() eligibility', () => {

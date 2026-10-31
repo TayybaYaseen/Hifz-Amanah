@@ -1,4 +1,4 @@
-// F14 · Excel import and export — unit (docs/specs/14-f14-excel-import-export/)
+// F14 · Excel import and export — unit (docs/specs/14-f14-excel-import-export.md)
 import { describe, it } from 'vitest';
 
 describe('F14 · workbook checks', () => {

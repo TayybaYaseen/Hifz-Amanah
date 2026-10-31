@@ -1,4 +1,4 @@
-// F05 · Daily Hifz entry — API E2E (docs/specs/09-f05-daily-hifz-entry/)
+// F05 · Daily Hifz entry — API E2E (docs/specs/09-f05-daily-hifz-entry.md)
 // Screen journeys: e2e/mobile/f05-daily-entry/.
 import { test } from './support/fixtures';
 

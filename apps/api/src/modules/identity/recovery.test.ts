@@ -1,4 +1,4 @@
-// F17 · Security, audit, and administration — unit: account recovery (docs/specs/05-f17-security-audit-admin/)
+// F17 · Security, audit, and administration — unit: account recovery (docs/specs/05-f17-security-audit-admin.md)
 import { describe, it } from 'vitest';
 
 describe('F17 · recovery OTP', () => {

@@ -1,4 +1,4 @@
-# F04 · Calendar and attendance — mobile E2E (docs/specs/08-f04-calendar-attendance/; design.md §4.8)
+# F04 · Calendar and attendance — mobile E2E (docs/specs/08-f04-calendar-attendance.md; design.md §4.8)
 # Covers: F04-AC6, F04-AC7, F04-AC8, F04-AC9, F04-AC11
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F04 bulk entry — attendance only, Mark all Present, unmarked, partial save

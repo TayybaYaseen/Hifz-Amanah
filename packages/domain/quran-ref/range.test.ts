@@ -1,4 +1,4 @@
-// F06 · Quran portions — unit: Quran reference validation (docs/specs/07-f06-quran-portions-metadata/)
+// F06 · Quran portions — unit: Quran reference validation (docs/specs/07-f06-quran-portions-metadata.md)
 import { describe, it } from 'vitest';
 
 describe('F06 · Para', () => {

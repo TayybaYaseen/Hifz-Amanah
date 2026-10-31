@@ -1,4 +1,4 @@
-# F13 · PDF and print — mobile E2E (docs/specs/16-f13-pdf-print/; decision review 2026-10-30, SRS §17)
+# F13 · PDF and print — mobile E2E (docs/specs/16-f13-pdf-print.md; decision review 2026-10-30, SRS §17)
 # Covers: F13-AC13
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F13 report template controls

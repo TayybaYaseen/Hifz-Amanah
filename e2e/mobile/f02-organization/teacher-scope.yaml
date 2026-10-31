@@ -1,4 +1,4 @@
-# F02 · Organization and roles — mobile E2E (docs/specs/03-f02-organization-roles/; design.md §3.3)
+# F02 · Organization and roles — mobile E2E (docs/specs/03-f02-organization-roles.md; design.md §3.3)
 # Covers: F02-AC6, F02-AC7, F02-AC8
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F02 scope — Teacher sees only assigned classes; removal hides class data

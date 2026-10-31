@@ -1,4 +1,4 @@
-// F07 · Mistakes and quality — unit: mistakes (docs/specs/10-f07-mistakes-quality/)
+// F07 · Mistakes and quality — unit: mistakes (docs/specs/10-f07-mistakes-quality.md)
 import { describe, it } from 'vitest';
 
 describe('F07 · mistake shape', () => {
