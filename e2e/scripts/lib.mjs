@@ -64,13 +64,14 @@ export function loadTests() {
       });
     } else if (rel.startsWith('e2e/api/') && rel.endsWith('.spec.ts')) {
       const fileTags = [...new Set((text.match(/'@(F\d{2}|APP)'/g) ?? []).map((t) => t.slice(2, -1)))];
-      for (const m of text.matchAll(/test(\.fixme|\.skip)?\(\s*'([^']+)'/g)) {
-        const story = m[2].match(/\((US-\d{3})\)/)?.[1];
+      for (const m of text.matchAll(/test(\.fixme|\.skip)?\(\s*(['"`])((?:(?!\2).)+)\2/g)) {
+        const title = m[3];
+        const story = title.match(/\((US-\d{3})\)/)?.[1];
         tests.push({
           file: rel,
           layer: 'api',
-          title: m[2],
-          ids: [...new Set(m[2].match(/F\d{2}-AC\d+/g) ?? [])],
+          title,
+          ids: [...new Set(title.match(/F\d{2}-AC\d+/g) ?? [])],
           tags: story ? [...fileTags, story] : fileTags,
           pending: Boolean(m[1]),
         });
