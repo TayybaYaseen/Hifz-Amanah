@@ -21,6 +21,7 @@ describe('F14 · row classification', () => {
   it.todo('F14-AC13 (US-060) add-new-only mode never proposes changes to existing records (AC-XLS-04)');
   it.todo('F14-AC14 (US-060) update mode shows field-level before and after values');
   it.todo('F14-AC6 (US-059) DailyRecords rows with the same student, date, and session form one daily record');
+  it.todo('F14-AC23 (US-059) a SABAQ row needs SurahStart, AyahStart, AyahEnd, TotalLines, and LINES; a Para preset makes it invalid (AC-XLS-07)');
 });
 
 describe('F14 · export escaping', () => {

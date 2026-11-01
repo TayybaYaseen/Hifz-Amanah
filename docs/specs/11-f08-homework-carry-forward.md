@@ -2,7 +2,7 @@
 
 **Status:** draft
 **Brief:** [00-product-brief.md](../00-product-brief.md) · **Flow:** Homework — suggestions and confirmed assignments ([design.md §4.9, §5.7](../design.md))
-**Requirements:** FR-HW-001…015, FR-QTY-005, FR-RPT-007, NFR-PERF-003, NFR-REL-003, FR-HW-016/017
+**Requirements:** FR-HW-001…015, FR-QTY-005, FR-RPT-007, NFR-PERF-003, NFR-REL-003, FR-HW-016/017, FR-HW-018
 **Stories:** US-033 – US-038 · **Depends on:** F05, F06
 **Build order:** 11 of 17 (dependency level 4)
 
@@ -14,7 +14,7 @@ Its story specs follow this page in `docs/specs/` and share the `11-` prefix, on
 |---|---|---|
 | [SPEC-US-033](11-us-033-create-structured-homework.md) | US-033 — Create structured homework | F08-AC1, F08-AC2 |
 | [SPEC-US-034](11-us-034-calculate-remaining-work.md) | US-034 — Calculate remaining work | F08-AC3, F08-AC4 |
-| [SPEC-US-035](11-us-035-suggest-carry-forward.md) | US-035 — Suggest carry-forward | F08-AC5, F08-AC6, F08-AC7 |
+| [SPEC-US-035](11-us-035-suggest-carry-forward.md) | US-035 — Suggest carry-forward | F08-AC5, F08-AC6, F08-AC7, F08-AC22 |
 | [SPEC-US-036](11-us-036-review-homework-suggestion.md) | US-036 — Review homework suggestion | F08-AC8, F08-AC9, F08-AC18 |
 | [SPEC-US-037](11-us-037-confirm-next-assignment.md) | US-037 — Confirm next assignment | F08-AC10, F08-AC11, F08-AC12, F08-AC20, F08-AC21 |
 | [SPEC-US-038](11-us-038-preserve-homework-history.md) | US-038 — Preserve homework history | F08-AC13, F08-AC14, F08-AC15, F08-AC16, F08-AC17, F08-AC19 |
@@ -70,6 +70,6 @@ It reads attempts from F05 and quantities from F06.
 | **Component** | Suggested vs Confirmed tabs, draft label/styling, edit/add/remove portions, confirm summary, offline-disabled Confirm | `apps/mobile/src/features/homework/__tests__/*.test.tsx` |
 | **E2E** | Every acceptance criterion: server-side checks (API) and device journeys (Maestro), including: SRS §10.8 end-to-end scenario, steps 2–8 (record → suggestion → confirm → next-class attempt → correction leaves confirmed homework unchanged) | `e2e/api/f08-homework.spec.ts`, `e2e/mobile/f08-homework/` |
 
-**Traceability:** Each test name starts with its criterion, e.g. `F08-AC14 (US-038) …`. Every AC 1–21 has at least one test.
+**Traceability:** Each test name starts with its criterion, e.g. `F08-AC14 (US-038) …`. Every AC 1–22 has at least one test.
 
 **Coverage:** ≥80% on new code (100% branch coverage on `suggest()`).

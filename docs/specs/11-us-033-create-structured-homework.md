@@ -34,7 +34,7 @@ Spec wording (from F08):
 
 Requirements this story covers. SRS.md has no story-to-requirement table, so this list is derived from the requirement text and the criteria below.
 
-- **Functional:** FR-HW-001, FR-HW-002, FR-HW-003, FR-HW-004
+- **Functional:** FR-HW-001, FR-HW-002, FR-HW-003, FR-HW-004, FR-QTY-010
 - **Non-functional:** Not applicable
 - **SRS acceptance tests cited:** None
 
@@ -47,14 +47,14 @@ Feature requirement set (from F08; additions of 2026-10-30 at the end): FR-HW-00
 Verbatim from [user-stories.md](../user-stories.md).
 
 1. A homework assignment can contain Sabaq, Sabqi, and Manzil portions, with multiple independent Para portions for Sabqi and Manzil.
-2. Each homework portion stores section, Para, optional Surah/Ayat range, quantity with unit, status, and optional instructions.
+2. Each homework portion stores section, Para, Surah/Ayat range (required for Sabaq, optional for Sabqi and Manzil), quantity with unit (lines for Sabaq), status, and optional instructions.
 3. The assignment stores assigned date, due/next-class date, status, creator, and optional general instructions.
 
 ### Detailed acceptance criteria
 
-From the F08 feature spec. The original IDs are kept because tests cite them. Criteria marked *Revised* or *Added* come from the decision review of 2026-10-30 (SRS §17).
+From the F08 feature spec. The original IDs are kept because tests cite them. Criteria marked *Revised* or *Added* come from the decision reviews of 2026-10-30 and 2026-11-01 (SRS §17).
 
-- **F08-AC1** — **(US-033) Given** a Teacher creating homework, **when** they add one Sabaq portion and two Sabqi Paras with different quantities, **then** each portion is stored with its section, Para, optional range, quantity and unit, and optional instructions.
+- **F08-AC1** — **(US-033) Given** a Teacher creating homework, **when** they add one Sabaq portion and two Sabqi Paras with different quantities, **then** each portion is stored with its section, Para, range, quantity and unit, and optional instructions. The Sabaq portion has a required single-Surah Ayat range, Total Lines, and Assigned Lines in `LINES`, with its Para derived; the Sabqi portions keep their Para presets. *(Revised 2026-11-01, DEC-B60.)*
 - **F08-AC2** — **(US-033) Given** a homework assignment, **when** it is saved, **then** it stores the assigned date, the due date, the status, the creator, and any general instructions.
 
 ## Business rules
@@ -135,7 +135,7 @@ Open questions from F08 that apply to this story, with their resolutions (decisi
 
 - **Story:** US-033 → SPEC-US-033 (this file)
 - **Detailed criteria:** F08-AC1, F08-AC2
-- **Requirements:** FR-HW-001, FR-HW-002, FR-HW-003, FR-HW-004
+- **Requirements:** FR-HW-001, FR-HW-002, FR-HW-003, FR-HW-004, FR-QTY-010
 - **SRS acceptance tests:** None
 - **Business rules:** SRS §9 #2
 - **Design:** design.md §13; **Architecture:** ARCHITECTURE.md §18 epic 8

@@ -34,11 +34,11 @@ Spec wording (from F08):
 
 Requirements this story covers. SRS.md has no story-to-requirement table, so this list is derived from the requirement text and the criteria below.
 
-- **Functional:** FR-HW-006, FR-HW-013, FR-HW-014
+- **Functional:** FR-HW-006, FR-HW-013, FR-HW-014, FR-HW-018
 - **Non-functional:** Not applicable
-- **SRS acceptance tests cited:** AC-HW-01, AC-HW-08, AC-HW-09
+- **SRS acceptance tests cited:** AC-HW-01, AC-HW-08, AC-HW-09, AC-HW-10
 
-Feature requirement set (from F08; additions of 2026-10-30 at the end): FR-HW-001…015, FR-QTY-005, FR-RPT-007, NFR-PERF-003, NFR-REL-003, FR-HW-016/017
+Feature requirement set (from F08; additions of 2026-10-30 at the end): FR-HW-001…015, FR-QTY-005, FR-RPT-007, NFR-PERF-003, NFR-REL-003, FR-HW-016/017, FR-HW-018
 
 ## Acceptance criteria
 
@@ -52,11 +52,12 @@ Verbatim from [user-stories.md](../user-stories.md).
 
 ### Detailed acceptance criteria
 
-From the F08 feature spec. The original IDs are kept because tests cite them. Criteria marked *Revised* or *Added* come from the decision review of 2026-10-30 (SRS §17).
+From the F08 feature spec. The original IDs are kept because tests cite them. Criteria marked *Revised* or *Added* come from the decision reviews of 2026-10-30 and 2026-11-01 (SRS §17).
 
 - **F08-AC5** — **(US-035) Given** a portion whose latest attempt is Partial or Not Remembered with remaining > 0, **when** suggestions are built, **then** it is suggested with its remaining quantity and linked to its source attempt (AC-HW-01, AC-HW-08).
 - **F08-AC6** — **(US-035) Given** a portion whose latest attempt is Absent, Not Assigned, Pending, or Completed, **when** suggestions are built, **then** it is not suggested (AC-HW-09).
 - **F08-AC7** — **(US-035) Given** a suggestion, **when** it is displayed, **then** it is labelled "Suggestion — not confirmed" and never styled like confirmed homework.
+- **F08-AC22** — **(US-035) Given** a Sabaq portion for Al-Baqarah Ayat 1–10 with 10 assigned lines whose latest attempt is Partial with 6 completed lines, **when** suggestions are built, **then** the Sabaq suggestion keeps Al-Baqarah Ayat 1–10 and Total Lines 10, assigns the 4 remaining lines, links to its source attempt, and stays a draft until the Teacher confirms it. Sabqi and Manzil suggestions keep their Para and unit (AC-HW-10). *(Added 2026-11-01, DEC-B61, FR-HW-018.)*
 
 ## Business rules
 
@@ -119,6 +120,7 @@ Nothing specific to this story in the source documents.
 
 - [e2e/api/f08-homework.spec.ts](../../e2e/api/f08-homework.spec.ts) — F08-AC5 (US-035) Partial and Not Remembered with remaining are suggested and linked (AC-HW-01, AC-HW-08)
 - [e2e/api/f08-homework.spec.ts](../../e2e/api/f08-homework.spec.ts) — F08-AC6 (US-035) Absent, Not Assigned, Pending, and Completed are not suggested (AC-HW-09)
+- [e2e/api/f08-homework.spec.ts](../../e2e/api/f08-homework.spec.ts) — F08-AC22 (US-035) a partial Sabaq is suggested with its original range and the remaining lines (AC-HW-10)
 
 **Mobile (Maestro):**
 
@@ -129,6 +131,8 @@ Nothing specific to this story in the source documents.
 - [packages/domain/homework/suggest.test.ts](../../packages/domain/homework/suggest.test.ts) — F08-AC5 (US-035) PARTIAL with remaining > 0 is suggested with its remaining quantity and source attempt (AC-HW-01, AC-HW-08)
 - [packages/domain/homework/suggest.test.ts](../../packages/domain/homework/suggest.test.ts) — F08-AC5 (US-035) NOT_REMEMBERED with remaining > 0 is suggested with its remaining quantity and source attempt
 - [packages/domain/homework/suggest.test.ts](../../packages/domain/homework/suggest.test.ts) — F08-AC6 (US-035) ABSENT, NOT_ASSIGNED, PENDING, and COMPLETED are not suggested (AC-HW-09)
+- [packages/domain/homework/suggest.test.ts](../../packages/domain/homework/suggest.test.ts) — F08-AC22 (US-035) a partial Sabaq keeps its Surah, Ayat range, and Total Lines, and suggests the remaining lines (AC-HW-10)
+- [packages/domain/homework/suggest.test.ts](../../packages/domain/homework/suggest.test.ts) — F08-AC22 (US-035) Sabqi and Manzil suggestions keep their Para and unit unchanged
 
 ## Open decisions and blockers
 
@@ -137,9 +141,9 @@ None specific to this story. See the [feature open questions](11-f08-homework-ca
 ## Traceability
 
 - **Story:** US-035 → SPEC-US-035 (this file)
-- **Detailed criteria:** F08-AC5, F08-AC6, F08-AC7
-- **Requirements:** FR-HW-006, FR-HW-013, FR-HW-014
-- **SRS acceptance tests:** AC-HW-01, AC-HW-08, AC-HW-09
+- **Detailed criteria:** F08-AC5, F08-AC6, F08-AC7, F08-AC22
+- **Requirements:** FR-HW-006, FR-HW-013, FR-HW-014, FR-HW-018
+- **SRS acceptance tests:** AC-HW-01, AC-HW-08, AC-HW-09, AC-HW-10
 - **Business rules:** SRS §9 #6, SRS §9 #9
 - **Design:** design.md §13; **Architecture:** ARCHITECTURE.md §18 epic 8
 - **Previous location:** `docs/specs/F08-homework-carry-forward.md`

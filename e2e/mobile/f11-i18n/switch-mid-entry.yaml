@@ -10,7 +10,7 @@ tags:
 ---
 - launchApp:
     clearState: true
-# 1. Sign in as teacher.a1 (English) → Daily Entry S1: fill Sabaq Para 5, Half, Not Remembered (unsaved).
+# 1. Sign in as teacher.a1 (English) → Daily Entry S1: fill Sabaq Al-Baqarah 1–10, 10 lines, Not Remembered (unsaved).
 # 2. Switch to Urdu without restarting → every value still there; labels in Urdu.                      (F11-AC5)
 # 3. Save → API check: status stored as NOT_REMEMBERED.                                                (F11-AC6)
 # 4. Sign out; sign in → app opens in Urdu.                                                            (F11-AC4)

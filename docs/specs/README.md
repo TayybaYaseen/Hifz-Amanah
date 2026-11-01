@@ -88,7 +88,7 @@
 | [SPEC-US-017](08-us-017-approve-leave.md) | US-017 — Approve leave | F04 | 4 |
 | [SPEC-US-018](09-us-018-create-individual-daily-report.md) | US-018 — Create individual daily report | F05 | 7 |
 | [SPEC-US-019](09-us-019-choose-daily-report-mode.md) | US-019 — Choose daily report mode | F05 | 4 |
-| [SPEC-US-020](09-us-020-record-sabaq.md) | US-020 — Record Sabaq | F05 | 1 |
+| [SPEC-US-020](09-us-020-record-sabaq.md) | US-020 — Record Sabaq | F05 | 4 |
 | [SPEC-US-021](09-us-021-record-sabqi-portions.md) | US-021 — Record Sabqi portions | F05 | 2 |
 | [SPEC-US-022](09-us-022-record-manzil-portions.md) | US-022 — Record Manzil portions | F05 | 2 |
 | [SPEC-US-023](09-us-023-record-repeated-attempts.md) | US-023 — Record repeated attempts | F05 | 3 |
@@ -99,7 +99,7 @@
 | [SPEC-US-032](10-us-032-set-overall-performance-label.md) | US-032 — Set overall performance label | F07 | 2 |
 | [SPEC-US-033](11-us-033-create-structured-homework.md) | US-033 — Create structured homework | F08 | 2 |
 | [SPEC-US-034](11-us-034-calculate-remaining-work.md) | US-034 — Calculate remaining work | F08 | 2 |
-| [SPEC-US-035](11-us-035-suggest-carry-forward.md) | US-035 — Suggest carry-forward | F08 | 3 |
+| [SPEC-US-035](11-us-035-suggest-carry-forward.md) | US-035 — Suggest carry-forward | F08 | 4 |
 | [SPEC-US-036](11-us-036-review-homework-suggestion.md) | US-036 — Review homework suggestion | F08 | 3 |
 | [SPEC-US-037](11-us-037-confirm-next-assignment.md) | US-037 — Confirm next assignment | F08 | 5 |
 | [SPEC-US-038](11-us-038-preserve-homework-history.md) | US-038 — Preserve homework history | F08 | 6 |
@@ -113,7 +113,7 @@
 | [SPEC-US-045](13-us-045-parent-views-linked-student-reports.md) | US-045 — Parent views linked student reports | F10 | 5 |
 | [SPEC-US-046](13-us-046-protect-private-teacher-notes.md) | US-046 — Protect private teacher notes | F10 | 4 |
 | [SPEC-US-058](14-us-058-import-student-workbook.md) | US-058 — Import student workbook | F14 | 7 |
-| [SPEC-US-059](14-us-059-import-daily-records.md) | US-059 — Import daily records | F14 | 5 |
+| [SPEC-US-059](14-us-059-import-daily-records.md) | US-059 — Import daily records | F14 | 6 |
 | [SPEC-US-060](14-us-060-preview-import-changes.md) | US-060 — Preview import changes | F14 | 6 |
 | [SPEC-US-061](14-us-061-export-authorized-data.md) | US-061 — Export authorized data | F14 | 4 |
 | [SPEC-US-062](15-us-062-view-deterministic-analytics.md) | US-062 — View deterministic analytics | F15 | 3 |

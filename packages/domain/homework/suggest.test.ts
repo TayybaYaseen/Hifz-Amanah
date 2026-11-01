@@ -8,6 +8,11 @@ describe('F08 · suggest() eligibility', () => {
   it.todo('F08 unit: eligibility uses only the latest attempt per portion');
 });
 
+describe('F08 · Sabaq carry-forward (2026-11-01)', () => {
+  it.todo('F08-AC22 (US-035) a partial Sabaq keeps its Surah, Ayat range, and Total Lines, and suggests the remaining lines (AC-HW-10)');
+  it.todo('F08-AC22 (US-035) Sabqi and Manzil suggestions keep their Para and unit unchanged');
+});
+
 describe('F08 · remaining', () => {
   it.todo('F08-AC3 (US-034) 3/4 Para assigned, 1/2 completed → 1/4 Para');
   it.todo('F08-AC4 (US-034) different units → no remaining, portion flagged for review');

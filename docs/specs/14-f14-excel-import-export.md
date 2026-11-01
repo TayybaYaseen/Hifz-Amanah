@@ -13,7 +13,7 @@ Its story specs follow this page in `docs/specs/` and share the `14-` prefix, on
 | Spec | Story | Detailed criteria |
 |---|---|---|
 | [SPEC-US-058](14-us-058-import-student-workbook.md) | US-058 — Import student workbook | F14-AC1, F14-AC2, F14-AC3, F14-AC4, F14-AC5, F14-AC20, F14-AC21 |
-| [SPEC-US-059](14-us-059-import-daily-records.md) | US-059 — Import daily records | F14-AC6, F14-AC7, F14-AC8, F14-AC9, F14-AC10 |
+| [SPEC-US-059](14-us-059-import-daily-records.md) | US-059 — Import daily records | F14-AC6, F14-AC7, F14-AC8, F14-AC9, F14-AC10, F14-AC23 |
 | [SPEC-US-060](14-us-060-preview-import-changes.md) | US-060 — Preview import changes | F14-AC11, F14-AC12, F14-AC13, F14-AC14, F14-AC15, F14-AC22 |
 | [SPEC-US-061](14-us-061-export-authorized-data.md) | US-061 — Export authorized data | F14-AC16, F14-AC17, F14-AC18, F14-AC19 |
 
@@ -73,6 +73,6 @@ There is no code yet. This feature builds the `import-export` module:
 | **Component** | Import wizard steps, localized preview counts and row errors, update-mode before/after view, export options | `apps/mobile/src/features/import-export/__tests__/*.test.tsx` |
 | **E2E** | Every acceptance criterion: server-side checks (API) and device journeys (Maestro), including: Admin imports a students file → previews → confirms → re-imports the same file and sees all exact matches | `e2e/api/f14-excel.spec.ts`, `e2e/mobile/f14-excel/` |
 
-**Traceability:** Each test name starts with its criterion, e.g. `F14-AC18 (US-061) …`. Every AC 1–22 has at least one test.
+**Traceability:** Each test name starts with its criterion, e.g. `F14-AC18 (US-061) …`. Every AC 1–23 has at least one test.
 
 **Coverage:** ≥80% on new code.

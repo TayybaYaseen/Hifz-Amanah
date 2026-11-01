@@ -14,6 +14,7 @@ SRS §15.1 template contract. Do not commit real workbooks or real student names
 | `students-formula.xlsx` | Students | Names `=1+1`, `+cmd`, `-2`, `@SUM(A1)`, and a tab/CR prefix | F14-AC18 |
 | `students-org-column.xlsx` | Students | Extra `organization_id` column naming Madrasa B | F14-AC8 |
 | `daily-records-s1.xlsx` | DailyRecords | 6 rows for S1 on one date and session; one row `MistakeCount = 3`; one row empty `QualityRating`; one row `EXT-B-001` | F14-AC6, F14-AC7, F14-AC9, F14-AC10 |
+| `daily-records-sabaq.xlsx` | DailyRecords | 4 rows: a valid `SABAQ` row (Al-Baqarah 1–10, `TotalLines` 10, `LINES`); a `SABAQ` row with `HALF`; a `SABAQ` row without `AyahEnd`; a `SABQI` row with `SALASAH` | F14-AC23 |
 | `daily-records-batches.xlsx` | DailyRecords | 600 rows: 3 commit batches of 200 (FR-XLS-018) | F14-AC15 |
 | `students-two-classes.xlsx` | Students | 4 rows for Class A1 and 2 rows for Class B1 (imported by teacher.a1) | F14-AC21 |
 | `students-no-meta.xlsx` | Students | No hidden `_meta` sheet | F14-AC22 |

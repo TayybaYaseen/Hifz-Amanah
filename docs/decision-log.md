@@ -216,3 +216,23 @@ All answers below come from the product owner's Q&A on 2026-10-30, and the produ
 - **Backups.**
   - `.backup/pre-spec-split-2026-10-30/docs/` holds SRS, design and architecture as they were before this review.
   - `.backup/pre-decisions-2026-10-30/snapshot-before-apply.tar` holds docs, e2e, apps and packages before the generated spec, story and test changes.
+
+## Later decisions
+
+### 2026-11-01 — Sabaq measured in lines (DEC-B60…B64)
+
+The product owner asked for Sabaq to be recorded by Surah, starting Ayat, ending Ayat, and line count, without the Para presets (Rubu, Half, Salasah, Complete). Sabqi and Manzil are unchanged. Four follow-up questions were answered in the Q&A:
+
+| ID | Question | Answer |
+|---|---|---|
+| DEC-B60 | How is Sabaq measured? | Lines over a Surah/Ayat range; no Para presets in Sabaq (the PO's request) |
+| DEC-B61 | Total Lines vs. Assigned Lines | Total Lines = lines the range covers; Assigned Lines ≤ Total and defaults to it; a carry-forward keeps the range and Total and assigns the remaining lines |
+| DEC-B62 | Can one Sabaq portion cross Surahs? | No; one Surah per portion, and a lesson crossing Surahs is two portions |
+| DEC-B63 | Para on a Sabaq portion | Derived from the range, not entered |
+| DEC-B64 | Where does Total Lines come from? | Pre-filled from the 15-line Mushaf layout; the Teacher confirms or corrects it |
+
+**Applied:**
+- `SRS.md` v1.12: FR-SAB-001…004 revised; FR-SAB-008…010, FR-QTY-010, FR-HW-018, business rule §9 #18, AC-QTY-07/08, AC-HW-10, AC-XLS-07 added; §15.1 `DailyRecords` gets `TotalLines`; register rows DEC-B60…B64.
+- `ARCHITECTURE.md` v1.2 (ADR-014), `design.md` v1.7, `user-stories.md` v1.5 (US-033 criterion 2).
+- Specs: F05-AC10 and F08-AC1 revised; F05-AC20…22, F08-AC22, and F14-AC23 added (322 detailed criteria).
+- Tests: pending API, Maestro, and unit tests for the new criteria; Sabaq steps in existing pending tests now use lines.

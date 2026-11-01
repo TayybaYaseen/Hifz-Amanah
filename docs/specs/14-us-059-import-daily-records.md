@@ -39,9 +39,9 @@ Spec wording (from F14):
 
 Requirements this story covers. SRS.md has no story-to-requirement table, so this list is derived from the requirement text and the criteria below.
 
-- **Functional:** FR-XLS-002, FR-XLS-004, FR-XLS-015
+- **Functional:** FR-XLS-002, FR-XLS-004, FR-XLS-015, FR-SAB-009, FR-QTY-010
 - **Non-functional:** NFR-XLS-002
-- **SRS acceptance tests cited:** None
+- **SRS acceptance tests cited:** AC-XLS-07
 
 Feature requirement set (from F14; additions of 2026-10-30 at the end): FR-XLS-001…017, NFR-XLS-001…004, SRS §15.1–15.2, FR-XLS-018
 
@@ -56,13 +56,14 @@ Verbatim from [user-stories.md](../user-stories.md).
 
 ### Detailed acceptance criteria
 
-From the F14 feature spec. The original IDs are kept because tests cite them. Criteria marked *Revised* or *Added* come from the decision review of 2026-10-30 (SRS §17).
+From the F14 feature spec. The original IDs are kept because tests cite them. Criteria marked *Revised* or *Added* come from the decision reviews of 2026-10-30 and 2026-11-01 (SRS §17).
 
 - **F14-AC6** — **(US-059) Given** a valid `DailyRecords` workbook, **when** it is imported, **then** each row becomes one portion, rows with the same student, date, and session form one daily record, and reports recalculate.
 - **F14-AC7** — **(US-059) Given** a row with `ExternalStudentID` not found in the active madrasa, **when** it is previewed, **then** it is invalid with the message "Student not found in this madrasa".
 - **F14-AC8** — **(US-059) Given** an `organization_id` or a different madrasa named in the workbook, **when** it is imported, **then** it is ignored, and every row goes into the signed-in user's madrasa only.
 - **F14-AC9** — **(US-059) Given** a row with `MistakeCount = 3`, **when** it is imported, **then** the attempt stores 3 uncategorized mistakes, and no mistake categories are created.
 - **F14-AC10** — **(US-059) Given** a row with an empty `QualityRating`, **when** it is imported, **then** the quality is stored as NULL, not 0.
+- **F14-AC23** — **(US-059) Given** a `DailyRecords` row with `SectionType = SABAQ`, **when** it is previewed, **then** it is valid only with `SurahStart`, `AyahStart`, `AyahEnd`, `TotalLines`, and `QuantityUnit = LINES`. A Sabaq row using `RUBU`, `HALF`, `SALASAH`, or `COMPLETE` is invalid with "Sabaq uses lines" and is never converted. Sabqi and Manzil rows are validated as before (AC-XLS-07). *(Added 2026-11-01, DEC-B60, SRS §15.1.)*
 
 ## Business rules
 
@@ -128,6 +129,7 @@ Nothing specific to this story in the source documents.
 - [e2e/api/f14-excel.spec.ts](../../e2e/api/f14-excel.spec.ts) — F14-AC8 (US-059) an organization named in the workbook is ignored
 - [e2e/api/f14-excel.spec.ts](../../e2e/api/f14-excel.spec.ts) — F14-AC9 (US-059) MistakeCount becomes uncategorized mistakes
 - [e2e/api/f14-excel.spec.ts](../../e2e/api/f14-excel.spec.ts) — F14-AC10 (US-059) an empty QualityRating is NULL
+- [e2e/api/f14-excel.spec.ts](../../e2e/api/f14-excel.spec.ts) — F14-AC23 (US-059) Sabaq rows need a range, TotalLines, and LINES (AC-XLS-07)
 
 **Mobile (Maestro):**
 
@@ -140,6 +142,7 @@ Nothing specific to this story in the source documents.
 - [apps/api/src/modules/import-export/rows.test.ts](../../apps/api/src/modules/import-export/rows.test.ts) — F14-AC9 (US-059) MistakeCount = 3 yields 3 uncategorized mistakes and no categories
 - [apps/api/src/modules/import-export/rows.test.ts](../../apps/api/src/modules/import-export/rows.test.ts) — F14-AC10 (US-059) an empty QualityRating is NULL, not 0
 - [apps/api/src/modules/import-export/rows.test.ts](../../apps/api/src/modules/import-export/rows.test.ts) — F14-AC6 (US-059) DailyRecords rows with the same student, date, and session form one daily record
+- [apps/api/src/modules/import-export/rows.test.ts](../../apps/api/src/modules/import-export/rows.test.ts) — F14-AC23 (US-059) a SABAQ row needs SurahStart, AyahStart, AyahEnd, TotalLines, and LINES; a Para preset makes it invalid (AC-XLS-07)
 
 ## Open decisions and blockers
 
@@ -148,9 +151,9 @@ None specific to this story. See the [feature open questions](14-f14-excel-impor
 ## Traceability
 
 - **Story:** US-059 → SPEC-US-059 (this file)
-- **Detailed criteria:** F14-AC6, F14-AC7, F14-AC8, F14-AC9, F14-AC10
-- **Requirements:** FR-XLS-002, FR-XLS-004, FR-XLS-015, NFR-XLS-002
-- **SRS acceptance tests:** None
+- **Detailed criteria:** F14-AC6, F14-AC7, F14-AC8, F14-AC9, F14-AC10, F14-AC23
+- **Requirements:** FR-XLS-002, FR-XLS-004, FR-XLS-015, FR-SAB-009, FR-QTY-010, NFR-XLS-002
+- **SRS acceptance tests:** AC-XLS-07
 - **Business rules:** None
 - **Design:** design.md §13; **Architecture:** ARCHITECTURE.md §18 epic 14
 - **Previous location:** `docs/specs/F14-excel-import-export.md`
