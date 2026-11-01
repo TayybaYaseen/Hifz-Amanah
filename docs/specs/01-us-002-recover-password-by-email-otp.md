@@ -6,7 +6,7 @@
 | **User story** | US-002 |
 | **Feature** | [F01 · Identity and authentication](01-f01-identity-authentication.md) |
 | **Epic** | EPIC 1 — Identity and Authentication ([user-stories.md](../user-stories.md)) |
-| **Status** | draft |
+| **Status** | Approved |
 | **Priority** | Not specified in the source documents (SRS, user-stories.md, feature specs). None is assigned here. |
 | **Split from** | `docs/specs/F01-identity-authentication.md` on 2026-10-30 |
 

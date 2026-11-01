@@ -1,6 +1,6 @@
 # F01 · Identity and authentication
 
-**Status:** draft
+**Status:** Approved
 **Brief:** [00-product-brief.md](../00-product-brief.md) · **Flow:** Sign-in and forgot password ([design.md §4.2](../design.md)); Admin account management (design gap)
 **Requirements:** FR-AUTH-001…011, FR-SEC-010, NFR-SEC-003, FR-AUTH-012…016
 **Stories:** US-001 – US-006, US-071, US-072 · **Depends on:** —
