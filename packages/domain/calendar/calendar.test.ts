@@ -1,4 +1,4 @@
-// F04 · Calendar and attendance — unit (docs/specs/08-f04-calendar-attendance/)
+// F04 · Calendar and attendance — unit (docs/specs/08-f04-calendar-attendance.md)
 import { describe, it } from 'vitest';
 
 describe('F04 · scheduled days', () => {

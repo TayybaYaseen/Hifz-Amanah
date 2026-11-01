@@ -1,4 +1,4 @@
-// F02 · Organization and roles — API E2E (docs/specs/03-f02-organization-roles/)
+// F02 · Organization and roles — API E2E (docs/specs/03-f02-organization-roles.md)
 // Screen journeys: e2e/mobile/f02-organization/.
 import { test } from './support/fixtures';
 

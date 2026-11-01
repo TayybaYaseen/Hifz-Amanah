@@ -1,4 +1,4 @@
-// F09 · Weekly and monthly reports — API E2E (docs/specs/12-f09-weekly-monthly-reports/)
+// F09 · Weekly and monthly reports — API E2E (docs/specs/12-f09-weekly-monthly-reports.md)
 // Screen journeys: e2e/mobile/f09-reports/.
 import { test } from './support/fixtures';
 

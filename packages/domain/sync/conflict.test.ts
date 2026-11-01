@@ -1,4 +1,4 @@
-// F12 · Offline and synchronization — unit: conflicts and merges (docs/specs/04-f12-offline-sync/)
+// F12 · Offline and synchronization — unit: conflicts and merges (docs/specs/04-f12-offline-sync.md)
 import { describe, it } from 'vitest';
 
 describe('F12 · conflict detection', () => {

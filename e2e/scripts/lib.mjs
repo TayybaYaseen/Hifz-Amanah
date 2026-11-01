@@ -15,18 +15,18 @@ function walk(dir) {
 }
 
 /**
- * One entry per story spec (docs/specs/<feature>/us-<nnn>-*.md):
+ * One entry per story spec (docs/specs/<NN>-us-<nnn>-*.md), in implementation order:
  * { id: 'US-022', feature: 'F05', file, criteria: ['F05-AC13', 'F05-AC14'] }
  */
 export function loadSpecs() {
   return walk(SPECS_DIR)
-    .filter((path) => /[\\/]us-\d{3}-[^\\/]+\.md$/.test(path))
+    .filter((path) => /[\\/]\d{2}-us-\d{3}-[^\\/]+\.md$/.test(path))
     .sort()
     .map((path) => {
       const text = readFileSync(path, 'utf8');
       const id = text.match(/^\| \*\*User story\*\* \| (US-\d{3}) \|$/m)[1];
       const criteria = [...text.matchAll(/^- \*\*(F\d{2}-AC\d+)\*\* — /gm)].map((m) => m[1]);
-      const feature = relative(SPECS_DIR, path).match(/f\d{2}/)[0].toUpperCase();
+      const feature = text.match(/^\| \*\*Feature\*\* \| \[(F\d{2})/m)[1];
       return { id, feature, file: relative(ROOT, path).replaceAll('\\', '/'), criteria };
     });
 }
@@ -64,13 +64,14 @@ export function loadTests() {
       });
     } else if (rel.startsWith('e2e/api/') && rel.endsWith('.spec.ts')) {
       const fileTags = [...new Set((text.match(/'@(F\d{2}|APP)'/g) ?? []).map((t) => t.slice(2, -1)))];
-      for (const m of text.matchAll(/test(\.fixme|\.skip)?\(\s*'([^']+)'/g)) {
-        const story = m[2].match(/\((US-\d{3})\)/)?.[1];
+      for (const m of text.matchAll(/test(\.fixme|\.skip)?\(\s*(['"`])((?:(?!\2).)+)\2/g)) {
+        const title = m[3];
+        const story = title.match(/\((US-\d{3})\)/)?.[1];
         tests.push({
           file: rel,
           layer: 'api',
-          title: m[2],
-          ids: [...new Set(m[2].match(/F\d{2}-AC\d+/g) ?? [])],
+          title,
+          ids: [...new Set(title.match(/F\d{2}-AC\d+/g) ?? [])],
           tags: story ? [...fileTags, story] : fileTags,
           pending: Boolean(m[1]),
         });

@@ -1,4 +1,4 @@
-# F04 · Calendar and attendance — mobile E2E (docs/specs/08-f04-calendar-attendance/; design.md §4.7, §4.14)
+# F04 · Calendar and attendance — mobile E2E (docs/specs/08-f04-calendar-attendance.md; design.md §4.7, §4.14)
 # Covers: F04-AC13, F04-AC14, F04-AC15, F04-AC16, F04-AC17
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F04 Leave — Teacher marks Leave with a reason, Admin approves and rejects

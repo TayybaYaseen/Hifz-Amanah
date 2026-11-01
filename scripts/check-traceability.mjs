@@ -1,4 +1,8 @@
 // Documentation traceability check for HifzAmanah specs.
+// Layout: every spec lives directly in docs/specs/, named in implementation order:
+//   <NN>-f<nn>-<feature>.md   feature page (NN = the feature's build order)
+//   <NN>-us-<nnn>-<title>.md  one story spec, prefixed with its feature's NN
+//   0. docs/specs/ has no subfolders, and each spec's NN matches the feature named in its header.
 //   1. Every spec file holds exactly one user story.
 //   2. No user story appears in more than one spec.
 //   3. Every story in docs/user-stories.md has a spec.
@@ -94,12 +98,25 @@ export function expandIds(text) {
 
 // ---------- Specs ----------
 const stories = parseUserStories();
-const featureDirs = readdirSync(SPECS).filter((n) => /^\d{2}-f\d{2}-/.test(n) && statSync(join(SPECS, n)).isDirectory());
-const specFiles = featureDirs.flatMap((d) =>
-  readdirSync(join(SPECS, d)).filter((n) => /^us-\d{3}-.*\.md$/.test(n)).map((n) => join(SPECS, d, n)),
-);
-const strayOld = readdirSync(SPECS).filter((n) => /^F\d{2}-.*\.md$/.test(n));
+const specEntries = readdirSync(SPECS);
+for (const n of specEntries) {
+  if (statSync(join(SPECS, n)).isDirectory()) errors.push(`[layout] docs/specs/${n}/ is a folder; specs must sit directly in docs/specs/`);
+}
+const featureFiles = specEntries.filter((n) => /^\d{2}-f\d{2}-.*\.md$/.test(n));
+const specFiles = specEntries.filter((n) => /^\d{2}-us-\d{3}-.*\.md$/.test(n)).map((n) => join(SPECS, n));
+const strayOld = specEntries.filter((n) => /^F\d{2}-.*\.md$/.test(n));
 for (const f of strayOld) errors.push(`[layout] old multi-story spec still present: docs/specs/${f}`);
+
+// F05 → '09' (build order taken from the feature page's file name)
+const featureOrder = new Map();
+for (const n of featureFiles) {
+  const [, order, f] = n.match(/^(\d{2})-(f\d{2})-/);
+  const id = f.toUpperCase();
+  if (featureOrder.has(id)) errors.push(`[layout] ${id} has more than one feature page`);
+  featureOrder.set(id, order);
+}
+const orders = [...featureOrder.values()];
+if (new Set(orders).size !== orders.length) errors.push('[layout] two feature pages share the same order prefix');
 
 const storyToSpec = new Map();
 const acIds = new Map(); // F05-AC3 → spec file
@@ -117,7 +134,13 @@ for (const file of specFiles) {
     continue;
   }
   const us = declared[0];
-  if (!name.includes(`/${us.toLowerCase()}-`)) errors.push(`[one-story] ${name}: file name does not match ${us}`);
+  if (!name.includes(`-${us.toLowerCase()}-`)) errors.push(`[one-story] ${name}: file name does not match ${us}`);
+
+  // 0. Order prefix matches the spec's feature
+  const feature = text.match(/^\| \*\*Feature\*\* \| \[(F\d{2})/m)?.[1];
+  const order = featureOrder.get(feature);
+  if (!order) errors.push(`[layout] ${name}: feature ${feature ?? '(none)'} has no feature page in docs/specs/`);
+  else if (!name.startsWith(`docs/specs/${order}-`)) errors.push(`[layout] ${name}: prefix should be ${order}- (build order of ${feature})`);
 
   // 2. No story in several specs
   if (storyToSpec.has(us)) errors.push(`[duplicate] ${us} is in ${rel(storyToSpec.get(us))} and ${name}`);
@@ -169,13 +192,8 @@ for (const [f, nums] of byFeature) {
 }
 
 // 5b. Feature requirement sets are mapped to stories
-for (const d of featureDirs) {
-  const readme = join(SPECS, d, 'README.md');
-  if (!existsSync(readme)) {
-    errors.push(`[layout] ${d} has no README.md`);
-    continue;
-  }
-  const line = readFileSync(readme, 'utf8').match(/^\*\*Requirements:\*\* (.+)$/m)?.[1] ?? '';
+for (const d of featureFiles) {
+  const line = readFileSync(join(SPECS, d), 'utf8').match(/^\*\*Requirements:\*\* (.+)$/m)?.[1] ?? '';
   for (const id of expandIds(line)) {
     if (!srsIds.has(id)) warnings.push(`[requirements] ${d}: feature set lists ${id}, which is not defined in SRS.md`);
     else if (!mappedIds.has(id)) warnings.push(`[requirements] ${d}: ${id} is in the feature set but mapped to no story`);

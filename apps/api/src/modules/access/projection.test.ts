@@ -1,4 +1,4 @@
-// F10 · Student and Parent access — unit: projectFor(audience) (docs/specs/13-f10-student-parent-access/)
+// F10 · Student and Parent access — unit: projectFor(audience) (docs/specs/13-f10-student-parent-access.md)
 import { describe, it } from 'vitest';
 
 describe('F10 · projectFor()', () => {

@@ -1,5 +1,6 @@
-// Checks that every detailed acceptance criterion in the story specs (docs/specs/<feature>/us-*.md)
-// has at least one E2E test, and that no E2E test cites a criterion that does not exist.
+// Checks that every detailed acceptance criterion in the story specs (docs/specs/<NN>-us-*.md)
+// has at least one E2E test, that no E2E test cites a criterion that does not exist, and that every
+// test citing a story's criterion is tagged with that story (the spec gate selects tests by tag).
 // Usage: node e2e/scripts/traceability.mjs [US-022 | F05]
 import { loadSpecs, loadTests, selectSpecs } from './lib.mjs';
 
@@ -16,8 +17,9 @@ const known = new Set(all.flatMap((s) => s.criteria));
 let failed = false;
 console.log('Spec        Criteria  Covered  Missing  E2E tests  Pending');
 for (const spec of specs) {
-  const specTests = tests.filter((t) => t.tags.includes(spec.id) || t.ids.some((id) => spec.criteria.includes(id)));
+  const specTests = tests.filter((t) => t.tags.includes(spec.id));
   const covered = new Set(specTests.flatMap((t) => t.ids));
+  const untagged = tests.filter((t) => !t.tags.includes(spec.id) && t.ids.some((id) => spec.criteria.includes(id)));
   const missing = spec.criteria.filter((id) => !covered.has(id));
   const pending = specTests.filter((t) => t.pending).length;
   const col = (v, w) => String(v).padStart(w);
@@ -25,6 +27,10 @@ for (const spec of specs) {
   if (missing.length) {
     failed = true;
     console.log(`      missing: ${missing.join(', ')}`);
+  }
+  for (const t of untagged) {
+    failed = true;
+    console.log(`      not tagged ${spec.id}, so its gate never runs it: [${t.layer}] ${t.file} — ${t.title}`);
   }
 }
 

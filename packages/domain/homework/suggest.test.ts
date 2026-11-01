@@ -1,4 +1,4 @@
-// F08 · Homework and carry forward — unit (docs/specs/11-f08-homework-carry-forward/)
+// F08 · Homework and carry forward — unit (docs/specs/11-f08-homework-carry-forward.md)
 import { describe, it } from 'vitest';
 
 describe('F08 · suggest() eligibility', () => {
@@ -6,6 +6,11 @@ describe('F08 · suggest() eligibility', () => {
   it.todo('F08-AC5 (US-035) NOT_REMEMBERED with remaining > 0 is suggested with its remaining quantity and source attempt');
   it.todo('F08-AC6 (US-035) ABSENT, NOT_ASSIGNED, PENDING, and COMPLETED are not suggested (AC-HW-09)');
   it.todo('F08 unit: eligibility uses only the latest attempt per portion');
+});
+
+describe('F08 · Sabaq carry-forward (2026-11-01)', () => {
+  it.todo('F08-AC22 (US-035) a partial Sabaq keeps its Surah, Ayat range, and Total Lines, and suggests the remaining lines (AC-HW-10)');
+  it.todo('F08-AC22 (US-035) Sabqi and Manzil suggestions keep their Para and unit unchanged');
 });
 
 describe('F08 · remaining', () => {

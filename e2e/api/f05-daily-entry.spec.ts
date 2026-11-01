@@ -1,4 +1,4 @@
-// F05 · Daily Hifz entry — API E2E (docs/specs/09-f05-daily-hifz-entry/)
+// F05 · Daily Hifz entry — API E2E (docs/specs/09-f05-daily-hifz-entry.md)
 // Screen journeys: e2e/mobile/f05-daily-entry/.
 import { test } from './support/fixtures';
 
@@ -40,9 +40,24 @@ test.describe('F05 · Daily Hifz entry', { tag: '@F05' }, () => {
     // As teacher.a1 update the mode → forbidden.
   });
 
-  test.fixme('F05-AC10 (US-020) a Sabaq portion stores every field', async () => {
-    // Save Sabaq: Para 5, Surah/Ayat range, assigned Half, completed Half, COMPLETED, 1 mistake, quality 2, remarks.
-    // Read it back: every field matches, quantities as (unit, numerator, denominator).
+  test.fixme('F05-AC10 (US-020) a Sabaq portion stores its range, lines, derived Para, and every other field', async () => {
+    // Save Sabaq: Al-Baqarah Ayat 1–10, total 10 LINES, assigned 10, completed 10, COMPLETED, 1 mistake, quality 2, remarks.
+    // Read it back: every field matches; para_number is derived (Para 1) although none was sent; quantities are LINES.
+  });
+
+  test.fixme('F05-AC20 (US-020) a Sabaq portion in a Para unit is rejected; Sabqi and Manzil still accept Para presets', async () => {
+    // Save Sabaq with assigned Half (PARA 1/2) → validation error on the unit; nothing stored.
+    // Save Sabqi Para 3 Salasah and Manzil Para 10 Rubu in the same record → accepted.
+  });
+
+  test.fixme('F05-AC21 (US-020) a Sabaq range crossing two Surahs or ending before it starts is rejected', async () => {
+    // Al-Fatihah 5 → Al-Baqarah 3 → refused (one Surah per portion). Al-Baqarah 10 → 1 → refused.
+    // Al-Baqarah 1–10 with no assigned lines sent → assigned defaults to total_lines.
+  });
+
+  test.fixme('F05-AC22 (US-020) Sabaq remaining lines, line limits, and the Not Remembered default', async () => {
+    // Assigned 10, completed 7 → remaining 3 LINES. Completed 11 → refused. Assigned 12 with total 10 → refused. Completed 2.5 → refused.
+    // NOT_REMEMBERED with assigned 10 and no completed → completed 0, remaining 10 LINES.
   });
 
   test.fixme('F05-AC11 (US-021) Sabqi portions keep independent statuses', async () => {

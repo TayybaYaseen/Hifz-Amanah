@@ -1,4 +1,4 @@
-# F09 · Weekly and monthly reports — mobile E2E (docs/specs/12-f09-weekly-monthly-reports/; design.md §4.10)
+# F09 · Weekly and monthly reports — mobile E2E (docs/specs/12-f09-weekly-monthly-reports.md; design.md §4.10)
 # Covers: F09-AC1, F09-AC3, F09-AC4, F09-AC5, F09-AC6, F09-AC7, F09-AC14
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F09 weekly report — range, units, latest attempt, homework, quality, correction

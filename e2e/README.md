@@ -20,6 +20,20 @@ The gate fails unless all four hold:
 
 `npm run e2e:gate -- F05` gates every story in a feature at once.
 
+A story whose tests are all in one layer (API-only or mobile-only) skips the other layer. The gate never reads an earlier run's report, and it fails if Playwright runs a different number of tests than the gate found.
+
+**Gate results.** Only `PASS` exits 0, so nothing short of a full pass completes a spec.
+
+| Result | Exit | Meaning | What to do |
+|---|---|---|---|
+| `PASS` | 0 | Every test for the story ran and passed | The spec is complete |
+| `FAIL` | 1 | A test ran and failed, or the run did not match the tests found | Fix the code or the test |
+| `INCOMPLETE` | 3 | A criterion has no E2E test, or a test cites a criterion without its story tag | Write or tag the test |
+| `PENDING` | 4 | Tests exist but are still `test.fixme` / tagged `pending` | Expected until the feature is implemented |
+| `BLOCKED` | 5 | Tests are ready, but no API answers at `E2E_API_URL`, `APP_ID` is unset, or the Maestro CLI is missing | Set up the environment |
+
+Exit code 2 means the argument was not a story, feature, or `APP`.
+
 A mobile flow can cover several stories, and it carries one tag per story. Until it is implemented, it keeps each of those stories' gates pending. Split the flow if one story needs to finish first.
 
 App-wide tests (`APP`) are the **release gate**: `npm run e2e:gate -- APP`. They span several specs, so they

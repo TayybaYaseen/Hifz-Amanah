@@ -2,8 +2,11 @@
 
 **Document type:** Software Requirements Specification\
 **Status:** Consolidated planning baseline; not implemented\
-**Version:** 1.11\
-**Last updated:** 2026-10-30\
+**Version:** 1.12\
+**Last updated:** 2026-11-01\
+**Changes in 1.12:** Sabaq is now measured in lines over one Surah's Ayat range (§17 DEC-B60…B64). Para-fraction options (Rubu, Half, Salasah, Complete) are not offered for Sabaq. Sabqi and Manzil are unchanged.
+- New requirements: FR-SAB-008…010, FR-QTY-010, FR-HW-018; business rule §9 #18; acceptance tests AC-QTY-07/08, AC-HW-10, AC-XLS-07.
+- Changed requirements: FR-SAB-001…004, FR-QTY-001/002, FR-HW-002/005, FR-SBQ-003 (note only), and §1.5, §6.2, §8.2, §10.8, §15.1.\
 **Changes in 1.11:** Every open decision was closed in the product-owner review of 2026-10-30. The new §17 is the decision register.
 - Two items are Deferred: the Android application ID and the AI provider vendor.
 - New requirements: FR-AUTH-012…016, FR-ORG-007, FR-CLS-003, FR-STU-005/006, FR-CAL-007…010, FR-DAY-010/011, FR-QTY-009, FR-ATT-011/012, FR-SAB-007, FR-HW-016/017, FR-RPT-010/011, FR-PORT-006/007, FR-I18N-009, FR-PDF-004, FR-AI-013/014, FR-NOT-004, FR-XLS-018, NFR-PRV-005, NFR-PERF-006, NFR-OFF-011, NFR-MNT-005.
@@ -51,7 +54,7 @@ than requiring duplicate manual totals.
 
 ### 1.5 Terminology
 
--   **Sabaq:** New memorization.
+-   **Sabaq:** New memorization. A Sabaq portion is one Surah's Ayat range, measured in lines (§5.6).
 -   **Sabqi:** Recent revision of memorized work.
 -   **Manzil:** Older revision.
 -   **Para/Juz:** One of the Quran's 30 sections.
@@ -398,16 +401,20 @@ show row-level success and errors.
 
 ### 5.6 Sabaq requirements
 
-**FR-SAB-001:** A Sabaq portion must support Para/Juz number.
+*Revised 2026-11-01 (§17 DEC-B60…B64):* Sabaq is the new lesson a student recites to the Teacher. It is measured in lines over a Surah/Ayat range, never in Para fractions. Sabqi (§5.7) and Manzil (§5.8) keep their Para-based quantities.
 
-**FR-SAB-002:** A Sabaq portion must support optional Surah, start Ayat,
-and end Ayat.
+**FR-SAB-001:** A Sabaq portion must store the Para/Juz it falls in. *Revised 2026-11-01 (DEC-B63):* the Teacher does not enter the Para. The system derives it from the portion's Surah and start Ayat, using the active Quran metadata (FR-SAB-005), and stores it for display, reports, and the Sabqi default (FR-SBQ-003).
 
-**FR-SAB-003:** A Sabaq portion must record assigned quantity and
-completed quantity separately.
+**FR-SAB-002:** *Revised 2026-11-01 (DEC-B60, DEC-B62):* A Sabaq portion must record a Surah, a starting Ayat, and an ending Ayat. All three are required. The range lies within one Surah, and the starting Ayat is less than or equal to the ending Ayat. A lesson that crosses into the next Surah is recorded as two Sabaq portions.
+
+**FR-SAB-003:** *Revised 2026-11-01 (DEC-B60, DEC-B61):* A Sabaq portion must record its quantities in lines (`LINES`) only:
+- **Total Lines:** the number of lines the Surah/Ayat range covers in the Mushaf edition in use (FR-SAB-006). A positive integer.
+- **Assigned Lines:** the lines the student was given from that range. A positive integer, at most Total Lines. It defaults to Total Lines.
+- **Completed Lines:** the lines the student recited. A whole number from 0 to Assigned Lines.
+- **Remaining Lines:** calculated, never entered: `max(0, Assigned Lines − Completed Lines)` (FR-QTY-005). For example, 10 assigned and 7 completed leave 3 remaining.
 
 **FR-SAB-004:** A Sabaq portion must support mistakes, quality rating,
-status, and optional teacher remarks.
+status, and optional teacher remarks. Statuses keep their meanings (FR-ATT-001): `NOT_REMEMBERED` defaults Completed Lines to 0 (FR-QTY-007), and `ABSENT`, `NOT_ASSIGNED`, and `PENDING` are never failure (FR-ATT-007).
 
 **FR-SAB-005:** Quran metadata (Surah, Ayat, and Para information) is managed by the Madrasa Admin, who can add/edit the reference information used by teachers. The MVP must not assume an external metadata provider or license has been selected. Validation uses the active admin-maintained metadata.
 
@@ -419,6 +426,19 @@ status, and optional teacher remarks.
 - Each madrasa starts from the seed. Admin edits to it are audited.
 - When an edit affects ranges already used by records, those records keep their stored ranges and are never changed automatically. Any that are no longer valid are listed for Admin review.
 
+**FR-SAB-008 (line count, added 2026-11-01, DEC-B64):** When the Teacher chooses a Sabaq Surah and Ayat range, the app pre-fills Total Lines from the 15-line Mushaf layout (FR-SAB-006, FR-SAB-007). The Teacher confirms or corrects it, and the confirmed number is stored with the edition it was counted on. A stored line count is never recalculated automatically, including after a metadata or layout edit (FR-SAB-007).
+
+**FR-SAB-009 (Sabaq validation, added 2026-11-01):** The server and the app reject a Sabaq portion when:
+- the Surah, starting Ayat, or ending Ayat is missing, or an Ayat is outside the Surah's Ayat count;
+- the starting Ayat is after the ending Ayat, or the range crosses a Surah boundary;
+- Total, Assigned, or Completed Lines is not a whole number, or Total or Assigned Lines is not positive;
+- Assigned Lines exceeds Total Lines, or Completed Lines exceeds Assigned Lines (extra work is a separate Extra portion, FR-QTY-006);
+- any quantity unit other than `LINES` is used, including the Para presets Rubu, Half, Salasah, and Complete (FR-QTY-010).
+
+Missing performance data is never read as completed lines (FR-QTY-008).
+
+**FR-SAB-010 (compatibility, added 2026-11-01):** No Sabaq record has been created yet, because the system is not implemented. If a Sabaq portion with a Para-fraction quantity ever reaches the system (for example, from a `DailyRecords` workbook built on an earlier template version), it is rejected for correction and never converted. There is no approved conversion between Para fractions and lines (FR-QTY-004).
+
 ### 5.7 Sabqi requirements
 
 **FR-SBQ-001:** Sabqi must support one or multiple Paras in a single
@@ -429,7 +449,7 @@ unit, mistakes, quality, status, and remarks.
 
 **FR-SBQ-003:** The system may suggest the current Sabaq Para as a
 default, but the teacher must be able to select the same Para, another
-Para, or multiple Paras.
+Para, or multiple Paras. *(2026-11-01: the "current Sabaq Para" is the Para derived from the Sabaq range, FR-SAB-001.)*
 
 **FR-SBQ-004:** Performance for one Sabqi Para must not overwrite or
 determine the status of another Para.
@@ -453,10 +473,10 @@ status if portions have different outcomes.
 
 **FR-QTY-001:** For Para-fraction units, the system must support
 Rubu/Rubah = 1/4 Para, Half = 1/2 Para, Salasah = 3/4 Para, and Complete
-= 1 full Para.
+= 1 full Para. *(2026-11-01: these presets are offered in Sabqi and Manzil, not in Sabaq; FR-QTY-010.)*
 
 **FR-QTY-002:** The UI must make the quantity unit explicit, such as
-Para fraction, lines, Ayat, or pages.
+Para fraction, lines, Ayat, or pages. Sabaq always shows lines (FR-QTY-010).
 
 **FR-QTY-003:** The system must represent quantity precisely and
 validate allowed ranges. It should use numerator/denominator or another
@@ -475,6 +495,15 @@ quantity must be calculated as
 - Reports show extra work separately.
 
 **FR-QTY-009:** `LINES`, `AYAT`, and `PAGES` quantities are whole numbers (0, 1, 2 …). Para quantities use the quarter presets (FR-QTY-001).
+
+**FR-QTY-010 (units by section, added 2026-11-01, DEC-B60):** Quantity validation depends on the section:
+
+| Section | Allowed units | Para presets (Rubu, Half, Salasah, Complete) |
+|---|---|---|
+| Sabaq | `LINES` only, with a Surah/Ayat range (FR-SAB-002, FR-SAB-003) | Not offered and rejected |
+| Sabqi, Manzil | Unchanged: `PARA` presets, `LINES`, `AYAT`, `PAGES` | Offered |
+
+This also applies to Extra portions, homework portions, and imported rows. Line quantities and Para fractions are never added, compared, or converted (FR-QTY-004).
 
 **FR-QTY-007:** If a portion is `NOT_REMEMBERED`, the default completed
 quantity is zero and remaining quantity is the applicable assigned
@@ -545,7 +574,7 @@ structured Sabaq, Sabqi, and Manzil portions.
 
 **FR-HW-002:** Each homework portion must support section type, Para,
 optional Surah/Ayat range, quantity, unit, status, and optional
-instructions.
+instructions. *Revised 2026-11-01 (FR-QTY-010):* a Sabaq homework portion has the Sabaq fields instead: a required single-Surah Ayat range, Total Lines, and Assigned Lines (FR-SAB-002, FR-SAB-003), with its Para derived (FR-SAB-001).
 
 **FR-HW-003:** Sabqi and Manzil homework must support multiple Para
 portions with independent quantities.
@@ -553,7 +582,7 @@ portions with independent quantities.
 **FR-HW-004:** A homework assignment must store assigned date, due/next-class date, status, creator, and optional general instructions/notes. The due date defaults to the student's next scheduled class day, skipping Sundays, holidays, closures, and no-class days. For example, Saturday's homework is due on Monday.
 
 **FR-HW-005:** The system must automatically calculate remaining
-quantity for eligible incomplete portions.
+quantity for eligible incomplete portions. Sabaq remaining is in lines; Sabqi and Manzil remaining keep the portion's own unit (FR-QTY-010).
 
 **FR-HW-006:** The system must generate a suggested next assignment from
 eligible remaining portions and link suggestions to their source
@@ -596,6 +625,13 @@ The homework is labelled "carried over — absent/holiday". It is not treated as
 - A Teacher may confirm homework while offline. The confirmation is saved on the device, queued, and shown as "Confirmed on device — waiting to sync".
 - On sync, the server checks that the draft's source records have not changed since the draft was built.
 - If they have changed, the confirmation becomes a sync conflict for review (FR-SYNC-008) instead of being applied.
+
+**FR-HW-018 (Sabaq carry-forward, added 2026-11-01):** When the latest attempt on a Sabaq portion is `PARTIAL` or `NOT_REMEMBERED` with Remaining Lines > 0, the suggested Sabaq homework portion:
+- keeps the original Surah, starting Ayat, ending Ayat, and Total Lines;
+- sets Assigned Lines to the Remaining Lines;
+- links to its source attempt (FR-HW-014).
+
+For example, Al-Baqarah Ayat 1–10 with 10 assigned lines and 6 completed is suggested as Al-Baqarah Ayat 1–10, Total Lines 10, Assigned Lines 4. The suggestion is a draft until the Teacher confirms it (FR-HW-008), and confirmed homework is never changed automatically (FR-HW-012). Sabqi and Manzil carry-forward is unchanged.
 
 ### 5.12 Weekly reports
 
@@ -884,7 +920,7 @@ attendance status, recorder, teacher notes, timestamps.
 
 **Lesson portion:** daily record, section type, Para, optional
 Surah/Ayat range, assigned/completed quantity, unit, mistakes, quality,
-performance status, remarks.
+performance status, remarks. *Revised 2026-11-01:* a Sabaq portion stores a required Surah, starting Ayat, and ending Ayat (one Surah), Total Lines, the Mushaf edition the lines were counted on, and assigned/completed quantities in `LINES`; its Para is derived (FR-SAB-001…003, FR-SAB-008). Sabqi and Manzil portions are unchanged.
 
 **Portion attempt:** daily record and lesson portion, optional homework
 portion, attempt time, recorder, assigned quantity snapshot, completed
@@ -897,7 +933,7 @@ creator, confirmer, confirmation time, timestamps.
 
 **Homework portion:** assignment, section type, Para/range, assigned
 quantity, unit, status, source homework portion and/or source attempt,
-instructions, timestamps.
+instructions, timestamps. A Sabaq homework portion also stores Total Lines, and its assigned quantity is in `LINES` (FR-HW-002, FR-HW-018).
 
 **Membership:** organization, user, role, status, timestamps.
 
@@ -1145,7 +1181,8 @@ Additional mobile-specific screens required:
 
 ### 8.2 Daily-entry usability
 
-The teacher should be able to select a student/date/class, enter Sabaq,
+The teacher should be able to select a student/date/class, enter Sabaq
+as a Surah/Ayat range with its line count,
 add one or more Sabqi and Manzil portions, record actual performance and
 mistakes, save notes with correct visibility, and view a suggested next
 homework. The bulk workflow records attendance only: Present, Late, Half day, Leave, or Absent for each student in a class grid, with no Hifz portion, mistake, or quality fields (FR-DAY-002A). Leave needs a reason and Admin approval (FR-CAL-008). Unmarked students are confirmed in a dialog before saving (FR-CAL-010).
@@ -1181,6 +1218,9 @@ retry-safe.
 16. Repeated attempts must not be double-counted as separate assigned
     portions in aggregate progress.
 17. Missing data is not the same as zero performance.
+18. Sabaq is measured in whole lines over one Surah's Ayat range. Para
+    fractions apply to Sabqi and Manzil only (added 2026-11-01,
+    FR-QTY-010).
 
 ## 10. Acceptance criteria and test scenarios
 
@@ -1197,6 +1237,14 @@ retry-safe.
     without an explicitly supported separate extra-work portion.
 -   **AC-QTY-06:** Multiple Manzil Paras can show different statuses
     without overwriting one another.
+-   **AC-QTY-07:** A Sabaq portion offers and accepts only lines; Rubu,
+    Half, Salasah, and Complete are not offered for Sabaq and are
+    rejected by the server, while Sabqi and Manzil still offer all four
+    (added 2026-11-01, FR-QTY-010).
+-   **AC-QTY-08:** A Sabaq portion for Al-Baqarah Ayat 1–10 with 10
+    assigned and 7 completed lines shows 3 remaining lines; 11 completed
+    lines, a start Ayat after the end Ayat, or a range crossing two
+    Surahs is rejected (added 2026-11-01, FR-SAB-003, FR-SAB-009).
 
 ### 10.2 Status and attendance tests
 
@@ -1228,6 +1276,10 @@ retry-safe.
     portion/attempt where possible.
 -   **AC-HW-09:** Absent/not-assigned/pending work is not automatically
     treated as failed work.
+-   **AC-HW-10:** A partial Sabaq of Al-Baqarah Ayat 1–10 (10 assigned,
+    6 completed lines) produces a draft suggestion for the same range
+    with 4 assigned lines, linked to its source attempt (added
+    2026-11-01, FR-HW-018).
 
 ### 10.4 Report tests
 
@@ -1281,12 +1333,13 @@ retry-safe.
 -   **AC-XLS-04:** Existing records are not overwritten without an explicit update preview and confirmation.
 -   **AC-XLS-05:** Student, daily-record, and report exports respect tenant scope and permissions.
 -   **AC-XLS-06:** Internal-only notes are excluded from student/guardian exports, and exported text is safe against spreadsheet formula execution.
+-   **AC-XLS-07:** A `DailyRecords` row with `SectionType = SABAQ` is invalid unless it has `SurahStart`, `AyahStart`, `AyahEnd`, `TotalLines`, and `QuantityUnit = LINES`; a Sabaq row with `RUBU`, `HALF`, `SALASAH`, or `COMPLETE` is invalid. Sabqi and Manzil rows are validated as before (added 2026-11-01).
 
 ### 10.8 End-to-end scenario
 
 1.  Admin creates a class and assigns the Teacher; the Teacher adds a student to that class (FR-CLS-001, FR-STU-001; corrected 2026-10-30, §17 DEC-B04).
-2.  Teacher records a daily Sabaq portion and multiple Sabqi/Manzil
-    portions.
+2.  Teacher records a daily Sabaq portion (a Surah/Ayat range with its
+    line count) and multiple Sabqi/Manzil Para portions.
 3.  Student recites part of the assigned work; teacher records completed
     quantity, mistakes, quality, and status.
 4.  System calculates remaining quantity and drafts a next-class
@@ -1438,6 +1491,9 @@ These decisions clarify the initial workbook contract, import safety, AI behavio
 **Daily Hifz template/export (`DailyRecords` sheet):** `ExternalRecordID` (optional stable key), `ExternalStudentID` (required and mapped to a student in the active organization), `RecordDate` (`YYYY-MM-DD`), `SessionLabel` (required when the madrasa uses multiple-session mode; otherwise optional/not applicable), `SectionType` (`SABAQ`, `SABQI`, `MANZIL`), `PortionNumber`, `ParaNumber` where applicable, optional `SurahStart`, `AyahStart`, `SurahEnd`, `AyahEnd`, `AssignedQuantity`, `CompletedQuantity`, `QuantityUnit`, optional `MistakeCount`, `PerformanceStatus`, optional `QualityRating`, and optional `TeacherNotes`.
 
 - One row represents one portion; multiple portion rows can belong to one logical daily record.
+- *Revised 2026-11-01 (FR-QTY-010, FR-SAB-009):* a new optional column `TotalLines` follows `AyahEnd`, so the template's `TemplateVersion` is incremented, and workbooks on the earlier version are rejected (FR-XLS-018).
+  - **Sabaq rows** (`SectionType = SABAQ`) require `SurahStart`, `AyahStart`, `AyahEnd`, and `TotalLines`. `SurahEnd` is empty or equal to `SurahStart`. `ParaNumber` may be left empty because it is derived; a value that disagrees with the range makes the row invalid. `QuantityUnit` must be `LINES`, and `AssignedQuantity` ≤ `TotalLines`. Rows with any other unit are invalid and are never converted (FR-SAB-010).
+  - **Sabqi and Manzil rows** are unchanged. `TotalLines` is left empty.
 - Supported quantity units include `RUBU`, `HALF`, `SALASAH`, `COMPLETE`, `LINES`, `AYAT`, and `PAGES`. Incompatible units must not be added or compared without an approved conversion.
 - `PerformanceStatus` is one of `COMPLETED`, `PARTIAL`, `NOT_REMEMBERED`, `ABSENT`, `NOT_ASSIGNED`, or `PENDING`. Attendance and performance remain distinct.
 - Missing mistake count or quality means unknown/not recorded, not zero. QualityRating is an optional integer from 1 to 5; missing means unknown, not zero. The workbook stores the numeric score; labels follow FR-ATT-009.
@@ -1566,7 +1622,7 @@ This register supersedes conflicting earlier draft statements in this document. 
 
 ## 17. Decision register (review of 2026-10-30)
 
-This is the central register of every decision that was open anywhere in the repository on 2026-10-30. It supersedes conflicting wording elsewhere, as §16 does.
+This is the central register of every decision that was open anywhere in the repository on 2026-10-30. It supersedes conflicting wording elsewhere, as §16 does. Later decisions are added with their date (DEC-B60…B64, Sabaq lines, 2026-11-01).
 
 - **History:** the original questions, their source references and the Q&A history are in [decision-log.md](decision-log.md).
 - **Source:**
@@ -1679,6 +1735,11 @@ This is the central register of every decision that was open anywhere in the rep
 | DEC-B57 | Dual enrollment | One active class | Approved | PO Q&A | Clear scope and reports | FR-STU-006 | US-012 | F03-AC18 |
 | DEC-B58 | Duplicate class names | Blocked (case-insensitive, active classes) | Approved | PO Q&A | Unambiguous Excel mapping | FR-CLS-003 | US-010 | F03-AC14 |
 | DEC-B59 | Page size | 25, more on scroll | Approved | PO Q&A | Low-end phones | NFR-PERF-001 | US-011 | F03-AC19 |
+| DEC-B60 | How is Sabaq measured? *(2026-11-01)* | Lines over a Surah/Ayat range. Rubu, Half, Salasah, and Complete are not offered for Sabaq. Sabqi and Manzil are unchanged | Approved | PO request 2026-11-01 | Sabaq is a new lesson, recited and counted by lines | FR-SAB-002/003/009/010, FR-QTY-010, FR-HW-002 | US-020, US-033, US-059 | F05-AC10, F05-AC20, F05-AC22, F08-AC1, F14-AC23 |
+| DEC-B61 | Total Lines vs. Assigned Lines *(2026-11-01)* | Total Lines = lines the range covers; Assigned Lines ≤ Total and defaults to it. A carry-forward keeps the range and Total and assigns the remaining lines | Approved | PO Q&A 2026-11-01 | Keeps the original reference on carried-forward work | FR-SAB-003, FR-HW-018 | US-020, US-035 | F05-AC21, F08-AC22 |
+| DEC-B62 | Can one Sabaq portion cross Surahs? *(2026-11-01)* | No. One Surah per portion; a lesson crossing Surahs is two portions | Approved | PO Q&A 2026-11-01 | Matches the Surah + start/end Ayat fields | FR-SAB-002 | US-020 | F05-AC21 |
+| DEC-B63 | Para on a Sabaq portion *(2026-11-01)* | Derived from the range, not entered | Approved | PO Q&A 2026-11-01 | Keeps Para-wise reports and the Sabqi default | FR-SAB-001, FR-SBQ-003 | US-020, US-021 | F05-AC10, F05-AC21 |
+| DEC-B64 | Where does Total Lines come from? *(2026-11-01)* | Pre-filled from the 15-line Mushaf layout; the Teacher confirms or corrects; stored with its edition and never recalculated | Approved | PO Q&A 2026-11-01 | Explicit count that respects the edition | FR-SAB-008 | US-020 | F05-AC21 |
 
 ### 17.3 Open items after this review
 

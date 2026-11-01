@@ -1,4 +1,4 @@
-# F03 · Classes and students — mobile E2E (docs/specs/06-f03-classes-students/; design.md §4.5, §4.6)
+# F03 · Classes and students — mobile E2E (docs/specs/06-f03-classes-students.md; design.md §4.5, §4.6)
 # Covers: F03-AC6, F03-AC7, F03-AC8, F03-AC9, F03-AC10
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F03 students — add, duplicate external ID, search and filter, deactivate and reactivate

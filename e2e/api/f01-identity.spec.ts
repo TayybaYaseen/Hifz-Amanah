@@ -1,4 +1,4 @@
-// F01 · Identity and authentication — API E2E (docs/specs/01-f01-identity-authentication/)
+// F01 · Identity and authentication — API E2E (docs/specs/01-f01-identity-authentication.md)
 // Server-enforced behaviour. Screen journeys: e2e/mobile/f01-identity/.
 import { test } from './support/fixtures';
 

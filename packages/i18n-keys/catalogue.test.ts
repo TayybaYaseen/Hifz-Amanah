@@ -1,4 +1,4 @@
-// F11 · Localization and accessibility — unit: message catalogues (docs/specs/02-f11-localization-accessibility/)
+// F11 · Localization and accessibility — unit: message catalogues (docs/specs/02-f11-localization-accessibility.md)
 import { describe, it } from 'vitest';
 
 describe('F11 · catalogue completeness', () => {

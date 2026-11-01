@@ -1,0 +1,22 @@
+# F05 · Daily Hifz entry — mobile E2E (docs/specs/09-us-020-record-sabaq.md; design.md §4.7, §5.3)
+# Covers: F05-AC20, F05-AC21, F05-AC22
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F05 daily entry — Sabaq by Surah/Ayat range and lines
+tags:
+  - pending
+  - F05
+  - US-020
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher.a1 → Daily Entry → today, class A1, student S1, Present.
+# 2. Sabaq · Add portion: no unit picker and no Rubu / Half / Salasah / Complete; the quantity shows "lines".   (F05-AC20)
+# 3. Sabqi · Add portion and Manzil · Add portion: Rubu, Half, Salasah, and Complete are all offered.           (F05-AC20)
+# 4. Sabaq: choose Al-Baqarah, Ayat 1 to 10 → Para 1 shown read-only; Total Lines pre-filled "From Mushaf layout";
+#    Assigned Lines equals Total Lines. Change Total Lines to 10 → the "From Mushaf layout" hint disappears.     (F05-AC21)
+# 5. Change the range to Ayat 10 to 1 → error "ending Ayat must not be before the starting Ayat".              (F05-AC21)
+# 6. Choose Al-Fatihah 5 to Al-Baqarah 3 → error "the range must stay within one Surah".                       (F05-AC21)
+# 7. Back to Al-Baqarah 1–10, Total 10, Assigned 10; Completed 7 → Remaining Lines shows 3.                    (F05-AC22)
+# 8. Completed 11 → error "completed lines cannot be more than assigned lines"; Assigned 12 → error
+#    "assigned lines cannot be more than total lines".                                                         (F05-AC22)
+# 9. Clear Completed; status Not Remembered; save → record shows 0 completed and 10 remaining lines.            (F05-AC22)

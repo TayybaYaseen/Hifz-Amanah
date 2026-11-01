@@ -1,4 +1,4 @@
-// F07 · Mistakes and quality — API E2E (docs/specs/10-f07-mistakes-quality/)
+// F07 · Mistakes and quality — API E2E (docs/specs/10-f07-mistakes-quality.md)
 // Screen journeys: e2e/mobile/f07-quality/.
 import { test } from './support/fixtures';
 

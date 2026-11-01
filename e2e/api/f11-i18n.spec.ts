@@ -1,4 +1,4 @@
-// F11 · Localization and accessibility — API E2E (docs/specs/02-f11-localization-accessibility/)
+// F11 · Localization and accessibility — API E2E (docs/specs/02-f11-localization-accessibility.md)
 // Screen journeys: e2e/mobile/f11-i18n/.
 import { test } from './support/fixtures';
 

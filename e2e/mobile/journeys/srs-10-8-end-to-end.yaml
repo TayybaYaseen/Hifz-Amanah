@@ -11,9 +11,9 @@ tags:
 - launchApp:
     clearState: true
 # 1. admin.a creates class "Hifz J1" (teacher.a1); teacher.a1 adds student J1; admin.a links parent.p1 (verified). (SRS-10.8-1)
-# 2. teacher.a1 records J1: Sabaq Para 2 Salasah; Sabqi Para 1 Half; Manzil Para 29 and 30.            (SRS-10.8-2)
-# 3. Sabaq completed Half, Partial, one Tajweed Minor, quality 3; Sabqi Completed; Manzil 29 Partial; Manzil 30 Not Remembered. (SRS-10.8-3)
-# 4. Remaining shows Sabaq 1/4 Para; Homework → Suggested has Sabaq 1/4, Manzil 29, Manzil 30.         (SRS-10.8-4)
+# 2. teacher.a1 records J1: Sabaq Al-Baqarah 142–150, total 10 lines (Para 2 derived); Sabqi Para 1 Half; Manzil Para 29 and 30.            (SRS-10.8-2)
+# 3. Sabaq completed 6 lines, Partial, one Tajweed Minor, quality 3; Sabqi Completed; Manzil 29 Partial; Manzil 30 Not Remembered. (SRS-10.8-3)
+# 4. Remaining shows Sabaq 4 lines; Homework → Suggested has Sabaq Al-Baqarah 142–150 · 4 of 10 lines, Manzil 29, Manzil 30.         (SRS-10.8-4)
 # 5. Review and confirm → Confirmed with teacher.a1 and time.                                          (SRS-10.8-5)
 # 6. Next class: record attempts on the homework portions; each links to its homework portion.        (SRS-10.8-6)
 # 7. Weekly and monthly reports show both days from source data.                                       (SRS-10.8-7)

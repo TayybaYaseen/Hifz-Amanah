@@ -1,4 +1,4 @@
-// F07 · Mistakes and quality — unit: quality scale (docs/specs/10-f07-mistakes-quality/)
+// F07 · Mistakes and quality — unit: quality scale (docs/specs/10-f07-mistakes-quality.md)
 // Scale is lower-is-better: 1 Excellent … 5 Weak (SRS FR-ATT-009).
 import { describe, it } from 'vitest';
 

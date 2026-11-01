@@ -1,4 +1,4 @@
-// F09 · Weekly and monthly reports — unit: buildReport() (docs/specs/12-f09-weekly-monthly-reports/)
+// F09 · Weekly and monthly reports — unit: buildReport() (docs/specs/12-f09-weekly-monthly-reports.md)
 import { describe, it } from 'vitest';
 
 describe('F09 · period boundaries', () => {

@@ -1,10 +1,16 @@
-// F08 · Homework and carry forward — API E2E (docs/specs/11-f08-homework-carry-forward/)
+// F08 · Homework and carry forward — API E2E (docs/specs/11-f08-homework-carry-forward.md)
 // Screen journeys: e2e/mobile/f08-homework/.
 import { test } from './support/fixtures';
 
 test.describe('F08 · Homework and carry forward', { tag: '@F08' }, () => {
   test.fixme('F08-AC1 (US-033) each homework portion stores its own section, Para, range, quantity, and instructions', async () => {
-    // Create homework: Sabaq Para 5 Half, Sabqi Para 3 Rubu, Sabqi Para 4 Complete; read back three portions.
+    // Create homework: Sabaq Al-Baqarah 1–10, 10 of 10 LINES; Sabqi Para 3 Rubu; Sabqi Para 4 Complete; read back three portions.
+  });
+
+  test.fixme('F08-AC22 (US-035) a partial Sabaq is suggested with its original range and the remaining lines (AC-HW-10)', async () => {
+    // Record Sabaq Al-Baqarah 1–10, total 10, assigned 10, completed 6, PARTIAL.
+    // The draft Sabaq portion has Al-Baqarah 1–10, total_lines 10, assigned 4 LINES, source_attempt_id set, status DRAFT.
+    // A Sabqi Para 3 PARTIAL Salasah/Half in the same record is suggested as PARA 1/4.
   });
 
   test.fixme('F08-AC2 (US-033) an assignment stores dates, status, creator, and instructions', async () => {

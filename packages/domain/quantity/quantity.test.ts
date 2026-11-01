@@ -1,4 +1,4 @@
-// F06 · Quran portions — unit: quantity type (docs/specs/07-f06-quran-portions-metadata/)
+// F06 · Quran portions — unit: quantity type (docs/specs/07-f06-quran-portions-metadata.md)
 import { describe, it } from 'vitest';
 
 describe('F06 · presets', () => {
@@ -23,4 +23,10 @@ describe('F06 · totals', () => {
 describe('Decision review 2026-10-30 (SRS §17)', () => {
   it.todo('F06-AC16 (US-027) extra work is a separate Extra portion; completed never exceeds assigned');
   it.todo('F06-AC17 (US-026) Lines, Ayat, and Pages are whole numbers only');
+});
+
+describe('Sabaq in lines, 2026-11-01 (SRS §17 DEC-B60…B64)', () => {
+  it.todo('F05-AC20 (US-020) Sabaq accepts only LINES; Sabqi and Manzil accept the four Para presets');
+  it.todo('F05-AC21 (US-020) a Sabaq range must stay in one Surah with start Ayat ≤ end Ayat, and Assigned Lines defaults to Total Lines');
+  it.todo('F05-AC22 (US-020) Sabaq remaining lines is assigned − completed, never negative; completed ≤ assigned ≤ total');
 });

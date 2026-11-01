@@ -1,4 +1,4 @@
-// F02 · Organization and roles — unit: can(actor, action, resource) (docs/specs/03-f02-organization-roles/)
+// F02 · Organization and roles — unit: can(actor, action, resource) (docs/specs/03-f02-organization-roles.md)
 import { describe, it } from 'vitest';
 
 describe('F02 · default organization settings', () => {

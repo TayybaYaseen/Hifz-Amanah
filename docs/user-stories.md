@@ -2,8 +2,9 @@
 
 **Document type:** Product backlog / acceptance baseline  
 **Status:** Planning only — not implemented  
-**Version:** 1.4  
-**Last updated:** 2026-10-30  
+**Version:** 1.5  
+**Last updated:** 2026-11-01  
+**Changes in 1.5:** US-033 criterion 2 now says a Sabaq homework portion has a required Surah/Ayat range and a quantity in lines (SRS §17 DEC-B60). The criteria count is unchanged.  
 **Changes in 1.4:** Applied the decision review of 2026-10-30 (SRS §17).
 - **New stories:** US-071 (Manage my profile), US-072 (Owner/Admin two-factor sign-in), US-073 (Class summary report). That is 9 new criteria.
 - **Leave:** "Excused absence" is now Leave. US-016, US-017 and US-042 are retitled.
@@ -399,7 +400,7 @@ As a Teacher, I want to assign Sabaq, Sabqi, and Manzil homework.
 **Acceptance criteria**
 
 1. A homework assignment can contain Sabaq, Sabqi, and Manzil portions, with multiple independent Para portions for Sabqi and Manzil.
-2. Each homework portion stores section, Para, optional Surah/Ayat range, quantity with unit, status, and optional instructions.
+2. Each homework portion stores section, Para, Surah/Ayat range (required for Sabaq, optional for Sabqi and Manzil), quantity with unit (lines for Sabaq), status, and optional instructions.
 3. The assignment stores assigned date, due/next-class date, status, creator, and optional general instructions.
 
 #### US-034 — Calculate remaining work

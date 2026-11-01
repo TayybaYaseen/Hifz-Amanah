@@ -1,4 +1,4 @@
-// F11 · Localization and accessibility — unit: direction and bidi helpers (docs/specs/02-f11-localization-accessibility/)
+// F11 · Localization and accessibility — unit: direction and bidi helpers (docs/specs/02-f11-localization-accessibility.md)
 import { describe, it } from 'vitest';
 
 describe('F11 · direction', () => {

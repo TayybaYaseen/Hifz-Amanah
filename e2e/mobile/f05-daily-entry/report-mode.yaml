@@ -1,4 +1,4 @@
-# F05 · Daily Hifz entry — mobile E2E (docs/specs/09-f05-daily-hifz-entry/; design.md §4.7 Step 1)
+# F05 · Daily Hifz entry — mobile E2E (docs/specs/09-f05-daily-hifz-entry.md; design.md §4.7 Step 1)
 # Covers: F05-AC6, F05-AC7, F05-AC8, F05-AC9
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F05 report mode — single report, sessions, blocked switch, Teacher has no control

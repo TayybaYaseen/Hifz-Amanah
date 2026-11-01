@@ -1,4 +1,4 @@
-// F01 · Identity and authentication — unit (docs/specs/01-f01-identity-authentication/)
+// F01 · Identity and authentication — unit (docs/specs/01-f01-identity-authentication.md)
 import { describe, it } from 'vitest';
 
 describe('F01 · password policy', () => {

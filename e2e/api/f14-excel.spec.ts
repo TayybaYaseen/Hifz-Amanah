@@ -1,4 +1,4 @@
-// F14 · Excel import and export — API E2E (docs/specs/14-f14-excel-import-export/)
+// F14 · Excel import and export — API E2E (docs/specs/14-f14-excel-import-export.md)
 // Workbooks are built by the test from synthetic data (see e2e/fixtures/workbooks.md).
 // Screen journeys: e2e/mobile/f14-excel/.
 import { test } from './support/fixtures';
@@ -34,6 +34,12 @@ test.describe('F14 · Excel import and export', { tag: '@F14' }, () => {
 
   test.fixme('F14-AC8 (US-059) an organization named in the workbook is ignored', async () => {
     // Workbook with an organization_id column for Madrasa B; every row lands in Madrasa A or is invalid.
+  });
+
+  test.fixme('F14-AC23 (US-059) Sabaq rows need a range, TotalLines, and LINES (AC-XLS-07)', async () => {
+    // Upload daily-records-sabaq.xlsx: a valid SABAQ row (Al-Baqarah 1–10, TotalLines 10, LINES), a SABAQ row with HALF,
+    // a SABAQ row without AyahEnd, and a SABQI row with SALASAH.
+    // Preview: the first and last rows are new; the HALF row is invalid "Sabaq uses lines"; the row without AyahEnd is invalid.
   });
 
   test.fixme('F14-AC9 (US-059) MistakeCount becomes uncategorized mistakes', async () => {

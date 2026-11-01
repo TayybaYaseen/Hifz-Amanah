@@ -2,9 +2,10 @@
 
 **Document type:** System architecture (planning baseline)
 **Status:** Planning only — not implemented
-**Version:** 1.1
-**Last updated:** 2026-10-30
-**Requirements baseline:** `SRS.md` v1.11 (decision register §17, closed 2026-10-30), `user-stories.md` v1.4 (73 stories / 17 epics), `design.md` v1.6
+**Version:** 1.2
+**Last updated:** 2026-11-01
+**Requirements baseline:** `SRS.md` v1.12 (decision register §17), `user-stories.md` v1.4 (73 stories / 17 epics), `design.md` v1.7
+**Changes in 1.2:** Sabaq is measured in lines over one Surah's Ayat range (SRS §17 DEC-B60…B64, ADR-014). Quantity validation now depends on the section (§6.2). Sabaq fields were added to `lesson_portions` and `homework_portions` (§6.3), with a Sabaq carry-forward rule (§9.2), Excel rules (§11), compatibility notes (§6.6), and tests (§17). Sabqi and Manzil are unchanged.
 **Changes in 1.1:** Every "Proposed" item and ADR-001…011 was approved on 2026-10-30 (SRS §17 DEC-B51). The open gates are closed, and §7.3 is the approved matrix. The data model gained new attendance statuses, Leave, two-factor sign-in, the "all classes" flag, extra portions, and publishing. Two items are Deferred: the Android application ID and the AI provider vendor.
 
 > This document describes how HifzAmanah should be built. It does not authorize implementation. The decisions it depends on were closed on 2026-10-30 (SRS §17). Items formerly marked **Proposed** are now **Approved**; a change to any of them needs a new ADR and the product owner's approval. Two items remain **Deferred**: the Android application ID and the AI provider vendor.
@@ -20,7 +21,7 @@ These requirements shape the architecture the most. Each design choice below tra
 | D1 | Teachers must record attendance, daily Hifz portions, attempts, and draft homework **offline**, with durable local saves and idempotent sync later. | NFR-OFF-001…010, FR-SYNC-006…009, US-051…054 |
 | D2 | **Tenant isolation** and role/assignment-scoped access are enforced **server-side** for every record, export, PDF, notification, and AI request. | FR-SEC-001…010, NFR-SEC-007, US-008, US-068 |
 | D3 | **Reports are derived** from source records and must be reproducible. Offline reports are labeled provisional; server reports are authoritative. | FR-RPT-001…009, NFR-OFF-008, US-039…043 |
-| D4 | **Exact quantity math** with explicit units. Incompatible units are never added. Missing data never becomes zero. | FR-QTY-001…008, FR-ATT-007/008, FR-RPT-004/005 |
+| D4 | **Exact quantity math** with explicit units. Incompatible units are never added. Missing data never becomes zero. Allowed units depend on the section: Sabaq uses lines only. | FR-QTY-001…010, FR-SAB-001…010, FR-ATT-007/008, FR-RPT-004/005 |
 | D5 | **Homework is teacher-confirmed.** Suggestions stay drafts until confirmed. Source edits recalculate drafts but never silently change confirmed homework. | FR-HW-001…015, US-033…038 |
 | D6 | **Private teacher notes never leak** to Student/Parent surfaces (API, app, PDF, Excel, push). | FR-SEC-006, FR-PORT-003/004, US-046, US-057 |
 | D7 | **Three languages:** English (LTR), Urdu (RTL), Roman Urdu (LTR). Quranic Arabic is preserved exactly. Stored values are language-neutral. | FR-I18N-001…008, NFR-MNT-003, US-047…050 |
@@ -153,7 +154,7 @@ hifz-amanah/
     i18n-keys/              # typed message keys shared by app and server (PDF/Excel/push labels)
   docs/
     adr/                    # architecture decision records
-    specs/                  # one spec per user story, grouped by feature (docs/specs/README.md)
+    specs/                  # one spec per user story, in one folder in implementation order (docs/specs/README.md)
     SRS.md  user-stories.md  design.md  ARCHITECTURE.md  AGENTS.md  00-product-brief.md
 ```
 
@@ -172,8 +173,8 @@ Each module owns its tables, services, and API routes. Other modules call it onl
 | `access` | Policy engine: role + tenant + assignment scope + audience projection | FR-SEC-*, US-008, US-046, US-068 |
 | `roster` | Classes, teacher assignments, students, enrollments (with history), guardian links | FR-CLS-*, FR-STU-*, US-010…012 |
 | `calendar` | Class schedules, holidays/closures/no-class days, attendance (Present/Late/Half day/Leave/Absent), Leave approval | FR-CAL-*, US-013…017 |
-| `quran-ref` | Admin-managed Surah/Ayat/Para metadata, 15-line Mushaf configuration, range validation | FR-SAB-005/006, US-024…026 |
-| `hifz` | Daily records, lesson portions, attempts, mistakes, quality, performance labels, note visibility | FR-DAY-*, FR-SAB/SBQ/MNZ-*, FR-ATT-*, US-018…032 |
+| `quran-ref` | Admin-managed Surah/Ayat/Para metadata, 15-line Mushaf configuration, range validation. Its service exposes `paraFor(surah, ayah)` and `countLines(surah, ayahStart, ayahEnd, edition)` for Sabaq (FR-SAB-001, FR-SAB-008) | FR-SAB-005…008, US-024…026 |
+| `hifz` | Daily records, lesson portions, attempts, mistakes, quality, performance labels, note visibility. Validates each portion with the section's quantity rule from `packages/domain/quantity` | FR-DAY-*, FR-SAB/SBQ/MNZ-*, FR-QTY-010, FR-ATT-*, US-018…032 |
 | `homework` | Assignments, portions, suggestion engine, review/confirm/revise lifecycle | FR-HW-*, US-033…038 |
 | `reporting` | Weekly/monthly reports, report cache, PDF rendering, report templates | FR-WKR/MNR/RPT/PDF/EXP-*, US-039…043, US-055…057 |
 | `portal` | Student/Parent read-only report APIs (published, projected) | FR-PORT-*, US-044…046 |
@@ -212,6 +213,22 @@ A quantity is stored as **`(unit, numerator, denominator)`**. Never use floats.
 - `remaining = max(0, assigned − completed)` is computed only when both quantities have the same unit **and** belong to the same portion (FR-QTY-005).
 - Aggregation groups by unit. The domain package has **no** cross-unit conversion. Any future conversion requires an approved ADR.
 - `completed ≤ assigned` is enforced. Extra work beyond the assigned amount is recorded as a separate portion with `is_extra = true` (SRS FR-QTY-006, design D6). `LINES`, `AYAT`, and `PAGES` are whole numbers (FR-QTY-009).
+
+**Units by section (FR-QTY-010, ADR-014).** The domain package picks the quantity rule from the portion's section. The same rule validates lesson portions, Extra portions, homework portions, sync operations, and imported rows, on the device and on the server.
+
+| Section | Range | Quantities | Para presets |
+|---|---|---|---|
+| `SABAQ` | Required: one Surah, `ayah_start ≤ ayah_end` (FR-SAB-002) | `LINES` only. `total_lines` > 0; `0 < assigned ≤ total_lines`; `0 ≤ completed ≤ assigned` (FR-SAB-003) | Rejected |
+| `SABQI`, `MANZIL` | Unchanged (Para required, range optional) | Unchanged: `PARA`, `LINES`, `AYAT`, `PAGES` | Allowed |
+
+```text
+packages/domain/quantity
+  rulesFor(section) → { allowedUnits, requiresRange, singleSurah, hasTotalLines }
+  validatePortion(section, range, totalLines?, assigned, completed?) → FieldError[]
+  remaining(assigned, completed) → Quantity            -- same unit only; Sabaq: max(0, assigned − completed) lines
+```
+
+There is no conversion between lines and Para fractions. A Sabaq quantity never appears in a Para total, and the reverse is also true.
 
 ### 6.3 Core tables
 
@@ -263,7 +280,12 @@ hifz
   lesson_portions(id, organization_id, daily_record_id, section[SABAQ|SABQI|MANZIL], position,
                   para_number, surah_start, ayah_start, surah_end, ayah_end, is_extra BOOLEAN,
                   assigned_unit, assigned_num, assigned_den,
+                  total_lines NULL, line_count_edition NULL,  -- Sabaq only (FR-SAB-003, FR-SAB-008)
                   homework_portion_id NULL, row_version)
+    -- CHECK, section = SABAQ: surah_start, ayah_start, ayah_end NOT NULL; surah_end = surah_start;
+    --   ayah_start ≤ ayah_end; assigned_unit = LINES; total_lines > 0; assigned_num ≤ total_lines;
+    --   line_count_edition NOT NULL. para_number is derived from the range (FR-SAB-001).
+    -- CHECK, section ≠ SABAQ: total_lines and line_count_edition are NULL (Sabqi/Manzil unchanged).
   portion_attempts(id, organization_id, lesson_portion_id, attempt_no, attempted_at, recorded_by,
                    completed_unit, completed_num, completed_den,
                    status[COMPLETED|PARTIAL|NOT_REMEMBERED|ABSENT|NOT_ASSIGNED|PENDING],
@@ -284,7 +306,8 @@ homework
                        assigned_date, due_date, status[DRAFT|CONFIRMED|SUPERSEDED|REJECTED],
                        revision_of NULL, created_by, confirmed_by, confirmed_at, instructions, row_version)
   homework_portions(id, organization_id, assignment_id, section, para_number, surah/ayah range,
-                    assigned_unit/num/den, status, source_homework_portion_id NULL,
+                    assigned_unit/num/den, total_lines NULL,       -- Sabaq: same CHECKs as lesson_portions
+                    status, source_homework_portion_id NULL,
                     source_attempt_id NULL, origin[SUGGESTED|TEACHER_ADDED|TEACHER_EDITED], instructions)
 
 reporting / platform
@@ -321,6 +344,13 @@ Attendance lives in `attendance_records`. Performance lives in `portion_attempts
 - **Counting (FR-CAL-005):** attended = `PRESENT + LATE + HALF_DAY`; approved `LEAVE` is its own count; `ABSENT` and rejected `LEAVE` are normal absences.
 - **Holidays declared later (FR-CAL-009):** attendance and daily records on a date that later becomes a `calendar_exceptions` holiday are excluded at report time. They are never deleted.
 - **Unmarked students (FR-CAL-010):** no row is written until the Teacher confirms "Mark them Absent".
+
+### 6.6 Sabaq compatibility (FR-SAB-010)
+
+- No Sabaq data exists yet, so the first migration creates the line-based Sabaq columns and CHECKs directly. Nothing has to be converted.
+- A Sabaq portion in a Para unit is rejected wherever it arrives: a sync operation from an outdated app build (answered with `UPGRADE_REQUIRED` or a validation error, and the outbox entry is kept), or a workbook on an earlier `DailyRecords` template version (rejected by version, FR-XLS-018). Nothing converts Para fractions to lines.
+- `total_lines` is stored as confirmed by the Teacher, with `line_count_edition`. A later Quran metadata or layout edit never rewrites it; ranges that become invalid are listed for review (FR-SAB-007).
+- If more Mushaf editions are added after MVP, `line_count_edition` identifies how each stored count was made.
 
 ---
 
@@ -473,6 +503,8 @@ sequenceDiagram
 
 1. The teacher selects the date, class (optional), and student.
 2. The teacher adds Sabaq, Sabqi, and Manzil portions. Each portion has its own quantity, status, mistakes, quality, and notes (FR-SBQ-004, FR-MNZ-004).
+   - **Sabaq:** the teacher picks a Surah and an Ayat range. The app pre-fills Total Lines from `quran-ref.countLines` and derives the Para from `quran-ref.paraFor`. The teacher confirms or corrects Total Lines, then enters Assigned Lines (defaulting to Total) and Completed Lines (FR-SAB-001…003, FR-SAB-008).
+   - **Sabqi / Manzil:** unchanged. Para, optional range, and a Para preset or a lines/Ayat/pages quantity.
 3. Each recitation creates a `portion_attempt`. A later attempt adds a row and never edits the earlier one (FR-ATT-005).
 4. `NOT_REMEMBERED` defaults `completed` to 0 (FR-QTY-007). `ABSENT`, `NOT_ASSIGNED`, and `PENDING` carry no quality and are never treated as failure (FR-ATT-007).
 5. On save, the domain package recomputes remaining quantities and the **draft** homework suggestion.
@@ -488,6 +520,8 @@ suggest(latestAttemptsByPortion, priorConfirmedHomework, rules) → DraftPortion
 - **Eligible:** the latest attempt is `PARTIAL` or `NOT_REMEMBERED` and has remaining > 0 in the same unit.
 - **Excluded:** `ABSENT`, `NOT_ASSIGNED`, `PENDING`, and `COMPLETED` (FR-HW-013).
 - Each suggested portion links `source_attempt_id` and `source_homework_portion_id` (FR-HW-014).
+- **Sabaq (FR-HW-018):** the suggestion copies the source portion's Surah, Ayat range, and `total_lines`, and sets the assigned quantity to the remaining lines. For example, Al-Baqarah 1–10 with 10 assigned and 6 completed suggests Al-Baqarah 1–10, Total 10, Assigned 4 `LINES`.
+- **Sabqi / Manzil:** unchanged. The suggestion keeps the Para and the remaining quantity in the portion's own unit.
 
 **Lifecycle**
 
@@ -513,7 +547,7 @@ buildReport(period, tz, weekStart, schedule, exceptions, attendance, records, at
 - **Carried-over homework (FR-HW-016):** a confirmed assignment whose due day was Absent, Leave, or a holiday is reported as outstanding and "carried over"; it is never failed and never edited.
 - **Class summary (FR-RPT-011):** the same `buildReport` per student, aggregated into one row each.
 - **Progress** uses the **latest attempt per portion** for current status. Full history is available separately and is never double-counted (FR-RPT-006).
-- **Quantities** are grouped by unit and never mixed (FR-RPT-005).
+- **Quantities** are grouped by unit and never mixed (FR-RPT-005). Sabaq totals are in lines; Sabqi and Manzil totals keep their units. Para-wise progress places Sabaq under its derived Para.
 - **Quality average** includes recorded ratings only and shows `n` (FR-RPT-004). "No data" is shown distinctly from 0. The scale is 1 = Excellent … 5 = Weak, so **lower is better**. The display label is the nearest whole score with .5 rounding up, while the exact average is kept for calculations (FR-ATT-009).
 - **Homework counts** report confirmed, draft, attempted, completed, and carried forward separately (FR-RPT-007, FR-MNR-005).
 - **Cache:** `report_cache` stores `source_seq`. A change-log entry for an affected student or period invalidates the cache. A nightly verification job recomputes a sample of reports and compares them (FR-RPT-008).
@@ -554,6 +588,7 @@ flowchart LR
 - **Tenant:** comes from the session only. Any org column in the workbook is ignored (FR-XLS-015).
 - **Export safety:** cells beginning with `= + - @ \t \r` are prefixed with `'`. Canonical enums and Arabic text are written unchanged (FR-XLS-009, NFR-XLS-004).
 - **Templates** (`Students`, `DailyRecords`) are versioned exactly as specified in SRS §15.1. Each template has a hidden `_meta` sheet with `TemplateName` and `TemplateVersion`. Commits run in batches of 200 rows (FR-XLS-018). A Teacher imports students only into assigned classes (FR-XLS-001).
+- **Sabaq rows (SRS §15.1, FR-QTY-010):** row validation calls the same `validatePortion(section, …)` rule as the app. A `SABAQ` row needs `SurahStart`, `AyahStart`, `AyahEnd`, `TotalLines`, and `QuantityUnit = LINES`. A Para preset makes the row `INVALID`; it is never converted. `ParaNumber` is derived. Sabqi and Manzil rows are unchanged.
 - **Mapping note:** `DailyRecords.MistakeCount` is a single number, but the in-app model is categorized mistakes. Imported counts go to `portion_attempts.mistake_count_summary`, and reports show them as "uncategorized".
 
 ---
@@ -623,7 +658,7 @@ App (online, Teacher/Admin) → POST /analytics/{studentId}/ai-recommendation
 
 | Layer | What | Tooling (Approved) |
 |---|---|---|
-| Domain unit | Quantity math, status semantics, carry-forward eligibility, report aggregation, timezone/week boundaries — every AC-QTY, AC-ATT, AC-HW, and AC-RPT case from SRS §10 | Vitest + property-based tests (fast-check) for quantity math |
+| Domain unit | Quantity math, status semantics, carry-forward eligibility, report aggregation, timezone/week boundaries — every AC-QTY, AC-ATT, AC-HW, and AC-RPT case from SRS §10. Section rules are tested per section: Sabaq accepts only `LINES` with a single-Surah range (AC-QTY-07/08); Sabqi and Manzil keep all four Para presets; Sabaq carry-forward keeps the range (AC-HW-10) | Vitest + property-based tests (fast-check) for quantity math |
 | API integration | Real Postgres; authorization matrix tests per role × endpoint; cross-tenant ID probing (AC-SEC-01…05); projection tests for every outbound channel | Vitest + Testcontainers |
 | Sync | Replay/idempotency, dependency ordering, conflict creation, revocation, protocol upgrade, local migration with populated outbox | Integration + device tests |
 | Excel | Template validation, 1,000-row limit, duplicate replay, formula-injection escaping (AC-XLS-01…06) | Fixture workbooks |
@@ -675,6 +710,7 @@ App (online, Teacher/Admin) → POST /analytics/{studentId}/ai-recommendation
 | ADR-011 | Globally unique `login_id`, one account per madrasa | Approved 2026-10-30 |
 | ADR-012 | Authentication built into the API; TOTP two-factor sign-in for Owner/Admin | Approved 2026-10-30 |
 | ADR-013 | AWS Mumbai hosting with S3 and SES; Expo Push Service for Android push | Approved 2026-10-30 |
+| ADR-014 | Quantity rules chosen by section: Sabaq = `LINES` over a single-Surah range with `total_lines`; Sabqi/Manzil unchanged (extends ADR-005; no conversion) | Approved 2026-11-01 (SRS DEC-B60…B64) |
 
 ### 19.1 Implementation gates (closed 2026-10-30)
 

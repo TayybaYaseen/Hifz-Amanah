@@ -1,4 +1,4 @@
-# F12 · Offline and synchronization — mobile E2E (docs/specs/04-f12-offline-sync/; design.md §4.13, §5.9)
+# F12 · Offline and synchronization — mobile E2E (docs/specs/04-f12-offline-sync.md; design.md §4.13, §5.9)
 # Covers: F12-AC6, F12-AC8, F12-AC10
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F12 sync queue — states, retry, sign-out warning

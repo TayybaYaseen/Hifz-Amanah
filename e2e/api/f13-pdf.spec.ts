@@ -1,4 +1,4 @@
-// F13 · PDF and print — API E2E (docs/specs/16-f13-pdf-print/)
+// F13 · PDF and print — API E2E (docs/specs/16-f13-pdf-print.md)
 // Generated PDFs are fetched and inspected (text extraction and page images).
 // Screen journeys: e2e/mobile/f13-pdf/.
 // Fonts and page rules are approved (FR-PDF-004: Inter, Noto Nastaliq Urdu, Noto Naskh Arabic; A4). Golden images are recorded at implementation.

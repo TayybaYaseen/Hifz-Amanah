@@ -1,4 +1,4 @@
-# F08 · Homework and carry forward — mobile E2E (docs/specs/11-f08-homework-carry-forward/; design.md §4.9)
+# F08 · Homework and carry forward — mobile E2E (docs/specs/11-f08-homework-carry-forward.md; design.md §4.9)
 # Covers: F08-AC1, F08-AC2, F08-AC10, F08-AC11, F08-AC13, F08-AC14, F08-AC15, F08-AC16
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F08 confirm — explicit confirm, next class, correction, revise
@@ -11,7 +11,7 @@ tags:
 ---
 - launchApp:
     clearState: true
-# 1. Sign in as teacher.a1 → Homework → New: Sabaq Para 5 Half, Sabqi Para 3 Rubu, Sabqi Para 4 Complete,
+# 1. Sign in as teacher.a1 → Homework → New: Sabaq Al-Baqarah 1–10 (10 lines), Sabqi Para 3 Rubu, Sabqi Para 4 Complete,
 #    instructions, due date → save draft; reopen → all fields kept.                                     (F08-AC1, F08-AC2)
 # 2. Test control advances the clock past the due date → still in Suggested.                           (F08-AC11)
 # 3. Confirm homework → summary → accept → in Confirmed with teacher name and time.                    (F08-AC10)
