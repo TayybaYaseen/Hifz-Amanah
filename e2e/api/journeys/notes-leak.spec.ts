@@ -3,6 +3,7 @@
 import { test } from '../support/fixtures';
 
 // A unique marker written into a private note before each check, then searched for in raw output.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used once the sweep is implemented (F10)
 const PRIVATE_MARKER = 'E2E-PRIVATE-NOTE-7f3a';
 
 test.describe('APP · Internal-note leak sweep', { tag: '@APP' }, () => {

@@ -236,3 +236,19 @@ The product owner asked for Sabaq to be recorded by Surah, starting Ayat, ending
 - `ARCHITECTURE.md` v1.2 (ADR-014), `design.md` v1.7, `user-stories.md` v1.5 (US-033 criterion 2).
 - Specs: F05-AC10 and F08-AC1 revised; F05-AC20…22, F08-AC22, and F14-AC23 added (322 detailed criteria).
 - Tests: pending API, Maestro, and unit tests for the new criteria; Sabaq steps in existing pending tests now use lines.
+
+### 2026-11-02 — F01 implementation values (DEC-B65…B68)
+
+Implementing F01 needed four values that no document set. The product owner chose each in the Q&A when implementation started:
+
+| ID | Question | Answer |
+|---|---|---|
+| DEC-B65 | How long does a session last before the user must sign in again? | 30 days from sign-in (refreshing does not extend it); the access token stays about 15 minutes |
+| DEC-B66 | How recent is a "recent sign-in" for regenerating recovery codes? | 15 minutes |
+| DEC-B67 | What is the progressive delay after 5 failed sign-ins? | 1 s, 2 s, 4 s, 8 s, then 8 s, the same for unknown User IDs |
+| DEC-B68 | Docker is not available: how do local runs and tests get a database? | Embedded Postgres (PGlite) now; Docker Compose stays the CI setup |
+
+**Applied:**
+- `SRS.md` v1.13: register rows DEC-B65…B68.
+- `apps/api`: values in `src/modules/identity/rules.ts`; embedded Postgres in `src/platform/embedded-postgres.ts`.
+- Also while implementing F01 (no product decision needed): each organization has a short `code` used for the suggested User ID prefix (FR-AUTH-013), and the E2E personas' User IDs use hyphens (`teacher-a1`) because FR-AUTH-013 allows no dots.

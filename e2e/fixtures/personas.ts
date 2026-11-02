@@ -5,8 +5,8 @@
 export const TEST_PASSWORD = 'E2e-Test-Pass-1'; // Meets FR-AUTH-012 (8–64 characters, not a common password, not a User ID)
 
 export const madaris = {
-  A: { name: 'Madrasa Alif (test)', timezone: 'Asia/Karachi', weekStart: 'MONDAY', reportMode: 'SINGLE' },
-  B: { name: 'Madrasa Baa (test)', timezone: 'Asia/Karachi', weekStart: 'MONDAY', reportMode: 'SINGLE' },
+  A: { name: 'Madrasa Alif (test)', code: 'ALIF', timezone: 'Asia/Karachi', weekStart: 'MONDAY', reportMode: 'SINGLE' },
+  B: { name: 'Madrasa Baa (test)', code: 'BAA', timezone: 'Asia/Karachi', weekStart: 'MONDAY', reportMode: 'SINGLE' },
 } as const;
 
 export const classes = {
@@ -38,4 +38,9 @@ export const students = {
 } as const;
 
 export type PersonaKey = keyof typeof personas;
+
+/** The seeded User ID of a persona. User IDs allow only letters, digits, and hyphens (FR-AUTH-013). */
+export function loginIdOf(persona: PersonaKey): string {
+  return persona.replace(/\./g, '-');
+}
 export type StudentKey = keyof typeof students;

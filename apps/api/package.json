@@ -1,0 +1,29 @@
+{
+  "name": "@hifz/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/dev.ts",
+    "start": "node src/main.ts",
+    "e2e-server": "node src/e2e-server.ts",
+    "migrate": "node src/platform/migrate-cli.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sesv2": "^3.1161.0",
+    "@hifz/contracts": "*",
+    "@node-rs/argon2": "^2.2.2",
+    "fastify": "^5.12.8",
+    "jose": "^6.2.15",
+    "kysely": "^0.29.8",
+    "otpauth": "^9.5.2",
+    "pg": "^8.23.1",
+    "uuid": "^14.0.3",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.14",
+    "@electric-sql/pglite-socket": "^0.2.17",
+    "@types/pg": "^8.23.1"
+  }
+}
