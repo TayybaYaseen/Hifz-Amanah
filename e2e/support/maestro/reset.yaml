@@ -1,0 +1,11 @@
+# Subflow: reset the test environment to the seeded personas, then start the app fresh.
+appId: ${APP_ID}
+---
+- runScript:
+    file: control.js
+    env:
+      ACTION: reset
+- launchApp:
+    clearState: true
+- assertVisible:
+    id: "signin.screen"

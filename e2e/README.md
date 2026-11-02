@@ -120,4 +120,10 @@ from a freshly reset and seeded environment.
 | Release gate | `npm run e2e:gate -- APP` |
 | API E2E against a local server | `npm run api:e2e-server`, then in another terminal `npm run e2e:api` |
 | API E2E against another environment | `E2E_API_URL=… E2E_CONTROL_SECRET=… npm run e2e:api` |
-| Mobile E2E | `npm run e2e:mobile -- -e APP_ID=…` (needs the Maestro CLI and an emulator) |
+| Mobile E2E | `npm run e2e:mobile -- -e APP_ID=…` (needs the Maestro CLI, an emulator running a development build, and `npm run api:e2e-server`) |
+
+**Mobile flows and test control.** `support/maestro/control.js` calls the test-control API from Maestro: reset,
+OTP, TOTP, and clock. Maestro runs it on the host, so it uses `http://localhost:3000`; override with
+`-e CONTROL_URL=… -e CONTROL_SECRET=…`. The app on the emulator reaches the same server at `http://10.0.2.2:3000`.
+- `support/maestro/reset.yaml` reseeds the environment and relaunches the app.
+- `sign-in-staff.yaml` signs in an Owner or Admin, including the two-factor step.

@@ -2,16 +2,20 @@
 # Usage:
 #   - runFlow:
 #       file: ../../support/maestro/sign-in.yaml
-#       env: { USER_ID: teacher.a1 }
-# Selectors use the testID contract in e2e/README.md.
+#       env: { USER_ID: teacher-a1 }
+# For Owner/Admin personas use sign-in-staff.yaml, which completes two-factor sign-in.
+# Selectors use the testID contract in e2e/README.md. The User ID field may be prefilled with the last User ID,
+# so it is cleared first.
 appId: ${APP_ID}
 ---
 - tapOn:
     id: "signin.userId"
+- eraseText: 64
 - inputText: ${USER_ID}
 - tapOn:
     id: "signin.password"
 - inputText: ${PASSWORD || 'E2e-Test-Pass-1'}
+- hideKeyboard
 - tapOn:
     id: "signin.submit"
 - assertVisible:

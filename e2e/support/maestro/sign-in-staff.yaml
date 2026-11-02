@@ -1,0 +1,33 @@
+# Subflow: sign in as a seeded Owner/Admin persona, completing two-factor sign-in (FR-AUTH-016).
+# Usage:
+#   - runFlow:
+#       file: ../../support/maestro/sign-in-staff.yaml
+#       env: { USER_ID: admin-a }
+# The User ID field may be prefilled with the last User ID, so it is cleared first.
+appId: ${APP_ID}
+---
+- tapOn:
+    id: "signin.userId"
+- eraseText: 64
+- inputText: ${USER_ID}
+- tapOn:
+    id: "signin.password"
+- inputText: ${PASSWORD || 'E2e-Test-Pass-1'}
+- hideKeyboard
+- tapOn:
+    id: "signin.submit"
+- assertVisible:
+    id: "twoFactor.screen"
+- runScript:
+    file: control.js
+    env:
+      ACTION: totp
+      LOGIN_ID: ${USER_ID}
+- tapOn:
+    id: "twoFactor.code"
+- inputText: ${output.totp}
+- hideKeyboard
+- tapOn:
+    id: "twoFactor.submit"
+- assertVisible:
+    id: "home.screen"

@@ -3,11 +3,11 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['**/node_modules/**', 'test-results/**', 'coverage/**', 'apps/api/.data/**', '.backup/**'] },
+  { ignores: ['**/node_modules/**', 'test-results/**', 'coverage/**', 'apps/api/.data/**', '.backup/**', 'apps/mobile/.expo/**', 'apps/mobile/android/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['**/*.ts'],
+    files: ['**/*.ts', '**/*.tsx'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
