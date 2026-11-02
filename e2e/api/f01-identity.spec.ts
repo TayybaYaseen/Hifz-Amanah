@@ -377,8 +377,12 @@ test.describe('F01 · Identity and authentication', { tag: '@F01' }, () => {
     const other = await (await as('teacher.a2')).get('/me');
     expect((await other.json()).displayName).toBe('Test teacher.a2');
 
-    // Display name and email remain editable.
-    const edited = await teacher.patch('/me', { data: { displayName: 'Ustad One', email: null } });
+    // Display name and email remain editable; changing the email needs the current password (DEC-B69).
+    const noPassword = await teacher.patch('/me', { data: { email: 'other@example.test' } });
+    expect(noPassword.status()).toBe(400);
+    const wrongPassword = await teacher.patch('/me', { data: { email: 'other@example.test', currentPassword: 'Not-The-Password-1' } });
+    expect((await wrongPassword.json()).error.code).toBe('CURRENT_PASSWORD_INCORRECT');
+    const edited = await teacher.patch('/me', { data: { displayName: 'Ustad One', email: null, currentPassword: TEST_PASSWORD } });
     expect(edited.status()).toBe(200);
     expect(await edited.json()).toMatchObject({ displayName: 'Ustad One', email: null, loginId: before.loginId, role: 'TEACHER' });
   });

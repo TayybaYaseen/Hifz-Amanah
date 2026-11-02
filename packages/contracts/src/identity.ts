@@ -135,11 +135,15 @@ export type CreateAccountRequest = z.infer<typeof CreateAccountRequest>;
 
 export const AdminSetPasswordRequest = z.strictObject({ newPassword: password });
 
-/** My profile: only display name, optional email, and language may change (FR-AUTH-006, F01-AC29). */
+/**
+ * My profile: only display name, optional email, and language may change (FR-AUTH-006, F01-AC29).
+ * Changing the email also needs `currentPassword` (DEC-B69); the server checks it.
+ */
 export const UpdateProfileRequest = z.strictObject({
   displayName: z.string().trim().min(1).max(100).optional(),
   email: email.nullable().optional(),
   preferredLocale: z.enum(LOCALES).optional(),
+  currentPassword: password.optional(),
 });
 
 export const ChangePasswordRequest = z.strictObject({ currentPassword: password, newPassword: password });

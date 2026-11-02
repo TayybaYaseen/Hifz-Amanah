@@ -248,7 +248,13 @@ Implementing F01 needed four values that no document set. The product owner chos
 | DEC-B67 | What is the progressive delay after 5 failed sign-ins? | 1 s, 2 s, 4 s, 8 s, then 8 s, the same for unknown User IDs |
 | DEC-B68 | Docker is not available: how do local runs and tests get a database? | Embedded Postgres (PGlite) now; Docker Compose stays the CI setup |
 
+The F01 code review (finding M5) then showed that a borrowed session could change the email and take over password recovery. The product owner decided:
+
+| ID | Question | Answer |
+|---|---|---|
+| DEC-B69 | Does changing the email on My profile need the current password? | Yes; display name and language do not |
+
 **Applied:**
-- `SRS.md` v1.13: register rows DEC-B65…B68.
+- `SRS.md` v1.13: register rows DEC-B65…B69.
 - `apps/api`: values in `src/modules/identity/rules.ts`; embedded Postgres in `src/platform/embedded-postgres.ts`.
 - Also while implementing F01 (no product decision needed): each organization has a short `code` used for the suggested User ID prefix (FR-AUTH-013), and the E2E personas' User IDs use hyphens (`teacher-a1`) because FR-AUTH-013 allows no dots.

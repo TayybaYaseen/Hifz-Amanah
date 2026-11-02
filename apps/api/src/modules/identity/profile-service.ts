@@ -20,6 +20,8 @@ export interface ProfilePatch {
   displayName?: string | undefined;
   email?: string | null | undefined;
   preferredLocale?: Locale | undefined;
+  /** Required when the email changes (DEC-B69). Never stored or logged. */
+  currentPassword?: string | undefined;
 }
 
 export class ProfileService {
@@ -62,11 +64,24 @@ export class ProfileService {
     };
   }
 
-  /** Only display name, email, and language can change; the schema rejects anything else (F01-AC29). */
+  /**
+   * Only display name, email, and language can change; the schema rejects anything else (F01-AC29).
+   * Changing the email needs the current password, because the email receives password-reset codes: a borrowed
+   * session must not be able to redirect recovery (DEC-B69). Nothing changes unless the password is right.
+   */
   async update(actor: Actor, patch: ProfilePatch): Promise<MeResponse> {
     const changes: { display_name?: string; email?: string | null; preferred_locale?: Locale } = {};
     if (patch.displayName !== undefined) changes.display_name = patch.displayName;
-    if (patch.email !== undefined) changes.email = patch.email;
+    if (patch.email !== undefined) {
+      const current = await this.db.selectFrom('users').select('email').where('id', '=', actor.userId).executeTakeFirstOrThrow();
+      if (patch.email !== current.email) {
+        if (!patch.currentPassword) throw fieldError('currentPassword', 'REQUIRED');
+        // Same throttle and lock as sign-in, so this cannot be used to guess the password.
+        const user = await this.auth.checkPasswordThrottled(actor.loginId, patch.currentPassword);
+        if (!user || user.id !== actor.userId) throw new AppError('CURRENT_PASSWORD_INCORRECT');
+        changes.email = patch.email;
+      }
+    }
     if (patch.preferredLocale !== undefined) changes.preferred_locale = patch.preferredLocale;
     const fields = Object.keys(changes);
     if (fields.length) {

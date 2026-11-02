@@ -138,6 +138,50 @@ describe('F01 · two-factor hardening (code review 2026-11-02)', () => {
   });
 });
 
+describe('F01 · email change needs the current password (DEC-B69)', () => {
+  const patchMe = (token: string, payload: object) =>
+    app.inject({ method: 'PATCH', url: '/me', payload, headers: { authorization: `Bearer ${token}` } });
+  const storedEmail = async () =>
+    (await sql<{ email: string | null }>`SELECT email FROM users WHERE login_id = 'teacher-a1'`.execute(db)).rows[0]!.email;
+
+  it('F01-AC27 (US-071) the email changes with the correct current password, and the password is not stored', async () => {
+    const { accessToken } = await signIn();
+    const res = await patchMe(accessToken, { email: 'new.address@example.test', currentPassword: TEST_PASSWORD });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().email).toBe('new.address@example.test');
+    expect(await storedEmail()).toBe('new.address@example.test');
+    const { rows } = await sql<{ summary: unknown }>`SELECT summary FROM audit_logs WHERE action = 'PROFILE_UPDATED'`.execute(db);
+    expect(JSON.stringify(rows)).not.toContain(TEST_PASSWORD);
+    expect(JSON.stringify(rows)).not.toContain('new.address@example.test');
+  });
+
+  it('F01-AC27 (US-071) a wrong current password is rejected and nothing changes', async () => {
+    const { accessToken } = await signIn();
+    const res = await patchMe(accessToken, { displayName: 'Changed', email: 'attacker@example.test', currentPassword: 'Not-The-Password-1' });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error.code).toBe('CURRENT_PASSWORD_INCORRECT');
+    expect(await storedEmail()).toBe('teacher.a1@example.test');
+    const me = await app.inject({ method: 'GET', url: '/me', headers: { authorization: `Bearer ${accessToken}` } });
+    expect(me.json().displayName).toBe('Test teacher.a1');
+  });
+
+  it('F01-AC27 (US-071) a missing current password is a field error; removing the email needs it too', async () => {
+    const { accessToken } = await signIn();
+    const missing = await patchMe(accessToken, { email: 'attacker@example.test' });
+    expect(missing.statusCode).toBe(400);
+    expect(missing.json().error.fields).toEqual({ currentPassword: 'REQUIRED' });
+    expect((await patchMe(accessToken, { email: null })).statusCode).toBe(400);
+    expect(await storedEmail()).toBe('teacher.a1@example.test');
+  });
+
+  it('F01-AC27 (US-071) display name and language change without a password; resending the same email needs none', async () => {
+    const { accessToken } = await signIn();
+    const res = await patchMe(accessToken, { displayName: 'Ustad One', preferredLocale: 'ur', email: 'teacher.a1@example.test' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ displayName: 'Ustad One', preferredLocale: 'ur', email: 'teacher.a1@example.test' });
+  });
+});
+
 describe('F01 · audit', () => {
   it('F01 unit: audit rows cannot be updated or deleted', async () => {
     const admin = await post('/auth/sign-in', { loginId: 'admin-a', password: TEST_PASSWORD });

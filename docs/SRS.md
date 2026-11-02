@@ -4,7 +4,7 @@
 **Status:** Consolidated planning baseline; not implemented\
 **Version:** 1.13\
 **Last updated:** 2026-11-02\
-**Changes in 1.13:** Register rows DEC-B65…B68, decided while implementing F01: session lifetime, recent sign-in, progressive sign-in delay, and embedded Postgres for local runs. No requirement text changed.\
+**Changes in 1.13:** Register rows DEC-B65…B69, decided while implementing F01: session lifetime, recent sign-in, progressive sign-in delay, embedded Postgres for local runs, and the current password for an email change. No requirement text changed.\
 **Changes in 1.12:** Sabaq is now measured in lines over one Surah's Ayat range (§17 DEC-B60…B64). Para-fraction options (Rubu, Half, Salasah, Complete) are not offered for Sabaq. Sabqi and Manzil are unchanged.
 - New requirements: FR-SAB-008…010, FR-QTY-010, FR-HW-018; business rule §9 #18; acceptance tests AC-QTY-07/08, AC-HW-10, AC-XLS-07.
 - Changed requirements: FR-SAB-001…004, FR-QTY-001/002, FR-HW-002/005, FR-SBQ-003 (note only), and §1.5, §6.2, §8.2, §10.8, §15.1.\
@@ -1745,6 +1745,7 @@ This is the central register of every decision that was open anywhere in the rep
 | DEC-B66 | "Recent sign-in" for recovery-code regeneration *(2026-11-02)* | Signed in within the last 15 minutes; refreshing a session does not count as signing in | Approved | PO Q&A 2026-11-02 | Short enough to stop a borrowed session | FR-AUTH-016 | US-072 | F01-AC32 |
 | DEC-B67 | Progressive sign-in delay *(2026-11-02)* | After 5 failures within 15 minutes: 1 s, 2 s, 4 s, 8 s, then 8 s per attempt; applied the same way to unknown User IDs | Approved | PO Q&A 2026-11-02 | Slows guessing without revealing which IDs exist | FR-AUTH-014 | US-001 | F01-AC4, F01-AC25 |
 | DEC-B68 | Database for local development and tests without Docker *(2026-11-02)* | Embedded Postgres (PGlite) over the normal wire protocol, with the same driver and SQL. Docker Compose stays the CI setup; production stays managed Postgres | Approved | PO Q&A 2026-11-02 | Docker is not available on the development machine | NFR-MNT-005 | all | API integration and E2E runs |
+| DEC-B69 | Does changing the email on My profile need the current password? *(2026-11-02)* | Yes. The server checks it under the sign-in throttle; a wrong or missing password changes nothing. Display name and language need no password | Approved | PO request 2026-11-02 (F01 code review M5) | The email receives reset codes, so a borrowed session must not redirect recovery | FR-AUTH-006 | US-071 | F01-AC27, F01-AC29 |
 
 ### 17.3 Open items after this review
 

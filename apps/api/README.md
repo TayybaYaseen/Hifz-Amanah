@@ -42,7 +42,7 @@ proxies in front of the API are trusted for the client address.
 | `POST /auth/password-reset/request` | anyone | `{ loginId }` | `202` `{ status: RESET_REQUESTED }`, always the same |
 | `POST /auth/password-reset/confirm` | anyone | `{ loginId, otp, newPassword }` | `204`; ends every session. `400 OTP_INVALID` for a wrong, expired, used, or over-tried code |
 | `GET /me` | signed in | — | `200` profile: display name, email, User ID, role, madrasa, language, 2FA status |
-| `PATCH /me` | signed in | `{ displayName?, email?, preferredLocale? }` only | `200` profile; any other field is `400` |
+| `PATCH /me` | signed in | `{ displayName?, email?, preferredLocale?, currentPassword? }` only | `200` profile; any other field is `400`. Changing the email needs `currentPassword` (DEC-B69): missing is `400 fields.currentPassword: REQUIRED`, wrong is `400 CURRENT_PASSWORD_INCORRECT`, and nothing changes |
 | `POST /me/password` | signed in | `{ currentPassword, newPassword }` | `204`; ends the user's other sessions |
 | `POST /me/two-factor/recovery-codes` | Owner/Admin, signed in within 15 min | `{ code }` | `200` `{ recoveryCodes }`; earlier codes stop working. `403 REAUTH_REQUIRED` if not recent |
 | `GET /accounts?page=` | Owner/Admin | — | `200` 25 per page |
@@ -76,8 +76,6 @@ fixtures read `E2E_CONTROL_SECRET`). Every route needs the `x-test-control-secre
 - Row-level security (ADR-006) arrives with F02's tenant-scoped tables.
 - The platform operator's reset of an Owner's two-factor setup is operator tooling, not an API route.
 - Open items from the F01 code review (2026-11-02):
-  - **Awaiting a product decision:** changing the email on My profile does not ask for the current password, so a
-    borrowed session could redirect password recovery (review M5).
   - Refresh-token reuse is detected one rotation back only; older replays are refused but do not end the session (L3).
   - `login_failures` rows are never pruned; a cleanup job arrives with the pg-boss workers (L10).
   - Unknown User IDs answer a reset request with slightly less database work than real ones; the email send no
