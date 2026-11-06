@@ -6,7 +6,7 @@
 | **User story** | US-047 |
 | **Feature** | [F11 · Localization and accessibility](02-f11-localization-accessibility.md) |
 | **Epic** | EPIC 11 — Localization and Accessibility ([user-stories.md](../user-stories.md)) |
-| **Status** | draft |
+| **Status** | Approved |
 | **Priority** | Not specified in the source documents (SRS, user-stories.md, feature specs). None is assigned here. |
 | **Split from** | `docs/specs/F11-localization-accessibility.md` on 2026-10-30 |
 
