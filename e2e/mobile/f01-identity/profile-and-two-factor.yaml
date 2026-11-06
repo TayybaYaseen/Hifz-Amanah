@@ -1,19 +1,138 @@
 # F01 · Identity and authentication — mobile E2E (docs/specs/01-f01-identity-authentication.md; decision review 2026-10-30, SRS §17)
 # Covers: F01-AC24, F01-AC26, F01-AC27, F01-AC28, F01-AC30
+# Android's Back first closes the keyboard, so `hideKeyboard` comes before every navigating `back`.
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F01 profile, User ID rules, Admin reset, and Owner/Admin two-factor sign-in
 tags:
-  - pending
   - F01
   - US-003
   - US-002
   - US-071
   - US-072
 ---
-- launchApp:
-    clearState: true
-# 1. Given an Admin creating an account, when the User ID field opens, then it suggests the madrasa-code prefix. An ID that differs from an existing one only in letter case is rejected as "User ID already in use", and an ID outside 3–32 letters, digits, and hyphens is rejected. (F01-AC24)
-# 2. Given an Owner or Admin, when they set a new password for a Teacher, Student, or Parent account, then the password changes, that user's sessions are revoked, and the action is audited. An Admin cannot reset another Admin's or the Owner's password; the Owner can reset an Admin's. (F01-AC26)
-# 3. Given a signed-in user, when they open My profile, then they see their display name, optional email, User ID, role, and madrasa, and can edit only the display name and email. (F01-AC27)
-# 4. Given a signed-in user changing their password, when they enter the correct current password and a new password that meets the policy, then the password changes, their other sessions are revoked, and the change is audited. A wrong current password is rejected and nothing changes. (F01-AC28)
-# 5. Given an Owner or Admin signing in for the first time, when the password is accepted, then they must set up an authenticator app and are shown 10 one-time recovery codes before any madrasa data is shown. (F01-AC30)
+- runFlow: ../../support/maestro/reset.yaml
+- runFlow:
+    file: ../../support/maestro/sign-in-staff.yaml
+    env: { USER_ID: admin-a }
+# 1. The User ID field starts with the madrasa prefix; a case-only duplicate and a bad format are refused. (F01-AC24)
+- tapOn: { id: "nav.more" }
+- tapOn: { id: "more.accounts" }
+- tapOn: { id: "accounts.add" }
+- assertVisible: { id: "accountCreate.userId", text: "ALIF-" }
+- tapOn: { id: "accountCreate.userId" }
+- eraseText: 40
+- inputText: "TEACHER-A1"
+- tapOn: { id: "accountCreate.name" }
+- inputText: "Case Only"
+- tapOn: { id: "accountCreate.password" }
+- inputText: "Fresh-Pass-2026"
+- hideKeyboard
+- tapOn: { id: "accountCreate.submit" }
+- assertVisible: { id: "accountCreate.userId.error" }
+- tapOn: { id: "accountCreate.userId" }
+- eraseText: 40
+- inputText: "bad.id"
+- hideKeyboard
+- tapOn: { id: "accountCreate.submit" }
+- assertVisible: { id: "accountCreate.userId.error" }
+- back            # New account → Accounts
+# 2. The Admin sets a Teacher's password; the Owner's account offers no password reset to an Admin. (F01-AC26)
+- scrollUntilVisible:
+    element: { id: "accounts.item.teacher-a1" }
+- tapOn: { id: "accounts.item.teacher-a1" }
+- tapOn: { id: "accountDetail.newPassword" }
+- inputText: "Admin-Set-2026"
+- hideKeyboard
+- tapOn: { id: "accountDetail.resetPassword" }
+- assertVisible: { id: "accountDetail.status.success" }
+- back            # Account → Accounts
+- scrollUntilVisible:
+    element: { id: "accounts.item.owner-a" }
+- tapOn: { id: "accounts.item.owner-a" }
+- assertVisible: { id: "accountDetail.screen" }
+- assertNotVisible: { id: "accountDetail.resetPassword" }
+- back            # Account → Accounts
+- back            # Accounts → More
+# 3. My profile shows display name, email, User ID, role, and madrasa; only name and email are editable. (F01-AC27)
+- tapOn: { id: "more.profile" }
+- assertVisible: { id: "profile.userId", text: "admin-a" }
+- assertVisible: { id: "profile.role" }
+- assertVisible: { id: "profile.madrasa", text: "Madrasa Alif (test)" }
+- assertVisible: { id: "profile.displayName" }
+- assertVisible: { id: "profile.email" }
+- tapOn: { id: "profile.displayName" }
+- eraseText: 60
+- inputText: "Admin Alif"
+- hideKeyboard
+- tapOn: { id: "profile.save" }
+- assertVisible: { id: "profile.status.success" }
+# 4. Change password: a wrong current password is refused; the right one succeeds.             (F01-AC28)
+- scrollUntilVisible:
+    element: { id: "profile.changePassword" }
+- tapOn: { id: "profile.currentPassword" }
+- inputText: "Not-The-Password-1"
+- tapOn: { id: "profile.newPassword" }
+- inputText: "Admin-Fresh-2026"
+- hideKeyboard
+- tapOn: { id: "profile.changePassword" }
+- assertVisible: { id: "profile.passwordStatus.error" }
+- tapOn: { id: "profile.currentPassword" }
+- inputText: "E2e-Test-Pass-1"
+- hideKeyboard
+- tapOn: { id: "profile.changePassword" }
+- assertVisible: { id: "profile.passwordStatus.success" }
+- back            # Profile → More
+- back            # More → Home
+- runFlow: ../../support/maestro/sign-out.yaml
+# 5. The Owner resets the Admin's two-factor setup; the Admin's next sign-in sets it up again
+#    and shows 10 recovery codes before any madrasa data.                                      (F01-AC30)
+- runFlow:
+    file: ../../support/maestro/sign-in-staff.yaml
+    env: { USER_ID: owner-a }
+- tapOn: { id: "nav.more" }
+- tapOn: { id: "more.accounts" }
+# The list loads after the screen opens. Wait for it (the Owner's own account is always listed): scrolling down
+# before it arrives can carry admin-a, the first entry, out of view above.
+- extendedWaitUntil:
+    visible: { id: "accounts.item.owner-a" }
+    timeout: 30000
+- scrollUntilVisible:
+    element: { id: "accounts.item.admin-a" }
+- tapOn: { id: "accounts.item.admin-a" }
+- tapOn: { id: "accountDetail.resetTwoFactor" }
+- tapOn: { id: "accountDetail.confirm" }
+- assertVisible: { id: "accountDetail.status.success" }
+- back            # Account → Accounts
+- back            # Accounts → More
+- back            # More → Home
+- runFlow: ../../support/maestro/sign-out.yaml
+- tapOn: { id: "signin.userId" }
+- eraseText: 64
+- inputText: "admin-a"
+- tapOn: { id: "signin.password" }
+- inputText: "Admin-Fresh-2026"
+- hideKeyboard
+- tapOn: { id: "signin.submit" }
+- assertVisible: { id: "twoFactorSetup.screen" }
+- assertVisible: { id: "twoFactorSetup.key" }
+- runScript:
+    file: ../../support/maestro/control.js
+    env: { ACTION: totp, LOGIN_ID: admin-a }
+- scrollUntilVisible:
+    element: { id: "twoFactorSetup.code" }
+- tapOn: { id: "twoFactorSetup.code" }
+- inputText: ${output.totp}
+- hideKeyboard
+- scrollUntilVisible:
+    element: { id: "twoFactorSetup.submit" }
+- tapOn: { id: "twoFactorSetup.submit" }
+- assertVisible: { id: "recoveryCodes.screen" }
+- assertVisible: { id: "recoveryCodes.code.0" }
+- assertNotVisible: { id: "home.screen" }
+- scrollUntilVisible:
+    element: { id: "recoveryCodes.code.9" }
+- scrollUntilVisible:
+    element: { id: "recoveryCodes.continue" }
+- tapOn: { id: "recoveryCodes.saved" }
+- tapOn: { id: "recoveryCodes.continue" }
+- assertVisible: { id: "home.role.ADMIN" }

@@ -1,5 +1,10 @@
 # F01 · Identity — mobile E2E (docs/specs/01-f01-identity-authentication.md; design.md §4.13, §8)
 # Covers: F01-AC6, F01-AC5
+#
+# STILL PENDING. F01-AC6 requires that unsynced local changes survive an expired session, which needs an offline
+# daily entry and the sync queue (F05, F12). Those screens do not exist yet, so this flow keeps the `pending` tag
+# and the F01 gate stays PENDING until it can run in full. The F01-observable steps are already written below;
+# the F05/F12 steps are marked TODO.
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F01 session — expired session prompts sign-in and keeps unsynced changes
 tags:
@@ -7,10 +12,35 @@ tags:
   - F01
   - US-001
 ---
-- launchApp:
-    clearState: true
-# 1. Sign in as teacher.a1; go offline; save a daily entry for S1 (pending 1).
-# 2. Test control expires the session; go online.
-# 3. The session-expired sign-in prompt appears; the sync queue still lists 1 pending item.            (F01-AC6)
-# 4. Sign in again; the item syncs.
-# 5. Sign out; press Back → the sign-in screen stays; no data screen opens.                            (F01-AC5)
+- runFlow: ../../support/maestro/reset.yaml
+# 1. Sign in as teacher-a1.
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+# TODO(F05, F12): go offline; save a daily entry for S1; assert the sync banner shows 1 pending; go online.
+# 2. The session ends: 31 days pass on the server clock (DEC-B65), so the refresh token is refused.
+- runScript:
+    file: ../../support/maestro/control.js
+    env: { ACTION: clock, ADVANCE_MS: "2678400000" }
+# 3. The next server call shows the session-expired prompt with the User ID kept.              (F01-AC6)
+- tapOn: { id: "nav.more" }
+- tapOn: { id: "more.profile" }
+- tapOn: { id: "profile.displayName" }
+- inputText: " 2"
+- hideKeyboard
+- tapOn: { id: "profile.save" }
+- assertVisible: { id: "sessionExpired.screen" }
+- assertVisible: { id: "signin.userId", text: "teacher-a1" }
+# TODO(F12): the sync queue still lists 1 pending item.                                       (F01-AC6)
+# 4. Sign in again.
+- tapOn: { id: "signin.password" }
+- inputText: "E2e-Test-Pass-1"
+- hideKeyboard
+- tapOn: { id: "signin.submit" }
+- assertVisible: { id: "home.screen" }
+# TODO(F12): the pending item syncs.
+# 5. Sign out; Back keeps the sign-in screen and opens no data screen.                         (F01-AC5)
+- runFlow: ../../support/maestro/sign-out.yaml
+- back
+- assertNotVisible: { id: "home.screen" }
+- assertNotVisible: { id: "profile.screen" }

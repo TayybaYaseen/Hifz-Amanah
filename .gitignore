@@ -1,3 +1,9 @@
 node_modules/
 coverage/
 test-results/
+apps/api/.data/
+apps/mobile/.expo/
+apps/mobile/android/
+apps/mobile/ios/
+
+.expo/

@@ -5,9 +5,8 @@ Instructions for AI coding agents (Claude Code, Codex, Cursor, Copilot, etc.) wo
 ## 1. Project status — read first
 
 - HifzAmanah is an **Android-first, offline-capable Hifz (Quran memorization) management app** for teachers, madaris, students, and parents.
-- The repository is currently **planning only. No code exists yet.**
-- **Do not scaffold, write, or change application code unless the user explicitly asks you to start implementation** (SRS §3.4, §12, §14). Editing planning documents is allowed when asked.
-- When implementation starts, follow the phase order in `SRS.md` §12 unless the user says otherwise.
+- **Implementation started on 2026-11-02** at the user's request, beginning with F01 (Identity and authentication). The API lives in `apps/api`, the shared contracts in `packages/contracts`, and the Expo app in `apps/mobile` (see each folder's README).
+- Build features in the spec order of `docs/specs/README.md` (`01`–`17`), one feature branch per feature, unless the user says otherwise.
 
 ## 2. Source of truth (highest wins)
 
@@ -39,18 +38,24 @@ Always cite requirement IDs (e.g. `FR-HW-012`, `US-037`) in PR descriptions, ADR
 
 ## 4. Commands
 
-Only test commands exist so far. **Update this section when the project is scaffolded** with dev, lint, typecheck, integration test, migration, and build commands. Do not guess commands that don't exist.
+Do not guess commands that don't exist. Mobile-only commands (`npm start`, `npm run android`) are in `apps/mobile/README.md`.
 
 | Task | Command |
 |---|---|
 | Install | `npm install` |
-| Unit tests (Vitest) | `npm test` |
+| Unit + API integration tests (Vitest; integration uses embedded Postgres) | `npm test` |
 | Unit tests, watch mode | `npm run test:watch` |
+| Typecheck (API, contracts, mobile) | `npm run typecheck` |
+| Bundle the mobile app for Android without a device (proves it compiles) | `npm run bundle:android -w @hifz/mobile` |
+| Lint | `npm run lint` |
+| API dev server (embedded Postgres in `apps/api/.data` unless `DATABASE_URL` is set) | `npm run api:dev` |
+| API for E2E runs (fresh in-memory database, seeded personas, test-control API) on port 3000 | `npm run api:e2e-server` |
+| Apply migrations to `DATABASE_URL` | `npm run db:migrate` |
 | E2E traceability (every criterion has an E2E test) | `npm run e2e:trace` |
 | **Spec completion gate** (one story spec) | `npm run e2e:gate -- US-022` |
 | Feature gate (every story in a feature) | `npm run e2e:gate -- F05` |
 | Release gate (app-wide E2E) | `npm run e2e:gate -- APP` |
-| API E2E (Playwright Test) | `E2E_API_URL=<url> npm run e2e:api` |
+| API E2E (Playwright Test; start `npm run api:e2e-server` first, or set `E2E_API_URL`) | `npm run e2e:api` |
 | Mobile E2E (Maestro; needs the Maestro CLI and an emulator) | `npm run e2e:mobile -- -e APP_ID=<android application id>` |
 | Docs traceability (one story per spec, verbatim criteria, requirement IDs, links) | `npm run docs:check` |
 

@@ -2,8 +2,9 @@
 
 **Document type:** Software Requirements Specification\
 **Status:** Consolidated planning baseline; not implemented\
-**Version:** 1.12\
-**Last updated:** 2026-11-01\
+**Version:** 1.13\
+**Last updated:** 2026-11-02\
+**Changes in 1.13:** Register rows DEC-B65…B69, decided while implementing F01: session lifetime, recent sign-in, progressive sign-in delay, embedded Postgres for local runs, and the current password for an email change. No requirement text changed.\
 **Changes in 1.12:** Sabaq is now measured in lines over one Surah's Ayat range (§17 DEC-B60…B64). Para-fraction options (Rubu, Half, Salasah, Complete) are not offered for Sabaq. Sabqi and Manzil are unchanged.
 - New requirements: FR-SAB-008…010, FR-QTY-010, FR-HW-018; business rule §9 #18; acceptance tests AC-QTY-07/08, AC-HW-10, AC-XLS-07.
 - Changed requirements: FR-SAB-001…004, FR-QTY-001/002, FR-HW-002/005, FR-SBQ-003 (note only), and §1.5, §6.2, §8.2, §10.8, §15.1.\
@@ -1622,7 +1623,7 @@ This register supersedes conflicting earlier draft statements in this document. 
 
 ## 17. Decision register (review of 2026-10-30)
 
-This is the central register of every decision that was open anywhere in the repository on 2026-10-30. It supersedes conflicting wording elsewhere, as §16 does. Later decisions are added with their date (DEC-B60…B64, Sabaq lines, 2026-11-01).
+This is the central register of every decision that was open anywhere in the repository on 2026-10-30. It supersedes conflicting wording elsewhere, as §16 does. Later decisions are added with their date (DEC-B60…B64, Sabaq lines, 2026-11-01; DEC-B65…B68, F01 implementation values, 2026-11-02).
 
 - **History:** the original questions, their source references and the Q&A history are in [decision-log.md](decision-log.md).
 - **Source:**
@@ -1740,6 +1741,11 @@ This is the central register of every decision that was open anywhere in the rep
 | DEC-B62 | Can one Sabaq portion cross Surahs? *(2026-11-01)* | No. One Surah per portion; a lesson crossing Surahs is two portions | Approved | PO Q&A 2026-11-01 | Matches the Surah + start/end Ayat fields | FR-SAB-002 | US-020 | F05-AC21 |
 | DEC-B63 | Para on a Sabaq portion *(2026-11-01)* | Derived from the range, not entered | Approved | PO Q&A 2026-11-01 | Keeps Para-wise reports and the Sabqi default | FR-SAB-001, FR-SBQ-003 | US-020, US-021 | F05-AC10, F05-AC21 |
 | DEC-B64 | Where does Total Lines come from? *(2026-11-01)* | Pre-filled from the 15-line Mushaf layout; the Teacher confirms or corrects; stored with its edition and never recalculated | Approved | PO Q&A 2026-11-01 | Explicit count that respects the edition | FR-SAB-008 | US-020 | F05-AC21 |
+| DEC-B65 | Session lifetime *(2026-11-02)* | Access token about 15 minutes, refreshed silently. A session ends 30 days after sign-in; refreshing does not extend it. Sign-out, password reset, deactivation, and a two-factor reset still end it at once | Approved | PO Q&A 2026-11-02 | A month of daily use without signing in again | FR-AUTH-003 | US-001 | F01-AC5, F01-AC6 |
+| DEC-B66 | "Recent sign-in" for recovery-code regeneration *(2026-11-02)* | Signed in within the last 15 minutes; refreshing a session does not count as signing in | Approved | PO Q&A 2026-11-02 | Short enough to stop a borrowed session | FR-AUTH-016 | US-072 | F01-AC32 |
+| DEC-B67 | Progressive sign-in delay *(2026-11-02)* | After 5 failures within 15 minutes: 1 s, 2 s, 4 s, 8 s, then 8 s per attempt; applied the same way to unknown User IDs | Approved | PO Q&A 2026-11-02 | Slows guessing without revealing which IDs exist | FR-AUTH-014 | US-001 | F01-AC4, F01-AC25 |
+| DEC-B68 | Database for local development and tests without Docker *(2026-11-02)* | Embedded Postgres (PGlite) over the normal wire protocol, with the same driver and SQL. Docker Compose stays the CI setup; production stays managed Postgres | Approved | PO Q&A 2026-11-02 | Docker is not available on the development machine | NFR-MNT-005 | all | API integration and E2E runs |
+| DEC-B69 | Does changing the email on My profile need the current password? *(2026-11-02)* | Yes. The server checks it under the sign-in throttle; a wrong or missing password changes nothing. Display name and language need no password | Approved | PO request 2026-11-02 (F01 code review M5) | The email receives reset codes, so a borrowed session must not redirect recovery | FR-AUTH-006 | US-071 | F01-AC27, F01-AC29 |
 
 ### 17.3 Open items after this review
 

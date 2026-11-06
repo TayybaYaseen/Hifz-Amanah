@@ -1,19 +1,74 @@
 # F01 · Identity — mobile E2E (docs/specs/01-f01-identity-authentication.md; design.md §4.2)
 # Covers: F01-AC1, F01-AC2, F01-AC3, F01-AC17
+# Students lists only Madrasa A students of Class A1 (former step 6): student records arrive with F03 and are
+# checked by e2e/mobile/f03-roster/teacher-students.yaml. Here F01-AC1 is checked through the home screen's
+# role and madrasa.
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F01 sign-in — role home, neutral errors, no forced password change
 tags:
-  - pending
   - F01
   - US-001
   - US-004
 ---
-- launchApp:
-    clearState: true
+- runFlow: ../../support/maestro/reset.yaml
 # 1. Sign-in screen shows User ID, password with show/hide, Sign in, Forgot password, language picker; no sign-up.
-# 2. Enter teacher.a1's email as User ID with the right password → "User ID or password is incorrect".  (F01-AC2)
-# 3. Enter teacher.a1 with a wrong password → the same message; User ID stays filled.                   (F01-AC3)
-# 4. Enter no.such.user → the same message.                                                             (F01-AC3)
-# 5. Sign in as teacher.a1 → Teacher Home; no change-password prompt.                                   (F01-AC1, F01-AC17)
-# 6. Students lists only Madrasa A students of Class A1.                                                (F01-AC1)
-# 7. Sign out; sign in as admin.a → Admin home; as student.s1 → read-only Student home; as parent.p1 → Parent home. (F01-AC1)
+- assertVisible: { id: "signin.userId" }
+- assertVisible: { id: "signin.password" }
+- assertVisible: { id: "signin.password.toggle" }
+- assertVisible: { id: "signin.submit" }
+- assertVisible: { id: "signin.forgot" }
+- assertVisible: { id: "language.option.ur" }
+- assertNotVisible: { id: "signin.signUp" }
+# 2. teacher.a1's email as User ID with the right password → the neutral message.            (F01-AC2)
+- tapOn: { id: "signin.userId" }
+- inputText: "teacher.a1@example.test"
+- tapOn: { id: "signin.password" }
+- inputText: "E2e-Test-Pass-1"
+- hideKeyboard
+- tapOn: { id: "signin.submit" }
+- assertVisible: { id: "signin.error" }
+- copyTextFrom: { id: "signin.error" }
+- evalScript: ${output.emailRefusal = maestro.copiedText}
+# 3. teacher-a1 with a wrong password → the same message; the User ID stays filled.           (F01-AC3)
+- tapOn: { id: "signin.userId", point: "95%,50%" } # at the field's end, so eraseText clears everything before the cursor
+- eraseText: 40
+- inputText: "teacher-a1"
+- tapOn: { id: "signin.password" }
+- inputText: "Not-The-Password-1"
+- hideKeyboard
+- tapOn: { id: "signin.submit" }
+- assertVisible: { id: "signin.error", text: "${output.emailRefusal}" }
+- assertVisible: { id: "signin.userId", text: "teacher-a1" }
+# 4. An unknown User ID → the same message.                                                    (F01-AC3)
+- tapOn: { id: "signin.userId", point: "95%,50%" } # at the field's end, so eraseText clears everything before the cursor
+- eraseText: 40
+- inputText: "no-such-user"
+- tapOn: { id: "signin.password" }
+- inputText: "Not-The-Password-1"
+- hideKeyboard
+- tapOn: { id: "signin.submit" }
+- assertVisible: { id: "signin.error", text: "${output.emailRefusal}" }
+# 5. Sign in as teacher-a1 → Teacher Home in Madrasa A; no change-password prompt.             (F01-AC1, F01-AC17)
+- tapOn: { id: "signin.userId", point: "95%,50%" } # at the field's end, so eraseText clears everything before the cursor
+- eraseText: 40
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+# The sign-in subflow lands directly on home.screen: no password-change step in between (F01-AC17).
+- assertVisible: { id: "home.role.TEACHER", text: ".*Madrasa Alif \\(test\\).*" }
+# 7. Sign out; Admin, Student, and Parent each reach their own home.                           (F01-AC1)
+- runFlow: ../../support/maestro/sign-out.yaml
+- runFlow:
+    file: ../../support/maestro/sign-in-staff.yaml
+    env: { USER_ID: admin-a }
+- assertVisible: { id: "home.role.ADMIN" }
+- runFlow: ../../support/maestro/sign-out.yaml
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: student-s1 }
+- assertVisible: { id: "home.role.STUDENT" }
+- runFlow: ../../support/maestro/sign-out.yaml
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: parent-p1 }
+- assertVisible: { id: "home.role.PARENT" }

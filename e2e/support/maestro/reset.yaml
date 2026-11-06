@@ -1,0 +1,15 @@
+# Subflow: reset the test environment to the seeded personas, then start the app fresh.
+appId: ${APP_ID}
+---
+- runScript:
+    file: control.js
+    env:
+      ACTION: reset
+- launchApp:
+    clearState: true
+# Debug builds load the JS bundle from Metro on a cold start; a slow emulator can take over 30 s, past the default
+# assertVisible wait. Wait up to 2 minutes; the flow still fails if the sign-in screen never appears.
+- extendedWaitUntil:
+    visible:
+      id: "signin.screen"
+    timeout: 120000

@@ -103,7 +103,12 @@ Maestro selects elements by `testID`, named `<screen>.<element>`, for example `s
 
 **Still deferred:**
 - **The Android application ID (`APP_ID`, DEC-B55).** Mobile flows read it from `-e APP_ID=…`.
-- **API routes and session transport.** They are defined at scaffolding; the fixtures throw until then.
+
+**API routes and session transport** are defined (`apps/api/README.md`): bearer access tokens, with the routes
+listed there. The fixtures sign personas in (completing two-factor sign-in for Owner/Admin) and call the
+test-control API. Its AI and push stubs arrive with F15 and F16. Persona keys such as `teacher.a1` map to User IDs
+with hyphens (`teacher-a1`, `loginIdOf()`), because User IDs allow no dots (FR-AUTH-013). Every API test starts
+from a freshly reset and seeded environment.
 
 ## Commands
 
@@ -113,5 +118,12 @@ Maestro selects elements by `testID`, named `<screen>.<element>`, for example `s
 | Gate one spec (story) | `npm run e2e:gate -- US-022` |
 | Gate a feature | `npm run e2e:gate -- F05` |
 | Release gate | `npm run e2e:gate -- APP` |
-| API E2E | `E2E_API_URL=… npm run e2e:api` |
-| Mobile E2E | `npm run e2e:mobile -- -e APP_ID=…` (needs the Maestro CLI and an emulator) |
+| API E2E against a local server | `npm run api:e2e-server`, then in another terminal `npm run e2e:api` |
+| API E2E against another environment | `E2E_API_URL=… E2E_CONTROL_SECRET=… npm run e2e:api` |
+| Mobile E2E | `npm run e2e:mobile -- -e APP_ID=…` (needs the Maestro CLI, an emulator running a development build, and `npm run api:e2e-server`) |
+
+**Mobile flows and test control.** `support/maestro/control.js` calls the test-control API from Maestro: reset,
+OTP, TOTP, and clock. Maestro runs it on the host, so it uses `http://localhost:3000`; override with
+`-e CONTROL_URL=… -e CONTROL_SECRET=…`. The app on the emulator reaches the same server at `http://10.0.2.2:3000`.
+- `support/maestro/reset.yaml` reseeds the environment and relaunches the app.
+- `sign-in-staff.yaml` signs in an Owner or Admin, including the two-factor step.
