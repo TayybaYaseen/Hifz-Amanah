@@ -5,14 +5,15 @@
   "workspaces": [
     "apps/api",
     "apps/mobile",
-    "packages/contracts"
+    "packages/contracts",
+    "packages/i18n-keys"
   ],
   "scripts": {
     "test": "vitest run",
     "test:unit": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
-    "typecheck": "tsc -p apps/api --noEmit && tsc -p packages/contracts --noEmit && tsc -p apps/mobile --noEmit",
+    "typecheck": "tsc -p apps/api --noEmit && tsc -p packages/contracts --noEmit && tsc -p packages/i18n-keys --noEmit && tsc -p apps/mobile --noEmit",
     "api:dev": "npm run dev -w @hifz/api",
     "api:e2e-server": "npm run e2e-server -w @hifz/api",
     "db:migrate": "npm run migrate -w @hifz/api",

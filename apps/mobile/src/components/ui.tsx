@@ -287,7 +287,46 @@ export function Notice({ tone, children, testID }: { tone: 'error' | 'info' | 's
   );
 }
 
+export type StatusTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
+
+const TONE_COLORS: Record<StatusTone, string> = {
+  success: colors.success,
+  warning: colors.warning,
+  danger: colors.danger,
+  info: colors.info,
+  neutral: colors.neutral,
+};
+
+/**
+ * A status shown with an icon and a text label, never color alone (F11-AC13, design.md §6.3). The icon is decorative;
+ * screen readers read the label.
+ */
+export function StatusBadge({ tone, icon, label, testID }: { tone: StatusTone; icon: string; label: string; testID?: string }) {
+  const color = TONE_COLORS[tone];
+  return (
+    <View testID={testID} accessible accessibilityRole="text" accessibilityLabel={label} style={[styles.badge, { borderColor: color }]}>
+      <AppText role="helper" color={color} latin>
+        {icon}
+      </AppText>
+      <AppText role="helper" color={color}>
+        {label}
+      </AppText>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    flexWrap: 'wrap',
+    gap: space[1],
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingHorizontal: space[2],
+    paddingVertical: space[1],
+  },
   safe: { flex: 1, backgroundColor: colors.canvas },
   content: { padding: inset, gap: space[4] },
   card: {

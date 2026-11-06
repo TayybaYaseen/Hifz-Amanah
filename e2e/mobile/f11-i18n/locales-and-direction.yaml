@@ -1,5 +1,7 @@
 # F11 · Localization and accessibility — mobile E2E (docs/specs/02-f11-localization-accessibility.md; design.md §6)
 # Covers: F11-AC1, F11-AC2, F11-AC3, F11-AC7
+# Pending until the screens it sweeps exist (F03, F04, F05, F08, F09, F12) and show the glossary terms (F05/F06).
+# Built in F11: in-place direction for screens and navigation headers, shared labels and glossary (packages/i18n-keys).
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F11 locales — English LTR, Urdu RTL, Roman Urdu LTR, glossary terms
 tags:

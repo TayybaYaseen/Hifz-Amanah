@@ -1,5 +1,7 @@
 # F11 · Localization and accessibility — mobile E2E (docs/specs/02-f11-localization-accessibility.md; decision review 2026-10-30, SRS §17)
 # Covers: F11-AC14
+# Pending until quantities (F05), quality scores (F07), and report dates (F09) are on screen.
+# Built in F11: formatNumber / formatCalendarDate / formatTime and qualityDisplay (packages/i18n-keys), Western digits only.
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F11 Western digits in the Urdu interface
 tags:

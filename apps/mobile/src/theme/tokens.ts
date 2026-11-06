@@ -37,3 +37,6 @@ export const type = {
 
 /** Nastaliq needs taller lines than Latin text (design.md §2.3). */
 export const NASTALIQ_LINE_HEIGHT_FACTOR = 1.9;
+
+/** Naskh Arabic (Quranic text, Surah names) needs room for its diacritics. */
+export const NASKH_LINE_HEIGHT_FACTOR = 1.7;

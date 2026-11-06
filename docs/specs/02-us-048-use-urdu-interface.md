@@ -126,13 +126,14 @@ Nothing specific to this story in the source documents.
 **Mobile (Maestro):**
 
 - [e2e/mobile/f11-i18n/locales-and-direction.yaml](../../e2e/mobile/f11-i18n/locales-and-direction.yaml) — F11 locales — English LTR, Urdu RTL, Roman Urdu LTR, glossary terms
-- [e2e/mobile/f11-i18n/switch-mid-entry.yaml](../../e2e/mobile/f11-i18n/switch-mid-entry.yaml) — F11 language switch — values kept, stored value unchanged, preference persists
+- [e2e/mobile/f11-i18n/switch-mid-entry.yaml](../../e2e/mobile/f11-i18n/switch-mid-entry.yaml) — F11 language switch — values kept mid-entry, stored value unchanged
 - [e2e/mobile/f11-i18n/western-digits.yaml](../../e2e/mobile/f11-i18n/western-digits.yaml) — F11 Western digits in the Urdu interface
 
 **Unit (Vitest):**
 
 - [apps/mobile/src/i18n/direction.test.ts](../../apps/mobile/src/i18n/direction.test.ts) — F11-AC2 (US-048) ur is right to left (AC-I18N-02)
 - [packages/i18n-keys/catalogue.test.ts](../../packages/i18n-keys/catalogue.test.ts) — F11-AC6 (US-048) status labels map to canonical values (e.g. NOT_REMEMBERED) identically in every locale
+- [packages/i18n-keys/bidi-digits.test.ts](../../packages/i18n-keys/bidi-digits.test.ts) — F11-AC14 (US-048) numbers, dates, and times use Western digits in every locale (FR-I18N-009)
 
 ## Open decisions and blockers
 

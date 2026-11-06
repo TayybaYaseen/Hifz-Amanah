@@ -89,9 +89,14 @@ export function ProfileScreen({ me }: { me: MeResponse }) {
     setAuthCode('');
   };
 
-  // The language choice is also kept on the account, so it follows the user to other devices (FR-AUTH-005).
+  // The language choice is also kept on the account, so it follows the user to other devices (FR-AUTH-005,
+  // F11-AC4). It changes on this device at once; whether the account kept it is shown, never silently dropped.
+  const language = useForm();
   const saveLocale = (preferredLocale: Locale) => {
-    void session.authorized('/me', { method: 'PATCH', body: { preferredLocale } }).catch(() => undefined);
+    void language.run(async () => {
+      await session.authorized('/me', { method: 'PATCH', body: { preferredLocale } });
+      return t('profile.languageSaved');
+    });
   };
 
   return (
@@ -181,6 +186,11 @@ export function ProfileScreen({ me }: { me: MeResponse }) {
       ) : null}
 
       <LanguagePicker onChange={saveLocale} />
+      {language.status ? (
+        <Notice tone={language.status.tone} testID={`profile.language.${language.status.tone}`}>
+          {language.status.tone === 'error' ? `${t('profile.languageNotSaved')} ${language.status.text}` : language.status.text}
+        </Notice>
+      ) : null}
     </AppScreen>
   );
 }

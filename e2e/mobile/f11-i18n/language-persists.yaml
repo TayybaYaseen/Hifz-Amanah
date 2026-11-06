@@ -1,0 +1,52 @@
+# F11 · Localization and accessibility — mobile E2E (docs/specs/02-f11-localization-accessibility.md; design.md §4.16)
+# Covers: F11-AC4
+# Split from switch-mid-entry.yaml, whose Daily Entry steps wait for F05.
+# The selected language option reports Android's "selected" state (LanguagePicker accessibilityState).
+appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+name: F11 language preference — kept across sign-out and on a new device
+tags:
+  - F11
+  - US-047
+---
+- runFlow: ../../support/maestro/reset.yaml
+# 1. Sign in as teacher.a1 (English) → My profile → choose Urdu; the account confirms it.
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- tapOn: { id: "nav.more" }
+- tapOn: { id: "more.profile" }
+- runFlow:
+    file: ../../support/maestro/set-language.yaml
+    env: { LOCALE: ur }
+- assertVisible: { id: "profile.language.success" }
+- assertVisible: { id: "language.option.ur", selected: true }
+# 2. Sign out; sign in → the app opens in Urdu.                                                        (F11-AC4)
+- back            # My profile → More
+- back            # More → Home
+- runFlow: ../../support/maestro/sign-out.yaml
+- assertVisible: { id: "language.option.ur", selected: true }
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- tapOn: { id: "nav.more" }
+- tapOn: { id: "more.profile" }
+- scrollUntilVisible:
+    element: { id: "language.option.ur" }
+- assertVisible: { id: "language.option.ur", selected: true }
+# 3. clearState, as on a new device: the sign-in screen starts in English, and signing in opens Urdu.  (F11-AC4)
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: { id: "signin.screen" }
+    timeout: 120000
+- runFlow:
+    file: ../../support/maestro/set-language.yaml
+    env: { LOCALE: en }
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- tapOn: { id: "nav.more" }
+- tapOn: { id: "more.profile" }
+- scrollUntilVisible:
+    element: { id: "language.option.ur" }
+- assertVisible: { id: "language.option.ur", selected: true }

@@ -151,6 +151,8 @@ export const urLatn: Messages = {
     regenerateHelp: 'Pichhle 15 minute mein sign in aur authenticator ka code zaroori hai. Purane code kaam karna band kar dein ge.',
     authCode: 'Authenticator code',
     newCodes: 'Aap ke naye recovery code',
+    languageSaved: 'Zaban aap ke account mein mehfooz ho gayi. Kisi bhi device par sign in karne par yehi zaban istemal ho gi.',
+    languageNotSaved: 'Zaban sirf is device par badli hai; aap ka account update nahin ho saka.',
   },
   accounts: {
     title: 'Accounts',
