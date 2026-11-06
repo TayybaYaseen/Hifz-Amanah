@@ -30,7 +30,7 @@ tags:
 - copyTextFrom: { id: "signin.error" }
 - evalScript: ${output.emailRefusal = maestro.copiedText}
 # 3. teacher-a1 with a wrong password → the same message; the User ID stays filled.           (F01-AC3)
-- tapOn: { id: "signin.userId" }
+- tapOn: { id: "signin.userId", point: "95%,50%" } # at the field's end, so eraseText clears everything before the cursor
 - eraseText: 40
 - inputText: "teacher-a1"
 - tapOn: { id: "signin.password" }
@@ -40,7 +40,7 @@ tags:
 - assertVisible: { id: "signin.error", text: "${output.emailRefusal}" }
 - assertVisible: { id: "signin.userId", text: "teacher-a1" }
 # 4. An unknown User ID → the same message.                                                    (F01-AC3)
-- tapOn: { id: "signin.userId" }
+- tapOn: { id: "signin.userId", point: "95%,50%" } # at the field's end, so eraseText clears everything before the cursor
 - eraseText: 40
 - inputText: "no-such-user"
 - tapOn: { id: "signin.password" }
@@ -49,7 +49,7 @@ tags:
 - tapOn: { id: "signin.submit" }
 - assertVisible: { id: "signin.error", text: "${output.emailRefusal}" }
 # 5. Sign in as teacher-a1 → Teacher Home in Madrasa A; no change-password prompt.             (F01-AC1, F01-AC17)
-- tapOn: { id: "signin.userId" }
+- tapOn: { id: "signin.userId", point: "95%,50%" } # at the field's end, so eraseText clears everything before the cursor
 - eraseText: 40
 - runFlow:
     file: ../../support/maestro/sign-in.yaml

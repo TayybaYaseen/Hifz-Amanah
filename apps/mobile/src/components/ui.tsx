@@ -1,8 +1,9 @@
 // Reusable UI built on the design tokens (design.md §2, §5). Direction follows the active locale; Urdu uses
 // Noto Nastaliq with taller lines. Touch targets are at least 44 dp, 48 dp for primary actions.
-import { useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -46,7 +47,9 @@ export function AppText({ role = 'body', color = colors.textPrimary, style, chil
         base as TextStyle,
         {
           color,
-          textAlign: direction === 'rtl' ? 'right' : 'left',
+          // Android aligns text to the start of the layout direction by itself (right in Urdu, left in English and
+          // Roman Urdu). An explicit 'right' there is swapped for right-to-left script and pinned Urdu to the left.
+          ...(Platform.OS === 'android' ? {} : { textAlign: direction === 'rtl' ? 'right' : 'left' }),
           writingDirection: direction,
           fontFamily: urdu ? 'NotoNastaliqUrdu_400Regular' : 'fontWeight' in base ? 'Inter_600SemiBold' : 'Inter_400Regular',
           ...(urdu ? { lineHeight: Math.round(base.fontSize * NASTALIQ_LINE_HEIGHT_FACTOR) } : {}),
@@ -59,17 +62,90 @@ export function AppText({ role = 'body', color = colors.textPrimary, style, chil
   );
 }
 
+/**
+ * Height of the open Android keyboard in dp, 0 when closed. With edge-to-edge the window is not resized for the
+ * keyboard and React Native reports the keyboard's top (`screenY`) as the bottom of the screen, so
+ * KeyboardAvoidingView sees no overlap. The reported `height` is right: it already excludes the navigation bar,
+ * which the safe area pads.
+ */
+function useAndroidKeyboardHeight(): number {
+  const [height, setHeight] = useState(0);
+  useEffect(() => {
+    if (Platform.OS !== 'android') return undefined;
+    const shown = Keyboard.addListener('keyboardDidShow', (event) => setHeight(event.endCoordinates.height));
+    const hidden = Keyboard.addListener('keyboardDidHide', () => setHeight(0));
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, []);
+  return height;
+}
+
+/** Lets a Field ask its screen to scroll it above the keyboard when it gains focus. */
+const RevealFocusedContext = createContext<() => void>(() => undefined);
+
+/** Room above the focused input for its label when it is scrolled to the top of the visible area. */
+const REVEAL_LABEL_DP = space[8];
+
 /** Screen container: safe area, ivory canvas, scrolling, and the locale's layout direction. */
 export function AppScreen({ title, children, testID }: { title?: string; children: ReactNode; testID?: string }) {
   const { direction } = useLocale();
+  const keyboardHeight = useAndroidKeyboardHeight();
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollY = useRef(0);
+  const contentHeight = useRef(0);
+
+  // While the keyboard is open and the form continues below the visible area, the focused field is scrolled, with
+  // its label, to the top of that area, so it and as much of the rest of the form as fits (next fields, submit)
+  // stay above the keyboard. A form that fits entirely does not move.
+  const revealFocused = useCallback(() => {
+    if (Platform.OS !== 'android' || keyboardHeight === 0) return;
+    const input = TextInput.State.currentlyFocusedInput();
+    const scroll = scrollRef.current;
+    const viewport = scroll?.getNativeScrollRef();
+    if (!input || !scroll || !viewport) return;
+    const reveal = () =>
+      viewport.measureInWindow((_sx, viewportTop, _sw, viewportHeight) => {
+        input.measureInWindow((_ix, inputTop, _iw, inputHeight) => {
+          const top = inputTop - viewportTop;
+          const formContinuesBelow = contentHeight.current - scrollY.current > viewportHeight;
+          const fieldHidden = top + inputHeight > viewportHeight;
+          const toTop = top - REVEAL_LABEL_DP;
+          if ((formContinuesBelow || fieldHidden) && toTop > 0) {
+            scroll.scrollTo({ y: scrollY.current + toTop, animated: true });
+          }
+        });
+      });
+    // Only the screen that contains the focused input scrolls. Screens kept underneath in the stack get the same
+    // keyboard events; measureLayout fails for an input outside this scroll view, so they stay where they were.
+    input.measureLayout(viewport, reveal, () => undefined);
+  }, [keyboardHeight]);
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      {/* With edge-to-edge, Android no longer resizes for the keyboard; keep fields and buttons above it. */}
-      <KeyboardAvoidingView style={styles.safe} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      {/* iOS resizes through KeyboardAvoidingView. On Android (edge-to-edge) the screen is padded by the keyboard's
+          height instead, so the scroll area ends at the keyboard's top (see useAndroidKeyboardHeight). */}
+      <KeyboardAvoidingView
+        style={[styles.safe, Platform.OS === 'android' ? { paddingBottom: keyboardHeight } : null]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        enabled={Platform.OS === 'ios'}
+      >
+      <RevealFocusedContext.Provider value={revealFocused}>
       <ScrollView
+        ref={scrollRef}
         testID={testID}
         contentContainerStyle={[styles.content, { direction }]}
         keyboardShouldPersistTaps="handled"
+        scrollEventThrottle={16}
+        onScroll={(event) => {
+          scrollY.current = event.nativeEvent.contentOffset.y;
+        }}
+        onContentSizeChange={(_width, height) => {
+          contentHeight.current = height;
+        }}
+        // The scroll area shrinks once the keyboard padding is applied; reveal the focused field after that layout.
+        onLayout={revealFocused}
       >
         {title ? (
           <AppText role="screenTitle" color={colors.brandDeep} accessibilityRole="header">
@@ -78,6 +154,7 @@ export function AppScreen({ title, children, testID }: { title?: string; childre
         ) : null}
         {children}
       </ScrollView>
+      </RevealFocusedContext.Provider>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -136,6 +213,7 @@ export function Field({ label, value, onChangeText, error, helper, secure = fals
   const { t } = useTranslation();
   const { direction } = useLocale();
   const [hidden, setHidden] = useState(true);
+  const revealFocused = useContext(RevealFocusedContext);
   return (
     <View style={styles.field}>
       <AppText role="helper" color={colors.textSecondary}>
@@ -152,6 +230,7 @@ export function Field({ label, value, onChangeText, error, helper, secure = fals
           autoCorrect={false}
           style={[styles.input, { textAlign: direction === 'rtl' ? 'right' : 'left' }]}
           placeholderTextColor={colors.textSecondary}
+          onFocus={revealFocused}
           {...input}
         />
         {secure ? (

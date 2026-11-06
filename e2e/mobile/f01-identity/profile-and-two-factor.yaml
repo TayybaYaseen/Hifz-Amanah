@@ -35,7 +35,6 @@ tags:
 - hideKeyboard
 - tapOn: { id: "accountCreate.submit" }
 - assertVisible: { id: "accountCreate.userId.error" }
-- hideKeyboard
 - back            # New account → Accounts
 # 2. The Admin sets a Teacher's password; the Owner's account offers no password reset to an Admin. (F01-AC26)
 - scrollUntilVisible:
@@ -92,6 +91,11 @@ tags:
     env: { USER_ID: owner-a }
 - tapOn: { id: "nav.more" }
 - tapOn: { id: "more.accounts" }
+# The list loads after the screen opens. Wait for it (the Owner's own account is always listed): scrolling down
+# before it arrives can carry admin-a, the first entry, out of view above.
+- extendedWaitUntil:
+    visible: { id: "accounts.item.owner-a" }
+    timeout: 30000
 - scrollUntilVisible:
     element: { id: "accounts.item.admin-a" }
 - tapOn: { id: "accounts.item.admin-a" }

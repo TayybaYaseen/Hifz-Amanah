@@ -56,7 +56,6 @@ tags:
 - hideKeyboard
 - tapOn: { id: "accountCreate.submit" }
 - assertVisible: { id: "accountCreate.password.error" }
-- hideKeyboard
 - back
 - assertVisible: { id: "accounts.screen" }
 - assertNotVisible: { id: "accounts.item.teacher-short" }
