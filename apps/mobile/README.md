@@ -13,11 +13,26 @@ with ICU messages, `expo-secure-store` for the refresh token.
 | Typecheck | `npm run typecheck` (also part of the root `npm run typecheck`) |
 | Unit tests (session, errors, catalogues, direction) | root `npm test` |
 
+- **The app is Android only** (`platforms: ['android']`). Opening `http://localhost:8081` in a browser shows a JSON
+  manifest: that is Metro's answer to an Android client, not an error. There is no web build.
 - **`APP_ID`** is the Android application ID. **DEFERRED: DEC-B55.** Builds and Maestro flows take it from the
   environment until it is chosen.
 - **`EXPO_PUBLIC_API_URL`** sets the API address. The default is `http://10.0.2.2:3000`: the host machine as seen from
   the Android emulator, where `npm run api:e2e-server` listens.
 - **`APP_VARIANT=development`** allows plain HTTP for that local API. Release builds allow HTTPS only.
+
+## Run in Expo Go on a phone
+
+1. Install Expo Go from the Play Store. It must support Expo SDK 54; if it says the project is incompatible, use
+   the debug build (`npm run android`) instead.
+2. From the repository root, start the API: `npm run api:e2e-server`.
+3. From `apps/mobile`, start Metro with the API address the phone can reach:
+   - **USB** (with USB debugging on): `adb reverse tcp:3000 tcp:3000`, then
+     `APP_VARIANT=development EXPO_PUBLIC_API_URL=http://localhost:3000 npx expo start --go`
+   - **Same Wi-Fi:** `APP_VARIANT=development EXPO_PUBLIC_API_URL=http://<PC LAN IP>:3000 npx expo start --go`
+     (allow Node through the Windows firewall)
+4. Scan the QR code in the terminal with Expo Go, or press `a` to open it on a USB-connected phone.
+5. Sign in with a seeded test account, for example `teacher-a1` / `E2e-Test-Pass-1`.
 
 ## Structure
 

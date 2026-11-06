@@ -20,4 +20,9 @@ export default tseslint.config(
       globals: { process: 'readonly', console: 'readonly', fetch: 'readonly', AbortSignal: 'readonly', URL: 'readonly' },
     },
   },
+  {
+    // CommonJS tool configs (Babel).
+    files: ['**/babel.config.js'],
+    languageOptions: { sourceType: 'commonjs', globals: { module: 'writable' } },
+  },
 );

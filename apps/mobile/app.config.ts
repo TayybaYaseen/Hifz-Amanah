@@ -14,6 +14,8 @@ const config: ExpoConfig = {
   name: 'HifzAmanah',
   slug: 'hifzamanah',
   version: '0.1.0',
+  // Android only in MVP (ARCHITECTURE.md §3: no web portal). Metro on :8081 serves the Android bundle, not a web page.
+  platforms: ['android'],
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'light',
