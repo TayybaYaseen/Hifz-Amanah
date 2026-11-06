@@ -1,11 +1,11 @@
 # F11 · Localization and accessibility — mobile E2E (docs/specs/02-f11-localization-accessibility.md; design.md §6.2)
-# Covers: F11-AC4, F11-AC5, F11-AC6
+# Covers: F11-AC5, F11-AC6
+# Pending until Daily Entry exists (F05, spec 09). The language kept after sign-in is checked by language-persists.yaml.
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
-name: F11 language switch — values kept, stored value unchanged, preference persists
+name: F11 language switch — values kept mid-entry, stored value unchanged
 tags:
   - pending
   - F11
-  - US-047
   - US-048
 ---
 - launchApp:
@@ -13,5 +13,3 @@ tags:
 # 1. Sign in as teacher.a1 (English) → Daily Entry S1: fill Sabaq Al-Baqarah 1–10, 10 lines, Not Remembered (unsaved).
 # 2. Switch to Urdu without restarting → every value still there; labels in Urdu.                      (F11-AC5)
 # 3. Save → API check: status stored as NOT_REMEMBERED.                                                (F11-AC6)
-# 4. Sign out; sign in → app opens in Urdu.                                                            (F11-AC4)
-# 5. clearState and sign in again (as on a new device) → app opens in Urdu.                           (F11-AC4)

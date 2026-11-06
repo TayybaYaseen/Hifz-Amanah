@@ -15,8 +15,10 @@ import {
 } from '@hifz/contracts';
 import { errorKeys } from '../../api/errors.ts';
 import { useSession } from '../../auth/SessionContext.tsx';
+import { formatTime } from '@hifz/i18n-keys';
+import { isolate } from '../../i18n/direction.ts';
 import { useLocale } from '../../i18n/LocaleContext.tsx';
-import { AppScreen, AppText, Button, Card, Field, Notice } from '../../components/ui.tsx';
+import { AppScreen, AppText, Button, Card, Field, Notice, StatusBadge } from '../../components/ui.tsx';
 import { colors, radius, space, touch } from '../../theme/tokens.ts';
 
 export function AccountsScreen({ onAdd, onOpen }: { onAdd: () => void; onOpen: (account: AccountResponse) => void }) {
@@ -70,8 +72,9 @@ export function AccountsScreen({ onAdd, onOpen }: { onAdd: () => void; onOpen: (
             {account.loginId}
           </AppText>
           <AppText role="helper" color={colors.textSecondary}>
-            {`${t(`roles.${account.role}`)} · ${account.status === 'ACTIVE' ? t('accounts.active') : t('accounts.deactivated')}`}
+            {t(`roles.${account.role}`)}
           </AppText>
+          <AccountStatus account={account} testID={`accounts.item.${account.loginId}.accountStatus`} />
         </Pressable>
       ))}
       {loading ? <AppText color={colors.textSecondary}>{t('common.loading')}</AppText> : null}
@@ -236,13 +239,14 @@ export function AccountDetailScreen({ me, account: initial }: { me: MeResponse; 
       ) : null}
       <Card>
         <AppText latin>{account.loginId}</AppText>
-        <AppText>{`${t(`roles.${account.role}`)} · ${account.status === 'ACTIVE' ? t('accounts.active') : t('accounts.deactivated')}`}</AppText>
+        <AppText>{t(`roles.${account.role}`)}</AppText>
+        <AccountStatus account={account} testID="accountDetail.accountStatus" />
         {account.email ? <AppText color={colors.textSecondary}>{account.email}</AppText> : null}
         {account.lockedUntil ? (
           <AppText color={colors.warning} testID="accountDetail.locked">
             {`⚠ ${t('accounts.lockedUntil', {
               // The app's language, with Western digits in every locale (FR-I18N-009).
-              time: new Date(account.lockedUntil).toLocaleTimeString(locale === 'ur' ? 'ur-PK-u-nu-latn' : 'en-PK', { hour: '2-digit', minute: '2-digit' }),
+              time: formatTime(locale, account.lockedUntil),
             })}`}
           </AppText>
         ) : null}
@@ -283,7 +287,7 @@ export function AccountDetailScreen({ me, account: initial }: { me: MeResponse; 
               label={t('accounts.resetTwoFactor')}
               disabled={busy}
               onPress={() =>
-                confirmThen(t('accounts.resetTwoFactorConfirm', { name: account.displayName }), () =>
+                confirmThen(t('accounts.resetTwoFactorConfirm', { name: isolate(account.displayName) }), () =>
                   void act(async () => {
                     await session.authorized(`/accounts/${account.id}/two-factor/reset`, { body: {} });
                     setAccount({ ...account, twoFactorEnabled: false });
@@ -299,7 +303,7 @@ export function AccountDetailScreen({ me, account: initial }: { me: MeResponse; 
             label={t('accounts.deactivate')}
             disabled={busy}
             onPress={() =>
-              confirmThen(t('accounts.deactivateConfirm', { name: account.displayName }), () =>
+              confirmThen(t('accounts.deactivateConfirm', { name: isolate(account.displayName) }), () =>
                 void act(async () => {
                   setAccount(await session.authorized<AccountResponse>(`/accounts/${account.id}/deactivate`, { body: {} }));
                   return t('accounts.deactivatedDone');
@@ -335,3 +339,13 @@ const styles = StyleSheet.create({
   },
   chipOn: { borderColor: colors.brandPrimary, backgroundColor: colors.surfaceSelected },
 });
+
+/** Active or deactivated, as icon and text (F11-AC13). */
+function AccountStatus({ account, testID }: { account: AccountResponse; testID: string }) {
+  const { t } = useTranslation();
+  return account.status === 'ACTIVE' ? (
+    <StatusBadge testID={testID} tone="success" icon="✓" label={t('accounts.active')} />
+  ) : (
+    <StatusBadge testID={testID} tone="neutral" icon="⊘" label={t('accounts.deactivated')} />
+  );
+}

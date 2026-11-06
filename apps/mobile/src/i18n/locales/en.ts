@@ -149,6 +149,8 @@ export const en = {
     regenerateHelp: 'Needs a sign-in within the last 15 minutes and a code from your authenticator. Old codes stop working.',
     authCode: 'Authenticator code',
     newCodes: 'Your new recovery codes',
+    languageSaved: 'Language saved to your account. It will be used when you sign in on any device.',
+    languageNotSaved: 'Language changed on this device only; your account could not be updated.',
   },
   accounts: {
     title: 'Accounts',

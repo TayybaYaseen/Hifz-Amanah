@@ -6,7 +6,7 @@
 | **User story** | US-047 |
 | **Feature** | [F11 · Localization and accessibility](02-f11-localization-accessibility.md) |
 | **Epic** | EPIC 11 — Localization and Accessibility ([user-stories.md](../user-stories.md)) |
-| **Status** | draft |
+| **Status** | Approved |
 | **Priority** | Not specified in the source documents (SRS, user-stories.md, feature specs). None is assigned here. |
 | **Split from** | `docs/specs/F11-localization-accessibility.md` on 2026-10-30 |
 
@@ -125,17 +125,22 @@ Stated in these criteria: F11-AC4.
 
 - [e2e/api/f11-i18n.spec.ts](../../e2e/api/f11-i18n.spec.ts) — F11-AC4 (US-047) the language preference is stored on the account
 - [e2e/api/f11-i18n.spec.ts](../../e2e/api/f11-i18n.spec.ts) — F11-AC11 (US-047) every message key exists in en, ur, and ur-Latn
+- [e2e/api/f11-i18n.spec.ts](../../e2e/api/f11-i18n.spec.ts) — F11-AC11 (US-047) every error code the API returns has a message in every app locale
 
 **Mobile (Maestro):**
 
 - [e2e/mobile/f11-i18n/accessibility.yaml](../../e2e/mobile/f11-i18n/accessibility.yaml) — F11 accessibility — largest font, touch targets, status text and icon
 - [e2e/mobile/f11-i18n/locales-and-direction.yaml](../../e2e/mobile/f11-i18n/locales-and-direction.yaml) — F11 locales — English LTR, Urdu RTL, Roman Urdu LTR, glossary terms
-- [e2e/mobile/f11-i18n/switch-mid-entry.yaml](../../e2e/mobile/f11-i18n/switch-mid-entry.yaml) — F11 language switch — values kept, stored value unchanged, preference persists
+- [e2e/mobile/f11-i18n/language-persists.yaml](../../e2e/mobile/f11-i18n/language-persists.yaml) — F11 language preference — kept across sign-out and on a new device
 
 **Unit (Vitest):**
 
 - [apps/mobile/src/i18n/direction.test.ts](../../apps/mobile/src/i18n/direction.test.ts) — F11-AC1 (US-047) en is left to right (AC-I18N-01)
 - [packages/i18n-keys/catalogue.test.ts](../../packages/i18n-keys/catalogue.test.ts) — F11-AC11 (US-047) every app and server key exists in en, ur, and ur-Latn
+
+**Integration (Vitest, embedded Postgres):**
+
+- [apps/api/test/identity/locale-preference.test.ts](../../apps/api/test/identity/locale-preference.test.ts) — F11-AC4 (US-047) the language chosen on one session is the language of every later session
 
 ## Open decisions and blockers
 

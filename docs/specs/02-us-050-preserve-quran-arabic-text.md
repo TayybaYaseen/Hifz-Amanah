@@ -6,7 +6,7 @@
 | **User story** | US-050 |
 | **Feature** | [F11 · Localization and accessibility](02-f11-localization-accessibility.md) |
 | **Epic** | EPIC 11 — Localization and Accessibility ([user-stories.md](../user-stories.md)) |
-| **Status** | draft |
+| **Status** | Approved |
 | **Priority** | Not specified in the source documents (SRS, user-stories.md, feature specs). None is assigned here. |
 | **Split from** | `docs/specs/F11-localization-accessibility.md` on 2026-10-30 |
 
@@ -125,6 +125,7 @@ Nothing specific to this story in the source documents.
 
 - [apps/mobile/src/i18n/direction.test.ts](../../apps/mobile/src/i18n/direction.test.ts) — F11-AC9 (US-050) "البقرة 2:255–260" is isolated so it reads correctly in English and Urdu sentences (AC-I18N-06)
 - [apps/mobile/src/i18n/direction.test.ts](../../apps/mobile/src/i18n/direction.test.ts) — F11-AC8 (US-050) Arabic text passes through unchanged in every locale
+- [packages/i18n-keys/bidi-digits.test.ts](../../packages/i18n-keys/bidi-digits.test.ts) — F11-AC9 (US-050) a Surah range holds its numbers left to right inside a right-to-left run (AC-I18N-06)
 
 ## Open decisions and blockers
 

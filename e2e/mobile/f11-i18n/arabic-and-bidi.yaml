@@ -1,5 +1,7 @@
 # F11 · Localization and accessibility — mobile E2E (docs/specs/02-f11-localization-accessibility.md; design.md §2.3, §6)
 # Covers: F11-AC8, F11-AC9, F11-AC10
+# Pending until a record holds a Surah range (F05/F06) and a report exports to PDF (F13).
+# Built in F11: QuranText (Noto Naskh Arabic, stored value unchanged) and surahRange() bidi isolation.
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F11 Arabic — Surah names unchanged; mixed ranges readable both directions
 tags:

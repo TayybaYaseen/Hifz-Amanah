@@ -1,6 +1,6 @@
 # F11 · Localization and accessibility
 
-**Status:** draft
+**Status:** Approved
 **Brief:** [00-product-brief.md](../00-product-brief.md) · **Flow:** Settings → Language ([design.md §4.16](../design.md)); direction system ([§6](../design.md))
 **Requirements:** FR-I18N-001…008, FR-AUTH-004/005, NFR-MNT-003, NFR-UX-002/005, NFR-COMP-002, FR-I18N-009
 **Stories:** US-047 – US-050 · **Depends on:** — (cross-cutting)

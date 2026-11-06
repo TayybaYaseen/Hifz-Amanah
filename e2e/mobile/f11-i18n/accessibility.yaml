@@ -1,5 +1,7 @@
 # F11 · Localization and accessibility — mobile E2E (docs/specs/02-f11-localization-accessibility.md; design.md §6.3)
 # Covers: F11-AC12, F11-AC13
+# Pending until the screens it sweeps exist: Students (F03), Bulk Entry (F04), Daily Entry (F05), Homework (F08), Reports (F09).
+# Built in F11: StatusBadge (icon + text), 44/48 dp touch targets, unclipped font scaling in components/ui.tsx.
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F11 accessibility — largest font, touch targets, status text and icon
 tags:
