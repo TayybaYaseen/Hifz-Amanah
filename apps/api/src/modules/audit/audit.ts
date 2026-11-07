@@ -15,13 +15,21 @@ export type AuditAction =
   | 'TWO_FACTOR_ENABLED'
   | 'TWO_FACTOR_RESET'
   | 'RECOVERY_CODE_USED'
-  | 'RECOVERY_CODES_REGENERATED';
+  | 'RECOVERY_CODES_REGENERATED'
+  // F02 · Organization and roles
+  | 'ORGANIZATION_CREATED'
+  | 'ORGANIZATION_UPDATED'
+  | 'ADMIN_ADDED'
+  | 'ADMIN_REMOVED'
+  | 'OWNER_ADDED'
+  | 'ALL_CLASSES_SET'
+  | 'ALL_CLASSES_CLEARED';
 
 export interface AuditEvent {
   organizationId: string | null;
   actorUserId: string | null;
   action: AuditAction;
-  targetType: 'USER';
+  targetType: 'USER' | 'ORGANIZATION';
   targetId: string | null;
   summary?: Record<string, unknown>;
   at: Date;
@@ -38,7 +46,17 @@ export function redact(summary: Record<string, unknown>): Record<string, unknown
   return out;
 }
 
+/**
+ * Test-only fault switch (F02-AC13): when set, the next audit write throws, so tests can prove the change it
+ * describes rolls back with it. Only the test-control API sets it, and that API never runs in production.
+ */
+export const auditFaults = { failNext: false };
+
 export async function recordAudit(db: Executor, event: AuditEvent): Promise<void> {
+  if (auditFaults.failNext) {
+    auditFaults.failNext = false;
+    throw new Error('audit write failed (test fault)');
+  }
   await db
     .insertInto('audit_logs')
     .values({

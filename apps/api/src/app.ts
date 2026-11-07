@@ -9,7 +9,10 @@ import type { Mailer, MemoryMailer } from './platform/mailer.ts';
 import { AccountsService } from './modules/identity/accounts-service.ts';
 import { AuthService } from './modules/identity/auth-service.ts';
 import { ProfileService } from './modules/identity/profile-service.ts';
-import { registerIdentityRoutes } from './modules/identity/routes.ts';
+import { bearer, registerIdentityRoutes } from './modules/identity/routes.ts';
+import { MembershipService } from './modules/organization/membership-service.ts';
+import { OrganizationService } from './modules/organization/organization-service.ts';
+import { registerOrganizationRoutes } from './modules/organization/routes.ts';
 import { TokenService } from './modules/identity/tokens.ts';
 import { registerTestControl, type LogSink } from './testing/control.ts';
 
@@ -55,6 +58,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   app.get('/', async () => ({ status: 'ok' }));
   registerIdentityRoutes(app, { auth, accounts, profile });
+  const organization = new OrganizationService(deps.db, deps.clock);
+  registerOrganizationRoutes(app, {
+    authenticate: (request) => auth.authenticate(bearer(request)),
+    organization,
+    memberships: new MembershipService(deps.db, deps.clock, accounts),
+  });
 
   if (deps.config.testControlSecret) {
     if (deps.config.env !== 'test') throw new Error('The test-control API is enabled only when NODE_ENV=test');
@@ -65,6 +74,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       mailer: deps.mailer as MemoryMailer,
       logSink: deps.logSink,
       totpKey: deps.config.totpKey,
+      organization,
     });
   }
   return app;

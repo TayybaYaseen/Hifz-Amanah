@@ -6,7 +6,7 @@ import { ACCESS_TOKEN_TTL_MS, SESSION_TTL_MS } from './rules.ts';
 import { newRefreshToken, sha256 } from './secrets.ts';
 import type { TokenService } from './tokens.ts';
 
-export type RevokeReason = 'SIGN_OUT' | 'PASSWORD_RESET' | 'PASSWORD_CHANGED' | 'DEACTIVATED' | 'TWO_FACTOR_RESET' | 'REFRESH_REUSE';
+export type RevokeReason = 'SIGN_OUT' | 'PASSWORD_RESET' | 'PASSWORD_CHANGED' | 'DEACTIVATED' | 'TWO_FACTOR_RESET' | 'REFRESH_REUSE' | 'ROLE_CHANGED';
 
 export async function createSession(
   db: Executor,

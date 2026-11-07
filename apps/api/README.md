@@ -62,6 +62,26 @@ Passwords are throttled per typed User ID (sign-in and the current password on M
 recovery codes have their own per-account counter, which a correct password does not reset. An authenticator code
 is accepted once only.
 
+## Organization routes (F02)
+
+Organization and role always come from the signed-in membership (FR-SEC-009). Bodies are strict: an
+`organizationId`, `role`, or any other unexpected field is `400` with `fields.<name>: NOT_ALLOWED` (F02-AC9).
+There is no route that creates a workspace or signs up (F02-AC16), and none that edits or deletes an audit record
+(F02-AC12). Rules live in [`src/modules/access/policy.ts`](src/modules/access/policy.ts) (the SRS §17.1 matrix as
+data, `can()` / `authorize()`, list scope) and [`src/modules/organization/rules.ts`](src/modules/organization/rules.ts).
+
+| Route | Who | Body | Result |
+|---|---|---|---|
+| `GET /organization` | any member | — | `200` `{ id, name, kind, timezone, weekStart, dailyReportMode, canEdit }` |
+| `PATCH /organization` | Owner/Admin | `{ name?, timezone?, weekStart? }` only | `200` settings; one `ORGANIZATION_UPDATED` audit with old and new values, none if nothing changed. `400 fields.name: REQUIRED` (blank), `fields.timezone: INVALID` (not an IANA name), `fields.weekStart: INVALID`. `403` for Teacher/Student/Parent |
+| `POST /accounts/:id/role` | Owner | `{ role: ADMIN \| TEACHER }` | `200` account; `ADMIN_ADDED` or `ADMIN_REMOVED` audit. A new Admin's sessions end, so the next sign-in sets up two-factor. `400` unless the target is an active Teacher or Admin; `409 LAST_ADMIN` if no Owner/Admin would remain |
+| `POST /accounts/:id/owner` | Owner | — | `200` account; the Admin becomes an Owner too, and the current Owner stays Owner. `OWNER_ADDED` audit. `400` unless the target is an active Admin |
+| `POST /accounts/:id/all-classes` | Owner/Admin | `{ allClasses: boolean }` | `200` account; `ALL_CLASSES_SET` or `ALL_CLASSES_CLEARED` audit, none if unchanged. `400` unless the target is an active Teacher |
+
+The role is checked first, so `403` comes before any ID lookup. An ID outside the madrasa is `404`, identical to an
+ID that does not exist (F02-AC7). Accounts now include `allClasses`. Deactivation is refused with `409 LAST_ADMIN`
+if it would leave no Owner or Admin.
+
 ## Test control (non-production only)
 
 Enabled when `TEST_CONTROL_SECRET` is set (the E2E server sets `local-e2e-control-secret` unless overridden; E2E
@@ -70,10 +90,20 @@ fixtures read `E2E_CONTROL_SECRET`). Every route needs the `x-test-control-secre
 `POST /__test/reset` · `POST /__test/clock { advanceMs }` · `GET /__test/users/:loginId` · `GET /__test/otp/:loginId` ·
 `GET /__test/emails/:loginId` · `GET /__test/audit/:loginId` · `GET /__test/totp/:loginId` · `POST /__test/search { text }`
 
-## Not yet in F01
+F02 adds:
+- `POST /__test/organizations { name, code, kind?, owner: { loginId, displayName?, email?, password? }, twoFactor? }`: the
+  platform operator creates a workspace and its first Owner (FR-ORG-001), with the database defaults for timezone,
+  week start, and report mode. With `twoFactor` (the default) the Owner gets an authenticator so fixtures can sign in.
+- `POST /__test/audit/fail-next`: the next audit write fails (F02-AC13). A reset clears it.
+- `GET /__test/audit-target/:id`: audit records about one organization or user, oldest first.
+
+## Not yet built
 
 - The per-IP throttle (F17-AC13) and the F17 audit query API arrive with F17.
-- Row-level security (ADR-006) arrives with F02's tenant-scoped tables.
+- Row-level security (ADR-006) is not built yet. F02 added no new tenant-scoped tables; every query filters by the
+  membership's organization. When to add it is an open question for the user (see docs/handover/F02-plan.md).
+- F02: an operator CLI or console for creating workspaces (only test control does it today), and removing or demoting
+  an Owner (who may do it is still open).
 - The platform operator's reset of an Owner's two-factor setup is operator tooling, not an API route.
 - Open items from the F01 code review (2026-11-02):
   - Refresh-token reuse is detected one rotation back only; older replays are refused but do not end the session (L3).

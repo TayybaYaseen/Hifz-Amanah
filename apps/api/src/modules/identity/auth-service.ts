@@ -54,6 +54,8 @@ export interface Actor {
   sessionId: string;
   organizationId: string;
   role: Role;
+  /** A Teacher's "all classes" flag (FR-SEC-003), re-read from the membership on every request. */
+  allClasses: boolean;
   loginId: string;
   authenticatedAt: Date;
 }
@@ -462,6 +464,7 @@ export class AuthService {
         'users.status',
         'memberships.organization_id',
         'memberships.role',
+        'memberships.all_classes',
       ])
       .where('sessions.id', '=', result.claims.sessionId)
       .where('sessions.user_id', '=', result.claims.userId)
@@ -472,6 +475,7 @@ export class AuthService {
       sessionId: row.sessionId,
       organizationId: row.organization_id,
       role: row.role,
+      allClasses: row.all_classes,
       loginId: row.login_id,
       authenticatedAt: row.authenticated_at,
     };

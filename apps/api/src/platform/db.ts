@@ -9,9 +9,10 @@ export interface OrganizationsTable {
   kind: 'INDIVIDUAL' | 'MADRASA';
   name: string;
   code: string;
-  timezone: string;
-  week_start: string;
-  daily_report_mode: 'SINGLE' | 'MULTI_SESSION';
+  // Defaults Asia/Karachi, MONDAY, SINGLE (F02-AC1): optional on insert so new workspaces get the database defaults.
+  timezone: Generated<string>;
+  week_start: Generated<'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY'>;
+  daily_report_mode: Generated<'SINGLE' | 'MULTI_SESSION'>;
   created_at: Timestamp;
 }
 

@@ -1,11 +1,12 @@
 // More menu (design.md §3.2). Accounts is shown to Owner/Admin only; the server enforces it regardless.
+// Madrasa settings is shown to everyone: editable for Owner/Admin, read-only for other roles (F02-AC4).
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { MeResponse } from '@hifz/contracts';
 import { useSession } from '../../auth/SessionContext.tsx';
 import { AppScreen, Button } from '../../components/ui.tsx';
 
-export function MoreScreen({ me, onProfile, onAccounts }: { me: MeResponse; onProfile: () => void; onAccounts: () => void }) {
+export function MoreScreen({ me, onProfile, onAccounts, onWorkspace }: { me: MeResponse; onProfile: () => void; onAccounts: () => void; onWorkspace: () => void }) {
   const { t } = useTranslation();
   const { session } = useSession();
   const [busy, setBusy] = useState(false);
@@ -13,6 +14,7 @@ export function MoreScreen({ me, onProfile, onAccounts }: { me: MeResponse; onPr
   return (
     <AppScreen testID="more.screen">
       <Button testID="more.profile" variant="secondary" label={t('more.profile')} onPress={onProfile} />
+      <Button testID="more.workspace" variant="secondary" label={t('more.workspace')} onPress={onWorkspace} />
       {staff ? <Button testID="more.accounts" variant="secondary" label={t('more.accounts')} onPress={onAccounts} /> : null}
       {/* TODO(F12): warn before signing out while changes are waiting to sync (design.md §4.13). */}
       <Button
