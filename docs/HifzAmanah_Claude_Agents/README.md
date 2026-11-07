@@ -17,8 +17,11 @@ This pack contains implementation instructions for Claude Code. It is based on t
 - `agents/code-review-agent.md`: independent code and security review.
 - `agents/testing-agent.md`: test strategy, automation, acceptance criteria.
 - `agents/documentation-agent.md`: docs, decisions, setup, API and release documentation.
+- `agents/security-agent.md`: authentication, authorization, tenant isolation, privacy, secure sync, audit, secrets, and security tests.
 - `IMPLEMENTATION_PLAN.md`: phases and gates, following the spec order `01`–`17`.
 - `OPEN_DECISIONS.md`: what is still open (two Deferred decisions and three product-owner actions), and where each former open item was decided.
+
+Each role is registered with Claude Code by a thin wrapper in `.claude/agents/<role>.md` that points back to the role file here (the role file stays the single source of truth). The `/dal <task>` command (`.claude/skills/dal/SKILL.md`) sends an implementation task to `master-agent`, which delegates to the specialists.
 
 ## Source of truth (highest wins)
 1. `SRS.md` §17 (decision register) and §16 (consolidated finalized decisions)
