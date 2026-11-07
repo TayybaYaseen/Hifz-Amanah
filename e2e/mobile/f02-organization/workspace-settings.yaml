@@ -1,5 +1,6 @@
 # F02 · Organization and roles — mobile E2E (docs/specs/03-f02-organization-roles.md; design.md §4.16)
 # Covers: F02-AC1, F02-AC2, F02-AC3, F02-AC4
+# Still pending: step 3's weekly report header waits for weekly reports (F09). Steps 1, 2, 4, and 5 run today.
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F02 settings — defaults, Admin edits, empty name, no controls for others
 tags:
@@ -7,10 +8,65 @@ tags:
   - F02
   - US-007
 ---
-- launchApp:
-    clearState: true
+- runFlow: ../../support/maestro/reset.yaml
 # 1. Sign in as admin.a → Settings → Madrasa: Asia/Karachi, Monday, one report per student/date.     (F02-AC1)
+- runFlow:
+    file: ../../support/maestro/sign-in-staff.yaml
+    env: { USER_ID: admin-a }
+- tapOn: { id: "nav.more" }
+- tapOn: { id: "more.workspace" }
+- assertVisible: { id: "workspace.nameInput" }
+- assertVisible: { id: "workspace.timezoneInput", text: "Asia/Karachi" }
+- assertVisible: { id: "workspace.weekStart.MONDAY", selected: true }
+- assertVisible: "Daily reports: One report per student per date"
 # 2. Clear the name and save → name field error; nothing saved.                                        (F02-AC3)
+- tapOn: { id: "workspace.nameInput" }
+- eraseText: 120
+- hideKeyboard
+- tapOn: { id: "workspace.save" }
+- assertVisible: { id: "workspace.nameInput.error" }
+- back
+- tapOn: { id: "more.workspace" }
+- assertVisible: { id: "workspace.nameInput", text: "Madrasa Alif (test)" }
 # 3. Change the timezone and save → saved; the weekly report header shows the new timezone.            (F02-AC2)
+- tapOn: { id: "workspace.timezoneInput" }
+- eraseText: 64
+- inputText: "Asia/Dubai"
+- hideKeyboard
+- tapOn: { id: "workspace.weekStart.SATURDAY" }
+- tapOn: { id: "workspace.save" }
+- assertVisible: { id: "workspace.status.success" }
+# TODO(F09): open this week's report and assert its header shows Asia/Dubai and starts on Saturday.
+- back
+- back
+- runFlow: ../../support/maestro/sign-out.yaml
 # 4. Sign out; sign in as teacher.a1 → Settings shows no Madrasa edit controls.                        (F02-AC4)
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- tapOn: { id: "nav.more" }
+- tapOn: { id: "more.workspace" }
+- assertVisible: { id: "workspace.readOnly" }
+- assertNotVisible: { id: "workspace.nameInput" }
+- assertNotVisible: { id: "workspace.save" }
+- back
+- back
+- runFlow: ../../support/maestro/sign-out.yaml
 # 5. Repeat step 4 as student.s1 and parent.p1.                                                        (F02-AC4)
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: student-s1 }
+- tapOn: { id: "nav.more" }
+- tapOn: { id: "more.workspace" }
+- assertVisible: { id: "workspace.readOnly" }
+- assertNotVisible: { id: "workspace.save" }
+- back
+- back
+- runFlow: ../../support/maestro/sign-out.yaml
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: parent-p1 }
+- tapOn: { id: "nav.more" }
+- tapOn: { id: "more.workspace" }
+- assertVisible: { id: "workspace.readOnly" }
+- assertNotVisible: { id: "workspace.save" }

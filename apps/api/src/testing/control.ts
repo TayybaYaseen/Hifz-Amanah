@@ -11,8 +11,11 @@ import type { Clock } from '../platform/clock.ts';
 import type { Db } from '../platform/db.ts';
 import { AppError, parse } from '../platform/errors.ts';
 import type { MemoryMailer } from '../platform/mailer.ts';
-import { decryptSecret } from '../modules/identity/secrets.ts';
-import { totpForStep, totpStep } from '../modules/identity/totp.ts';
+import { auditFaults } from '../modules/audit/audit.ts';
+import { decryptSecret, encryptSecret } from '../modules/identity/secrets.ts';
+import type { OrganizationService } from '../modules/organization/organization-service.ts';
+import { newTotpSecret, totpForStep, totpStep } from '../modules/identity/totp.ts';
+import { TEST_PASSWORD } from '../../../../e2e/fixtures/personas.ts';
 import { seedPersonas } from './seed.ts';
 
 /** Keeps every log line in memory so tests can prove secrets never reach the logs (F01-AC15). */
@@ -36,7 +39,26 @@ interface ControlDeps {
   mailer: MemoryMailer;
   logSink: LogSink | undefined;
   totpKey: Buffer;
+  organization: OrganizationService;
 }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// The platform operator's onboarding input (FR-ORG-001). Timezone, week start, and report mode are not accepted:
+// a new workspace always starts from the defaults (F02-AC1).
+const NewWorkspaceInput = z.strictObject({
+  kind: z.enum(['INDIVIDUAL', 'MADRASA']).default('MADRASA'),
+  name: z.string().max(100),
+  code: z.string().regex(/^[A-Za-z0-9]{2,12}$/),
+  owner: z.strictObject({
+    loginId: z.string().max(32),
+    displayName: z.string().min(1).max(100).default('Test Owner'),
+    email: z.email().nullable().default(null),
+    password: z.string().max(64).default(TEST_PASSWORD),
+  }),
+  /** Enroll an authenticator now, so E2E fixtures can sign in; a real Owner sets it up at first sign-in. */
+  twoFactor: z.boolean().default(true),
+});
 
 const TABLES = [
   'audit_logs',
@@ -78,6 +100,7 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
         deps.clock.reset();
         deps.mailer.clear();
         deps.logSink?.clear();
+        auditFaults.failNext = false;
         await seedPersonas(deps.db, deps.clock, deps.totpKey);
         return { status: 'reset' };
       });
@@ -98,6 +121,34 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
       scope.get('/emails/:loginId', async (request) => {
         const sent = sentTo((request.params as { loginId: string }).loginId);
         return { count: sent.length, to: [...new Set(sent.map((m) => m.to))] };
+      });
+
+      // The platform operator creates a workspace and its first Owner (FR-ORG-001). Never a public route (F02-AC16).
+      scope.post('/organizations', async (request, reply) => {
+        const input = parse(NewWorkspaceInput, request.body);
+        const created = await deps.organization.createWorkspace(input);
+        if (input.twoFactor) {
+          const now = deps.clock.now();
+          await deps.db
+            .insertInto('user_totp')
+            .values({ user_id: created.ownerUserId, secret_encrypted: encryptSecret(deps.totpKey, newTotpSecret()), created_at: now, enabled_at: now, last_used_step: null })
+            .execute();
+        }
+        return reply.status(201).send(created);
+      });
+
+      // The next audit write fails, so tests can prove the change rolls back with it (F02-AC13).
+      scope.post('/audit/fail-next', async () => {
+        auditFaults.failNext = true;
+        return { status: 'armed' };
+      });
+
+      // Audit records about one target (an organization or a user), oldest first.
+      scope.get('/audit-target/:id', async (request) => {
+        const { id } = request.params as { id: string };
+        if (!UUID.test(id)) throw new AppError('NOT_FOUND');
+        const rows = await deps.db.selectFrom('audit_logs').selectAll().where('target_id', '=', id).orderBy('created_at').orderBy('id').execute();
+        return { items: rows };
       });
 
       scope.get('/audit/:loginId', async (request) => {

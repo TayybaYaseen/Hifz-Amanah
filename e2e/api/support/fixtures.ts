@@ -16,8 +16,8 @@ export type Who = PersonaKey | string;
 
 // Test control (NFR-MNT-005): a test-only API, enabled only in local and staging with a secret
 // (apps/api/src/testing/control.ts). It provides seed reset, the OTP mail sink, clock control, audit and
-// text search, and TOTP codes for the seeded Owner/Admin personas (FR-AUTH-016). AI and push stubs arrive
-// with F15 and F16.
+// text search, TOTP codes for the seeded Owner/Admin personas (FR-AUTH-016), operator workspace creation, and an
+// audit-failure switch (F02). AI and push stubs arrive with F15 and F16.
 export interface TestControl {
   reset(): Promise<void>;
   latestOtp(who: Who): Promise<string | null>;
@@ -29,6 +29,12 @@ export interface TestControl {
   setPushProviderFailing(failing: boolean): Promise<void>;
   pushesFor(userId: string): Promise<PushMessage[]>;
   auditFor(who: Who): Promise<Array<Record<string, unknown>>>;
+  /** Audit records about one target ID (an organization or a user), oldest first. */
+  auditForTarget(id: string): Promise<Array<Record<string, unknown>>>;
+  /** The platform operator creates a workspace and its first Owner (FR-ORG-001); the Owner gets an authenticator. */
+  createWorkspace(input: { name: string; code: string; ownerLoginId: string; kind?: 'MADRASA' | 'INDIVIDUAL' }): Promise<{ organizationId: string; ownerUserId: string }>;
+  /** The next audit write fails (F02-AC13). Cleared by reset. */
+  failNextAuditWrite(): Promise<void>;
   totpFor(who: Who): Promise<string>;
   userIdOf(who: Who): Promise<string>;
   /** Counts a string in every database table and in the captured API logs. */
@@ -86,6 +92,9 @@ export const test = base.extend<Fixtures>({
       emailRecipients: async (who) => (await json(await ctx.get(`emails/${id(who)}`))).to,
       advanceClock: async (ms) => void (await json(await ctx.post('clock', { data: { advanceMs: ms } }))),
       auditFor: async (who) => (await json(await ctx.get(`audit/${id(who)}`))).items,
+      auditForTarget: async (target) => (await json(await ctx.get(`audit-target/${encodeURIComponent(target)}`))).items,
+      createWorkspace: async ({ ownerLoginId, ...rest }) => json(await ctx.post('organizations', { data: { ...rest, owner: { loginId: ownerLoginId } } })),
+      failNextAuditWrite: async () => void (await json(await ctx.post('audit/fail-next'))),
       totpFor: async (who) => (await json(await ctx.get(`totp/${id(who)}`))).code,
       userIdOf: async (who) => (await json(await ctx.get(`users/${id(who)}`))).id,
       search: async (text) => json(await ctx.post('search', { data: { text } })),

@@ -1,7 +1,7 @@
 // Safe, stable API errors. Clients localize by `code`; messages never include internal detail.
 import type { FastifyError, FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { ApiError, ErrorCode } from '@hifz/contracts';
+import { LAST_ADMIN_MESSAGE, type ApiError, type ErrorCode } from '@hifz/contracts';
 
 const STATUS: Record<ErrorCode, number> = {
   VALIDATION: 400,
@@ -15,6 +15,7 @@ const STATUS: Record<ErrorCode, number> = {
   FORBIDDEN: 403,
   NOT_FOUND: 404,
   LOGIN_ID_TAKEN: 409,
+  LAST_ADMIN: 409,
   RATE_LIMITED: 429,
   INTERNAL: 500,
 };
@@ -31,6 +32,7 @@ const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
   FORBIDDEN: 'You do not have permission to do this',
   NOT_FOUND: 'Not found',
   LOGIN_ID_TAKEN: 'User ID already in use',
+  LAST_ADMIN: LAST_ADMIN_MESSAGE,
   RATE_LIMITED: 'Too many requests. Try again later',
   INTERNAL: 'Something went wrong',
 };

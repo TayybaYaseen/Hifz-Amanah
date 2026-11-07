@@ -12,6 +12,7 @@ import {
   type CreatableRole,
   type LoginIdSuggestionResponse,
   type MeResponse,
+  type RoleChangeRole,
 } from '@hifz/contracts';
 import { errorKeys } from '../../api/errors.ts';
 import { useSession } from '../../auth/SessionContext.tsx';
@@ -196,6 +197,8 @@ export function AccountDetailScreen({ me, account: initial }: { me: MeResponse; 
     account.id !== me.id &&
     (me.role === 'OWNER' ? account.role !== 'OWNER' : ['TEACHER', 'STUDENT', 'PARENT'].includes(account.role));
   const canResetTwoFactor = me.role === 'OWNER' && account.role === 'ADMIN';
+  const isOwner = me.role === 'OWNER' && account.id !== me.id;
+  const staff = me.role === 'OWNER' || me.role === 'ADMIN';
 
   const act = async (action: () => Promise<string>) => {
     setBusy(true);
@@ -215,6 +218,12 @@ export function AccountDetailScreen({ me, account: initial }: { me: MeResponse; 
   // Consequential actions are summarized and confirmed in place (design.md §5.11).
   const [pending, setPending] = useState<{ message: string; action: () => void } | null>(null);
   const confirmThen = (message: string, action: () => void) => setPending({ message, action });
+
+  const changeRole = (role: RoleChangeRole) =>
+    act(async () => {
+      setAccount(await session.authorized<AccountResponse>(`/accounts/${account.id}/role`, { body: { role } }));
+      return role === 'ADMIN' ? t('accounts.makeAdminDone') : t('accounts.removeAdminDone');
+    });
 
   return (
     <AppScreen title={account.displayName} testID="accountDetail.screen">
@@ -248,6 +257,65 @@ export function AccountDetailScreen({ me, account: initial }: { me: MeResponse; 
         ) : null}
         {account.twoFactorEnabled ? <AppText>{`✓ ${t('accounts.twoFactorOn')}`}</AppText> : null}
       </Card>
+      {account.status === 'ACTIVE' && ((staff && account.role === 'TEACHER') || (isOwner && account.role === 'ADMIN')) ? (
+        // Roles and permissions (design.md §4.16; F02-AC14, AC15). Only the Owner adds or removes Admins.
+        <Card>
+          <AppText role="cardTitle">{t('accounts.permissionsTitle')}</AppText>
+          {account.role === 'TEACHER' ? (
+            <>
+              <Button
+                testID="accountDetail.allClasses"
+                variant="secondary"
+                label={account.allClasses ? t('accounts.allClassesClear') : t('accounts.allClassesSet')}
+                disabled={busy}
+                onPress={() =>
+                  void act(async () => {
+                    setAccount(await session.authorized<AccountResponse>(`/accounts/${account.id}/all-classes`, { body: { allClasses: !account.allClasses } }));
+                    return account.allClasses ? t('accounts.allClassesCleared') : t('accounts.allClassesDone');
+                  })
+                }
+              />
+              <AppText role="helper" color={colors.textSecondary} testID="accountDetail.allClassesState">
+                {`${account.allClasses ? '✓ ' : ''}${account.allClasses ? t('accounts.allClassesOn') : t('accounts.allClassesOff')}`}
+              </AppText>
+            </>
+          ) : null}
+          {isOwner && account.role === 'TEACHER' ? (
+            <Button
+              testID="accountDetail.makeAdmin"
+              variant="secondary"
+              label={t('accounts.makeAdmin')}
+              disabled={busy}
+              onPress={() => confirmThen(t('accounts.makeAdminConfirm', { name: account.displayName }), () => void changeRole('ADMIN'))}
+            />
+          ) : null}
+          {isOwner && account.role === 'ADMIN' ? (
+            <>
+              <Button
+                testID="accountDetail.removeAdmin"
+                variant="secondary"
+                label={t('accounts.removeAdmin')}
+                disabled={busy}
+                onPress={() => confirmThen(t('accounts.removeAdminConfirm', { name: account.displayName }), () => void changeRole('TEACHER'))}
+              />
+              <Button
+                testID="accountDetail.makeOwner"
+                variant="secondary"
+                label={t('accounts.makeOwner')}
+                disabled={busy}
+                onPress={() =>
+                  confirmThen(t('accounts.makeOwnerConfirm', { name: account.displayName }), () =>
+                    void act(async () => {
+                      setAccount(await session.authorized<AccountResponse>(`/accounts/${account.id}/owner`, { body: {} }));
+                      return t('accounts.makeOwnerDone');
+                    }),
+                  )
+                }
+              />
+            </>
+          ) : null}
+        </Card>
+      ) : null}
       {canManage && account.status === 'ACTIVE' ? (
         <>
           <Card>

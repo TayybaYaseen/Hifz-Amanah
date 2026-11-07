@@ -65,6 +65,7 @@ export const ERROR_CODES = [
   'FORBIDDEN',
   'NOT_FOUND',
   'LOGIN_ID_TAKEN',
+  'LAST_ADMIN',
   'OTP_INVALID',
   'CURRENT_PASSWORD_INCORRECT',
   'TWO_FACTOR_INVALID',
@@ -199,6 +200,8 @@ export interface AccountResponse {
   /** Set while the account is locked after repeated failed sign-ins (FR-AUTH-014). */
   lockedUntil: string | null;
   twoFactorEnabled: boolean;
+  /** A Teacher's "all classes" flag (FR-SEC-003); always false for other roles. */
+  allClasses: boolean;
   createdAt: string;
 }
 

@@ -17,6 +17,7 @@ import { RecoveryCodesScreen, TwoFactorSetupScreen } from '../features/auth/TwoF
 import { HomeScreen } from '../features/home/HomeScreen.tsx';
 import { MoreScreen } from '../features/home/MoreScreen.tsx';
 import { ProfileScreen } from '../features/profile/ProfileScreen.tsx';
+import { WorkspaceScreen } from '../features/settings/WorkspaceScreen.tsx';
 import { colors } from '../theme/tokens.ts';
 
 type AuthStack = { SignIn: undefined; ForgotPassword: undefined };
@@ -24,6 +25,7 @@ type AppStack = {
   Home: undefined;
   More: undefined;
   Profile: undefined;
+  Workspace: undefined;
   Accounts: undefined;
   AccountCreate: undefined;
   AccountDetail: { account: AccountResponse };
@@ -112,11 +114,19 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
       </App.Screen>
       <App.Screen name="More" options={{ title: t('more.title') }}>
         {({ navigation }) => (
-          <MoreScreen me={me} onProfile={() => navigation.navigate('Profile')} onAccounts={() => navigation.navigate('Accounts')} />
+          <MoreScreen
+            me={me}
+            onProfile={() => navigation.navigate('Profile')}
+            onAccounts={() => navigation.navigate('Accounts')}
+            onWorkspace={() => navigation.navigate('Workspace')}
+          />
         )}
       </App.Screen>
       <App.Screen name="Profile" options={{ title: t('profile.title') }}>
         {() => <ProfileScreen me={me} />}
+      </App.Screen>
+      <App.Screen name="Workspace" options={{ title: t('workspace.title') }}>
+        {() => <WorkspaceScreen />}
       </App.Screen>
       {staff ? (
         <>
