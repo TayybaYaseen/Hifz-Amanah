@@ -1,6 +1,6 @@
 # F12 · Offline and synchronization
 
-**Status:** draft
+**Status:** Approved
 **Brief:** [00-product-brief.md](../00-product-brief.md) · **Flow:** Offline and synchronization ([design.md §4.13, §5.9, §8](../design.md)); conflict review
 **Requirements:** NFR-OFF-001…010, FR-SYNC-006…009, NFR-OFF-011
 **Stories:** US-051 – US-054 · **Depends on:** F01, F02

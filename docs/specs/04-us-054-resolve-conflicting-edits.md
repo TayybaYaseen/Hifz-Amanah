@@ -6,7 +6,7 @@
 | **User story** | US-054 |
 | **Feature** | [F12 · Offline and synchronization](04-f12-offline-sync.md) |
 | **Epic** | EPIC 12 — Offline and Synchronization ([user-stories.md](../user-stories.md)) |
-| **Status** | draft |
+| **Status** | Approved |
 | **Priority** | Not specified in the source documents (SRS, user-stories.md, feature specs). None is assigned here. |
 | **Split from** | `docs/specs/F12-offline-sync.md` on 2026-10-30 |
 
