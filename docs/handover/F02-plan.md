@@ -2,7 +2,7 @@
 
 **Branch:** `feature/f02-organization-roles`, from `origin/main` (`bcf3b05`, F01 merged). It does not contain F11.
 **Specs:** `docs/specs/03-*` · **Stories:** US-007, US-008, US-009 · **Requirements:** FR-ORG-001…007, FR-SEC-003,
-FR-SEC-008/009, FR-AUD-*, SRS §17.1 (DEC-B12), DEC-B01, DEC-B02, DEC-B13 · **Status:** plan agreed, no code yet.
+FR-SEC-008/009, FR-AUD-*, SRS §17.1 (DEC-B12), DEC-B01, DEC-B02, DEC-B13 · **Status:** built 2026-11-06; the F02 gate is PENDING, as expected (see "Status" at the end).
 
 ## Decisions taken with the user (2026-11-06)
 
@@ -18,6 +18,9 @@ FR-SEC-008/009, FR-AUD-*, SRS §17.1 (DEC-B12), DEC-B01, DEC-B02, DEC-B13 · **S
   themselves? Proposed default: only themselves, and only while another active Owner remains. Needs confirmation.
 - **Production onboarding tooling.** FR-ORG-001: the platform operator creates each workspace and its first Owner.
   F02 adds this to the test-control API only (needed by F02-AC1). An operator CLI or console is not specified.
+- **Row-level security (ADR-006).** The F01 API README deferred it "to F02's tenant-scoped tables", but this plan
+  does not include it, and F02 adds no new tenant tables. Every query already filters by the membership's
+  organization. Proposed: add RLS with F03, the first feature with tenant-scoped domain tables. Needs a decision.
 
 ## Already in place from F01
 
@@ -45,8 +48,9 @@ No route creates an organization, signs up, or edits or deletes an audit record 
 
 1. **Contracts** (`packages/contracts/src/organization.ts`): settings response, strict patch schema, `WEEK_DAYS`,
    role-change and all-classes bodies, new error codes `LAST_ADMIN`.
-2. **Migration `0003_organization_roles.sql`:** trigger that rejects `UPDATE` and `DELETE` on `audit_logs` for
-   every database role the API uses (defense in depth for F02-AC12). No change to existing columns.
+2. **Migration `0003_organization_roles.sql`:** *(as built)* the trigger that rejects `UPDATE` and `DELETE` on
+   `audit_logs` already existed from 0001 and applies to every database role. So 0003 only adds a CHECK on
+   `week_start` and an index for counting active Owners and Admins. No change to existing columns.
 3. **Access policy** (`apps/api/src/modules/access/policy.ts`, pure): `can(actor, action, resource)` for the
    SRS §17.1 matrix, and `scopeOf(membership, assignedClassIds)`, where Teacher scope is the assigned classes or
    every class with `all_classes`. Out-of-scope resolves to `NOT_FOUND`, identical to a missing ID. Assigned
@@ -77,3 +81,40 @@ Mobile: `workspace-settings.yaml` step 3 (weekly report header) waits for F09; `
 `no-self-signup.yaml` can be completed. All mobile gates stay BLOCKED until DEC-B55.
 
 **Expected F02 gate result: PENDING.** Not complete until F03, F05, F09, and F10 supply the missing parts.
+
+## Status (2026-11-06)
+
+**Built:**
+- Contracts: `packages/contracts/src/organization.ts`, the `LAST_ADMIN` error, and `AccountResponse.allClasses`.
+- Migration 0003.
+- The pure access policy (`apps/api/src/modules/access/policy.ts`): the §17.1 matrix as data, `authorize` and `can`,
+  `scopeOf`, `studentsInScope`, and the at-least-one-Admin and at-least-one-Owner rules.
+- The organization module: settings, role changes, the Owner grant, the all-classes flag, and the operator's
+  `createWorkspace`. The all-classes flag is also on the authenticated actor.
+- Test control.
+- Mobile: Settings → Madrasa, and role actions on account detail, in all three locales.
+
+**Results:**
+- `npm test`: 146 passed, 177 todo. Lint, typecheck, and the Android bundle are clean.
+- API E2E against a fresh E2E server: all 29 F01 tests and 12 F02 tests pass; 8 F02 tests are `test.fixme`.
+- `e2e:trace` and `docs:check` are OK.
+- Gates: F02, US-007, US-008, and US-009 are all **PENDING**.
+- Mobile flows were not run: there is no Maestro CLI or emulator here, and the application ID is Deferred (DEC-B55).
+
+**Still pending, and what each waits for:**
+- AC2, later reports use the new settings: F09.
+- AC5, `report_date` unchanged: F05.
+- AC6, AC7, AC8, AC9 (unassigned class), and AC14 (wider scope over records): F03/F05. The policy for each is
+  unit-tested.
+- AC10, guardian link and note-visibility audits: F10, F05/F07.
+- Mobile: `workspace-settings.yaml` step 3 (weekly report header) waits for F09, and `teacher-scope.yaml` waits for
+  F03. `no-self-signup.yaml` is complete.
+- Component tests for the settings screen: the repo has no React Native component-test setup yet (Vitest covers
+  `.ts` files only). The Maestro flow and the API's `canEdit` cover "no edit controls".
+
+**How F03 plugs in:**
+1. Load the Teacher's assigned class IDs, and for Students and Parents the student ID and verified links. Pass them
+   to `accessActor(membership, scope)`.
+2. Use `scopeOf` for lists.
+3. For by-ID reads, call `authorize` with a `Resource` loaded with an organization filter. A NOT_FOUND decision must
+   return the same 404 as a missing ID.
