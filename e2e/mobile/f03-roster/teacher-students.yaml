@@ -3,11 +3,57 @@
 appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
 name: F03 Teacher adds students in assigned classes; minimal student form
 tags:
-  - pending
   - F03
   - US-011
 ---
 - launchApp:
     clearState: true
-# 1. Given a Teacher assigned to Class A, when they add or edit a student in Class A, then it is saved and audited. Adding or editing a student in a class they are not assigned to is refused. (F03-AC15)
+- runFlow: ../../support/maestro/reset.yaml
+# Seeded: teacher.a1 is assigned to Hifz A1 only (S1, S2); Hifz A2 (S3) belongs to teacher.a2.
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- tapOn: { id: "nav.more" }
+- tapOn: { id: "more.students" }
+- assertVisible: { id: "students.screen" }
 # 2. Given the add-student form, when it opens, then only name and class are required; roll number / External Student ID, admission date, and private notes are optional; and there is no date of birth, address, phone, or photo field. (F03-AC17)
+- tapOn: { id: "students.add" }
+- assertVisible: { id: "studentForm.name" }
+- assertVisible: { id: "studentForm.class.Hifz A1" }
+- assertVisible: { id: "studentForm.externalId" }
+- assertVisible: { id: "studentForm.admissionDate" }
+- assertVisible: { id: "studentForm.privateNotes" }
+- assertNotVisible: "Date of birth"
+- assertNotVisible: "Address"
+- assertNotVisible: "Phone"
+- assertNotVisible: "Photo"
+# Only the Teacher's assigned class is offered.
+- assertNotVisible: { id: "studentForm.class.Hifz A2" }
+# Name is required.
+- tapOn: { id: "studentForm.save" }
+- assertVisible: { id: "studentForm.name.error" }
+# 1. Given a Teacher assigned to Class A, when they add or edit a student in Class A, then it is saved and audited. Adding or editing a student in a class they are not assigned to is refused. (F03-AC15)
+- tapOn: { id: "studentForm.name" }
+- inputText: "Teacher Added"
+- hideKeyboard
+- tapOn: { id: "studentForm.save" }
+- assertVisible: { id: "studentProfile.screen" }
+- assertVisible: { id: "studentProfile.class", text: "Class: Hifz A1" }
+# No deactivate or move controls for a Teacher (F03-AC16).
+- assertNotVisible: { id: "studentProfile.deactivate" }
+- assertNotVisible: { id: "studentProfile.move" }
+- tapOn: { id: "studentProfile.edit" }
+- tapOn: { id: "studentForm.name" }
+- eraseText: 64
+- inputText: "Teacher Edited"
+- hideKeyboard
+- tapOn: { id: "studentForm.save" }
+- assertVisible: "Teacher Edited"
+# The audit records of both saves are asserted by the API E2E test of F03-AC15 (e2e/api/f03-roster.spec.ts).
+# Students of Hifz A2 are not listed, so they cannot be opened or edited.
+- back
+- back
+- tapOn: { id: "students.search" }
+- inputText: "Test Student Three"
+- hideKeyboard
+- assertVisible: { id: "students.noMatch" }
