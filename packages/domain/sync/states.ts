@@ -2,7 +2,7 @@
 // PENDING → SYNCING → SYNCED | FAILED | ACTION_REQUIRED. SYNCED is reached only from a server acknowledgement:
 // an APPLIED result, or the server confirming that the item's conflict was resolved.
 // ACTION_REQUIRED has two forms: the item's own conflict (CONFLICT result, conflictId set; CONFLICT_RESOLVED →
-// SYNCED), or held behind another operation's open conflict on the same row (RETRY CONFLICT_OPEN, decision Q7;
+// SYNCED; CONFLICT_GONE → FAILED NOT_FOUND when the conflict is no longer reachable), or held behind another operation's open conflict on the same row (RETRY CONFLICT_OPEN, decision Q7;
 // conflictId null, failure CONFLICT_OPEN; CONFLICT_CLEARED → PENDING and sent again).
 import { nextAttemptAt } from './backoff.ts';
 
@@ -50,7 +50,16 @@ export type QueueEvent =
    * The open conflict that held this item (RETRY CONFLICT_OPEN: another operation's conflict on the same row) is
    * no longer open, so the item is sent again. The resend may apply, or become its own explicit conflict.
    */
-  | { type: 'CONFLICT_CLEARED' };
+  | { type: 'CONFLICT_CLEARED' }
+  /**
+   * This item's own conflict is no longer reachable for the user (the server answers 404: the conflict's record
+   * left their scope, decision Q8). The item becomes FAILED with failure NOT_FOUND; it is never SYNCED, and the user
+   * may retry it (a new operation) or discard it (review N7).
+   */
+  | { type: 'CONFLICT_GONE' };
+
+/** Failure code of an item whose own conflict is gone ({@link QueueEvent} CONFLICT_GONE). */
+export const CONFLICT_GONE_FAILURE = 'NOT_FOUND';
 
 /**
  * RETRY code meaning "the row has an open conflict" (decision Q7): the item is held as ACTION_REQUIRED, without a
@@ -164,6 +173,12 @@ export function transition(item: QueueItemStatus, event: QueueEvent, ctx: Transi
       // Back to pending at once, with no backoff penalty: the wait was not this item's failure.
       if (!isHeldByOpenConflict(item)) throw invalid();
       return { ...item, state: 'PENDING', attempts: 0, nextAttemptAt: null, failure: null };
+
+    case 'CONFLICT_GONE':
+      // Only an item with a conflict of its own; an item merely held behind another's conflict gets CONFLICT_CLEARED
+      // and the server answers for it when it is sent again.
+      if (item.state !== 'ACTION_REQUIRED' || item.conflictId === null) throw invalid();
+      return { ...item, state: 'FAILED', nextAttemptAt: null, failure: { code: CONFLICT_GONE_FAILURE }, conflictId: null };
 
     default: {
       const unknown: never = event;

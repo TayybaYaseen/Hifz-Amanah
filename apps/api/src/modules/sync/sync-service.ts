@@ -88,6 +88,8 @@ export class SyncService {
       entity: op.entity,
       entity_id: op.entityId,
       op_hash: hash,
+      // Orders this device's own edits in the conflict check (review N1); not part of the hash, not unique.
+      seq: op.seq,
       status,
       result: JSON.stringify(result),
       received_at: this.d.clock.now(),
@@ -137,14 +139,19 @@ export class SyncService {
 
   /**
    * An op waits until every op it depends on is settled for this user (F12-AC4): APPLIED, or a CONFLICT whose
-   * conflict has since been RESOLVED (the resolution wrote the row, which is never deleted, so the record the
-   * dependent needs exists). Not stored: RETRY.
+   * conflict has since been RESOLVED; AND the dependency's record exists in this organization (review N8), loaded
+   * through its handler in this tenant transaction. Not stored: RETRY DEPENDENCY_PENDING.
+   *
+   * The existence check matters once a CREATE can conflict: F04/F05 natural-key create-create conflicts (decision
+   * Q11) resolved with KEEP_SERVER leave the device's record id never created, so its dependents stay
+   * DEPENDENCY_PENDING here (never applied against a missing record). F04/F05 MUST decide what happens to those
+   * dependents (e.g. re-point them to the server's record or fail them for the user) when they add that conflict.
    */
   private async dependencyPending(tx: Tx, actor: Actor, op: SyncOp): Promise<boolean> {
     if (op.dependsOn.length === 0) return false;
     const settled = await tx
       .selectFrom('sync_ops')
-      .select('sync_ops.op_id')
+      .select(['sync_ops.op_id', 'sync_ops.entity', 'sync_ops.entity_id'])
       .where('sync_ops.op_id', 'in', op.dependsOn)
       .where('sync_ops.user_id', '=', actor.userId)
       .where((eb) =>
@@ -164,7 +171,12 @@ export class SyncService {
         ]),
       )
       .execute();
-    return settled.length < op.dependsOn.length;
+    if (settled.length < op.dependsOn.length) return true;
+    for (const dep of settled) {
+      const handler = this.d.registry.get(dep.entity);
+      if (!handler || !(await handler.load(tx, actor.organizationId, dep.entity_id, { forUpdate: false }))) return true;
+    }
+    return false;
   }
 
   private async decide(tx: Tx, actor: Actor, deviceId: string, op: SyncOp, scope: SyncScope): Promise<OpResult> {
@@ -227,7 +239,9 @@ export class SyncService {
     if (open) return { opId: op.opId, status: 'RETRY', code: 'CONFLICT_OPEN' };
 
     // Changes made since the base by OTHER users or devices; this device's own earlier edits are not a conflict.
-    const serverChanged = base === row.rowVersion ? [] : await changedSince(tx, org, op.entity, op.entityId, base, { userId: actor.userId, deviceId });
+    // An own edit from a LATER outbox seq that is already applied counts as a server change (review N1).
+    const serverChanged =
+      base === row.rowVersion ? [] : await changedSince(tx, org, op.entity, op.entityId, base, { userId: actor.userId, deviceId, seq: op.seq });
     const outcome = detect({ local: parsed.data, server: row.fields, serverChanged }, handler.fieldSpec);
     const at = this.d.clock.now();
 

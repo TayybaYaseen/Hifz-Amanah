@@ -1,5 +1,5 @@
 // Database access. Kysely over node-postgres; parameterized SQL only (ARCHITECTURE.md §7.5).
-import { Kysely, PostgresDialect, type Generated, type Transaction } from 'kysely';
+import { Kysely, PostgresDialect, type ColumnType, type Generated, type Transaction } from 'kysely';
 import pg from 'pg';
 
 type Timestamp = Date;
@@ -116,6 +116,8 @@ export interface SyncOpsTable {
   entity: string;
   entity_id: string;
   op_hash: Buffer;
+  /** The client's outbox seq (bigint; pg returns a string). Null on rows stored before migration 0006. */
+  seq: ColumnType<string | null, number | null | undefined, never>;
   status: 'APPLIED' | 'CONFLICT' | 'REJECTED';
   result: unknown;
   received_at: Timestamp;

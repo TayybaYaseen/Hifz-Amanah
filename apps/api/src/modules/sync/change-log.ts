@@ -74,10 +74,17 @@ export async function recordScopeChange(tx: Tx, organizationId: string, userId: 
 
 /**
  * Fields changed on the server since `baseVersion` (exclusive), from the change log, leaving out changes made by
- * the same user on the same device (`self`): a device that edits one row several times offline sends every edit
- * from the base it last pulled, and its own earlier edits are not a conflict with its later ones (review H3).
- * Changes without a sync operation (conflict resolutions, op_id NULL) and changes from any other user or device
- * always count. The base version is never rebased.
+ * the same user on the same device (`self`) from an EARLIER outbox position: a device that edits one row several
+ * times offline sends every edit from the base it last pulled, and its own earlier edits are not a conflict with
+ * its later ones (review H3).
+ *
+ * An own change whose stored `seq` is greater than the incoming operation's `seq` is a LATER edit that reached the
+ * server first (a retry or backoff overtook the older edit): it counts as a server change, so the older edit
+ * becomes an explicit conflict instead of silently overwriting the newer one (review N1, NFR-OFF-006). An equal
+ * seq is the same outbox entry retried under a new op_id, and is own. An own change stored without a seq (before
+ * migration 0006) counts as a server change. `seq` is per device workspace (account + organization), so it is only
+ * compared within the same user, device, and organization. Changes without a sync operation (conflict resolutions,
+ * op_id NULL) and changes from any other user or device always count. The base version is never rebased.
  */
 export async function changedSince(
   tx: Tx,
@@ -85,7 +92,7 @@ export async function changedSince(
   entity: string,
   entityId: string,
   baseVersion: number,
-  self: { userId: string; deviceId: string },
+  self: { userId: string; deviceId: string; seq: number },
 ): Promise<string[]> {
   const rows = await tx
     .selectFrom('change_log')
@@ -100,6 +107,8 @@ export async function changedSince(
         eb('sync_ops.op_id', 'is', null),
         eb('sync_ops.user_id', '!=', self.userId),
         eb('sync_ops.device_id', '!=', self.deviceId),
+        eb('sync_ops.seq', 'is', null),
+        eb(sql<number>`sync_ops.seq`, '>', self.seq),
       ]),
     )
     .execute();

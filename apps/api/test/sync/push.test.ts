@@ -3,7 +3,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { sql } from 'kysely';
 import { v7 as uuidv7 } from 'uuid';
-import { CLASS_A1, CLASS_A2, count, op, orgIdOf, OTHER_DEVICE, probeRow, push, pushOk, resend, startSyncHarness, type SyncHarness } from './support.ts';
+import { CLASS_A1, CLASS_A2, count, DEVICE, op, orgIdOf, OTHER_DEVICE, probeRow, push, pushOk, resend, startSyncHarness, type SyncHarness } from './support.ts';
 
 let s: SyncHarness;
 
@@ -214,6 +214,129 @@ describe('F12 · push: repeated offline edits (review H3)', () => {
     const [result] = await pushOk(s.h, teacher, [op({ opType: 'UPDATE', entityId: id, baseVersion: 1, fields: { status: 'HELD' } })]);
     expect(result).toMatchObject({ status: 'CONFLICT' });
     expect((await probeRow(s.h, id))!.status).toBe('DONE');
+  });
+});
+
+describe('F12 · push: an older own edit never overwrites a newer one (review N1)', () => {
+  it('F12-AC11 (US-054) a later edit applied first makes the older edit from the same device an explicit conflict, not applied', async () => {
+    const teacher = await s.h.signIn('teacher.a1');
+    const create = op();
+    await pushOk(s.h, teacher, [create]);
+    const id = create.entityId as string;
+    // Queued in this order on the device (seq older < newer), both from base 1, no dependsOn between them.
+    const older = op({ opType: 'UPDATE', entityId: id, baseVersion: 1, fields: { status: 'DONE' } });
+    const newer = op({ opType: 'UPDATE', entityId: id, baseVersion: 1, fields: { status: 'HELD' } });
+    expect((older.seq as number) < (newer.seq as number)).toBe(true);
+    // Backoff after a transport error let the newer edit reach the server first.
+    expect(await pushOk(s.h, teacher, [newer])).toEqual([{ opId: newer.opId, status: 'APPLIED', rowVersion: 2, entityId: id }]);
+    const [result] = await pushOk(s.h, teacher, [older]);
+    expect(result).toMatchObject({ opId: older.opId, status: 'CONFLICT' });
+    // The newer value stays; both versions are kept for explicit resolution (never last-write-wins).
+    expect(await probeRow(s.h, id)).toMatchObject({ status: 'HELD', row_version: '2' });
+    const { rows } = await sql<{ device_fields: unknown; conflict_fields: string[] }>`
+      SELECT device_fields, conflict_fields FROM sync_conflicts WHERE op_id = ${older.opId as string}`.execute(s.h.db);
+    expect(rows).toEqual([{ device_fields: { status: 'DONE' }, conflict_fields: ['status'] }]);
+  });
+
+  it('F12-AC11 (US-054) a retried edit keeps its seq under a new op id: applied when nothing newer exists, a conflict when a newer own edit was applied', async () => {
+    const teacher = await s.h.signIn('teacher.a1');
+    const create = op();
+    await pushOk(s.h, teacher, [create]);
+    const id = create.entityId as string;
+
+    // Rejected first, then retried by the user with the same seq and a new op id: applies (equal seq is own).
+    const bad = op({ opType: 'UPDATE', entityId: id, baseVersion: 1, fields: { label: '' } });
+    expect(await pushOk(s.h, teacher, [bad])).toEqual([expect.objectContaining({ status: 'REJECTED', code: 'VALIDATION' })]);
+    const retried = { ...bad, opId: uuidv7(), fields: { label: 'Fixed' } };
+    expect(await pushOk(s.h, teacher, [retried])).toEqual([{ opId: retried.opId, status: 'APPLIED', rowVersion: 2, entityId: id }]);
+    const { rows } = await sql<{ seq: string }>`SELECT seq::text AS seq FROM sync_ops WHERE op_id IN (${bad.opId as string}, ${retried.opId as string})`.execute(s.h.db);
+    expect(rows.map((r) => r.seq)).toEqual([String(bad.seq), String(bad.seq)]);
+
+    // Rejected, then a newer edit of the same field applied, then the retry of the older one: a conflict.
+    const older = op({ opType: 'UPDATE', entityId: id, baseVersion: 2, fields: { label: '' } });
+    const newer = op({ opType: 'UPDATE', entityId: id, baseVersion: 2, fields: { label: 'Newer' } });
+    expect(await pushOk(s.h, teacher, [older, newer])).toEqual([
+      expect.objectContaining({ status: 'REJECTED', code: 'VALIDATION' }),
+      { opId: newer.opId, status: 'APPLIED', rowVersion: 3, entityId: id },
+    ]);
+    const [late] = await pushOk(s.h, teacher, [{ ...older, opId: uuidv7(), fields: { label: 'Older' } }]);
+    expect(late).toMatchObject({ status: 'CONFLICT' });
+    expect((await probeRow(s.h, id))!.label).toBe('Newer');
+  });
+
+  it('F12-AC11 (US-054) an own change stored without a seq (before migration 0006) counts as a server change', async () => {
+    const teacher = await s.h.signIn('teacher.a1');
+    const create = op();
+    await pushOk(s.h, teacher, [create]);
+    const id = create.entityId as string;
+    const first = op({ opType: 'UPDATE', entityId: id, baseVersion: 1, fields: { status: 'DONE' } });
+    await pushOk(s.h, teacher, [first]);
+    await sql`UPDATE sync_ops SET seq = NULL WHERE op_id = ${first.opId as string}`.execute(s.h.db);
+    const [result] = await pushOk(s.h, teacher, [op({ opType: 'UPDATE', entityId: id, baseVersion: 1, fields: { status: 'HELD' } })]);
+    expect(result).toMatchObject({ status: 'CONFLICT' });
+    expect((await probeRow(s.h, id))!.status).toBe('DONE');
+  });
+});
+
+describe('F12 · push: a met dependency needs its record (review N8)', () => {
+  it('F12-AC4 (US-052) a dependency whose conflict was resolved but whose record does not exist keeps the dependent waiting', async () => {
+    // A resolved CREATE conflict that left the device's record id unused (as F04/F05 natural-key create-create
+    // conflicts resolved with KEEP_SERVER will): no sync_probe row with that id.
+    const teacher = await s.h.signIn('teacher.a1');
+    const userId = await s.h.userId('teacher.a1');
+    const org = await orgIdOf(s.h, 'teacher.a1');
+    const create = op();
+    const id = create.entityId as string;
+    const at = new Date('2026-11-08T05:00:00.000Z');
+    await s.h.db.transaction().execute(async (tx) => {
+      await tx
+        .insertInto('sync_ops')
+        .values({
+          op_id: create.opId as string,
+          organization_id: org,
+          user_id: userId,
+          device_id: DEVICE,
+          entity: 'sync_probe',
+          entity_id: id,
+          op_hash: Buffer.alloc(32),
+          seq: create.seq as number,
+          status: 'CONFLICT',
+          result: JSON.stringify({ opId: create.opId, status: 'CONFLICT', conflictId: uuidv7() }),
+          received_at: at,
+        })
+        .execute();
+      await tx
+        .insertInto('sync_conflicts')
+        .values({
+          id: uuidv7(),
+          organization_id: org,
+          entity: 'sync_probe',
+          entity_id: id,
+          base_version: null,
+          server_version: 1,
+          device_fields: JSON.stringify({ status: 'OPEN' }),
+          server_fields: JSON.stringify({ status: 'DONE' }),
+          conflict_fields: ['status'],
+          student_id: null,
+          class_id: CLASS_A1,
+          caused_by_user_id: userId,
+          op_id: create.opId as string,
+          status: 'RESOLVED',
+          resolved_by: userId,
+          resolved_at: at,
+          resolution: JSON.stringify({ choice: 'KEEP_SERVER' }),
+          created_at: at,
+        })
+        .execute();
+    });
+
+    const dependent = op({ opType: 'UPDATE', entityId: id, baseVersion: 1, fields: { label: 'After' }, dependsOn: [create.opId as string] });
+    expect(await pushOk(s.h, teacher, [dependent])).toEqual([{ opId: dependent.opId, status: 'RETRY', code: 'DEPENDENCY_PENDING' }]);
+    expect(await count(s.h, 'sync_ops', sql`op_id = ${dependent.opId as string}`)).toBe(0);
+
+    // Once the record exists (here created by another operation), the dependency is met.
+    expect(await pushOk(s.h, teacher, [op({ entityId: id })])).toEqual([expect.objectContaining({ status: 'APPLIED', rowVersion: 1 })]);
+    expect(await pushOk(s.h, teacher, [dependent])).toEqual([{ opId: dependent.opId, status: 'APPLIED', rowVersion: 2, entityId: id }]);
   });
 });
 

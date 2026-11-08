@@ -33,6 +33,7 @@ describe('F12 · queue-item states', () => {
       { type: 'RESULT', result: { status: 'RETRY', code: 'DEPENDENCY_PENDING' } },
       { type: 'RESULT', result: { status: 'RETRY', code: 'CONFLICT_OPEN' } },
       { type: 'CONFLICT_CLEARED' },
+      { type: 'CONFLICT_GONE' },
       { type: 'RESULT', result: { status: 'REJECTED', code: 'NOT_FOUND' } },
       { type: 'RESULT', result: { status: 'CONFLICT', conflictId: 'c' } },
     ];
@@ -84,6 +85,20 @@ describe('F12 · queue-item states', () => {
     expect(() => transition(own, { type: 'CONFLICT_CLEARED' }, ctx)).toThrow(InvalidQueueTransitionError);
     for (const state of QUEUE_STATES.filter((s) => s !== 'ACTION_REQUIRED')) {
       expect(() => transition({ ...initialQueueStatus(), state }, { type: 'CONFLICT_CLEARED' }, ctx)).toThrow(InvalidQueueTransitionError);
+    }
+  });
+
+  it('F12-AC7 (US-052) review N7: an item whose own conflict is gone (404, out of scope) becomes failed NOT_FOUND, never synced', () => {
+    const own = { ...transition(syncing(), { type: 'RESULT', result: { status: 'CONFLICT', conflictId: 'c' } }, ctx), attempts: 2 };
+    const gone = transition(own, { type: 'CONFLICT_GONE' }, ctx);
+    expect(gone).toEqual({ state: 'FAILED', attempts: 2, nextAttemptAt: null, failure: { code: 'NOT_FOUND' }, rowVersion: null, conflictId: null });
+    // The user may retry it (the app sends it as a new operation) or discard it.
+    expect(transition(gone, { type: 'RETRY' }, ctx)).toMatchObject({ state: 'PENDING', failure: null, attempts: 0 });
+    // Only an item with a conflict of its own: one held behind another's conflict is CONFLICT_CLEARED instead.
+    const held = transition(syncing(), { type: 'RESULT', result: { status: 'RETRY', code: 'CONFLICT_OPEN' } }, ctx);
+    expect(() => transition(held, { type: 'CONFLICT_GONE' }, ctx)).toThrow(InvalidQueueTransitionError);
+    for (const state of QUEUE_STATES.filter((s) => s !== 'ACTION_REQUIRED')) {
+      expect(() => transition({ ...initialQueueStatus(), state, conflictId: 'c' }, { type: 'CONFLICT_GONE' }, ctx)).toThrow(InvalidQueueTransitionError);
     }
   });
 
