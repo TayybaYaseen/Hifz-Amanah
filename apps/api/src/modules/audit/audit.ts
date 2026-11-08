@@ -23,13 +23,15 @@ export type AuditAction =
   | 'ADMIN_REMOVED'
   | 'OWNER_ADDED'
   | 'ALL_CLASSES_SET'
-  | 'ALL_CLASSES_CLEARED';
+  | 'ALL_CLASSES_CLEARED'
+  // F12 · Offline sync
+  | 'SYNC_CONFLICT_RESOLVED';
 
 export interface AuditEvent {
   organizationId: string | null;
   actorUserId: string | null;
   action: AuditAction;
-  targetType: 'USER' | 'ORGANIZATION';
+  targetType: 'USER' | 'ORGANIZATION' | 'SYNC_CONFLICT';
   targetId: string | null;
   summary?: Record<string, unknown>;
   at: Date;

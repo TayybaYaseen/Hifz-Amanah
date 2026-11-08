@@ -171,6 +171,11 @@ export type PushResponse = z.infer<typeof PushResponse>;
 // ---------- GET /sync/pull ----------
 
 export const PullQuery = z.strictObject({
+  /**
+   * The app's sync protocol version, checked like the push envelope's (426 UPGRADE_REQUIRED below the minimum).
+   * Absent means 1, the first protocol, so raising the minimum also refuses apps that do not send it.
+   */
+  protocolVersion: z.coerce.number().int().min(1).default(1),
   /** Opaque cursor from the previous pull; absent for the first pull (bootstrap snapshot). */
   cursor: z.string().min(1).max(512).optional(),
   limit: z.coerce.number().int().min(1).max(SYNC_LIMITS.maxPullLimit).default(SYNC_LIMITS.maxPullLimit),

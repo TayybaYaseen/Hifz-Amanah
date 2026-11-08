@@ -125,8 +125,9 @@ describe('F12 · push contract', () => {
 
 describe('F12 · pull contract', () => {
   it('F12-AC7 (US-052) pull takes an opaque cursor and a limit of 1 to 500', () => {
-    expect(PullQuery.parse({})).toEqual({ limit: 500 });
-    expect(PullQuery.parse({ cursor: 'abc', limit: '20' })).toEqual({ cursor: 'abc', limit: 20 });
+    expect(PullQuery.parse({})).toEqual({ protocolVersion: 1, limit: 500 });
+    expect(PullQuery.parse({ cursor: 'abc', limit: '20', protocolVersion: '2' })).toEqual({ protocolVersion: 2, cursor: 'abc', limit: 20 });
+    expect(PullQuery.safeParse({ protocolVersion: '0' }).success).toBe(false);
     expect(PullQuery.safeParse({ limit: '0' }).success).toBe(false);
     expect(PullQuery.safeParse({ limit: '501' }).success).toBe(false);
     expect(PullQuery.safeParse({ organizationId: 'x' }).success).toBe(false);

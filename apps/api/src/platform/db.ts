@@ -106,7 +106,70 @@ export interface AuditLogsTable {
   created_at: Timestamp;
 }
 
+// ---------- Sync (F12, 0004_sync.sql). Row-level security applies: query them only through withTenant(). ----------
+
+export interface SyncOpsTable {
+  op_id: string;
+  organization_id: string;
+  user_id: string;
+  device_id: string;
+  entity: string;
+  entity_id: string;
+  op_hash: Buffer;
+  status: 'APPLIED' | 'CONFLICT' | 'REJECTED';
+  result: unknown;
+  received_at: Timestamp;
+}
+
+export interface ChangeLogTable {
+  /** bigint, returned as a string by pg. */
+  seq: Generated<string>;
+  organization_id: string;
+  entity: string;
+  entity_id: string;
+  row_version: string | number;
+  op: 'UPSERT' | 'REMOVE';
+  changed_fields: string[];
+  student_id: string | null;
+  class_id: string | null;
+  actor_user_id: string | null;
+  op_id: string | null;
+  at: Timestamp;
+}
+
+export interface SyncConflictsTable {
+  id: string;
+  organization_id: string;
+  entity: string;
+  entity_id: string;
+  base_version: string | number | null;
+  server_version: string | number;
+  device_fields: unknown;
+  server_fields: unknown;
+  conflict_fields: string[];
+  student_id: string | null;
+  class_id: string | null;
+  caused_by_user_id: string;
+  op_id: string;
+  status: 'OPEN' | 'RESOLVED';
+  resolved_by: string | null;
+  resolved_at: Timestamp | null;
+  resolution: unknown;
+  created_at: Timestamp;
+}
+
+export interface ScopeChangesTable {
+  organization_id: string;
+  user_id: string;
+  seq: Generated<string>;
+  at: Timestamp;
+}
+
 export interface Database {
+  sync_ops: SyncOpsTable;
+  change_log: ChangeLogTable;
+  sync_conflicts: SyncConflictsTable;
+  scope_changes: ScopeChangesTable;
   organizations: OrganizationsTable;
   users: UsersTable;
   memberships: MembershipsTable;

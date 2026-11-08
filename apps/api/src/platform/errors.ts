@@ -75,13 +75,18 @@ export function body(error: AppError): ApiError {
 export function parse<T extends z.ZodType>(schema: T, input: unknown): z.infer<T> {
   const result = schema.safeParse(input ?? {});
   if (result.success) return result.data;
+  throw new AppError('VALIDATION', issueFields(result.error));
+}
+
+/** Field path → issue code for a Zod error. Never includes the rejected values. */
+export function issueFields(error: z.ZodError): Record<string, string> {
   const fields: Record<string, string> = {};
-  for (const issue of result.error.issues) {
+  for (const issue of error.issues) {
     const key = issue.path.length ? issue.path.join('.') : '_';
     fields[key] ??= issue.code === 'unrecognized_keys' ? 'NOT_ALLOWED' : 'INVALID';
     if (issue.code === 'unrecognized_keys') for (const k of issue.keys) fields[k] = 'NOT_ALLOWED';
   }
-  throw new AppError('VALIDATION', fields);
+  return fields;
 }
 
 export function registerErrorHandler(app: FastifyInstance): void {
