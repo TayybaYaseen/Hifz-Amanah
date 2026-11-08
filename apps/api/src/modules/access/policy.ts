@@ -38,6 +38,8 @@ export const MATRIX = {
   'teacher.allClasses.set': STAFF,
   'classes.manage': STAFF,
   'classes.view': STAFF_AND_ASSIGNED,
+  /** Student lists and profiles: whoever may add/edit students sees them (FR-STU-001, FR-STU-003). */
+  'students.view': STAFF_AND_ASSIGNED,
   /** Add/edit students, including Excel import (DEC-B15). */
   'students.edit': STAFF_AND_ASSIGNED,
   'students.deactivateOrMove': STAFF,

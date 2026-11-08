@@ -167,7 +167,66 @@ export interface ScopeChangesTable {
   at: Timestamp;
 }
 
+// ---------- Roster (F03, 0007_roster.sql). Row-level security applies: query them only through withTenant(). ----------
+// DATE columns are returned as 'YYYY-MM-DD' strings (see the type parser below createDb's options), never as Date
+// objects, so a calendar date never shifts with the server's timezone.
+
+export interface ClassesTable {
+  id: string;
+  organization_id: string;
+  name: string;
+  status: 'ACTIVE' | 'INACTIVE';
+  created_at: Timestamp;
+  updated_at: Timestamp;
+  deactivated_at: Timestamp | null;
+  /** bigint, returned as a string by pg. */
+  row_version: ColumnType<string, number | undefined, number>;
+}
+
+export interface ClassTeachersTable {
+  id: string;
+  organization_id: string;
+  class_id: string;
+  teacher_user_id: string;
+  assigned_at: Timestamp;
+  assigned_by: string | null;
+  unassigned_at: Timestamp | null;
+  unassigned_by: string | null;
+}
+
+export interface StudentsTable {
+  id: string;
+  organization_id: string;
+  name: string;
+  external_student_id: string | null;
+  admission_date: string | null;
+  /** Internal staff notes: never logged, audited by value, or sent to a Student or Parent. */
+  private_notes: string | null;
+  status: 'ACTIVE' | 'INACTIVE';
+  created_at: Timestamp;
+  updated_at: Timestamp;
+  deactivated_at: Timestamp | null;
+  row_version: ColumnType<string, number | undefined, number>;
+}
+
+export interface StudentEnrollmentsTable {
+  id: string;
+  organization_id: string;
+  student_id: string;
+  class_id: string;
+  start_date: string;
+  end_date: string | null;
+  created_at: Timestamp;
+  created_by: string | null;
+  ended_at: Timestamp | null;
+  ended_by: string | null;
+}
+
 export interface Database {
+  classes: ClassesTable;
+  class_teachers: ClassTeachersTable;
+  students: StudentsTable;
+  student_enrollments: StudentEnrollmentsTable;
   sync_ops: SyncOpsTable;
   change_log: ChangeLogTable;
   sync_conflicts: SyncConflictsTable;
@@ -194,6 +253,9 @@ export interface DbOptions {
   /** Embedded Postgres (PGlite) serves one connection at a time. */
   maxConnections?: number;
 }
+
+/** Postgres DATE (OID 1082) as its 'YYYY-MM-DD' text: a calendar date has no time or timezone (ARCHITECTURE.md §6.1). */
+pg.types.setTypeParser(1082, (value: string) => value);
 
 export function createDb({ connectionString, maxConnections = 10 }: DbOptions): { db: Db; pool: pg.Pool } {
   const pool = new pg.Pool({ connectionString, max: maxConnections });

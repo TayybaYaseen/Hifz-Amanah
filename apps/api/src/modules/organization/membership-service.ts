@@ -12,6 +12,8 @@ import { recordAudit } from '../audit/audit.ts';
 import type { AccountsService } from '../identity/accounts-service.ts';
 import type { Actor } from '../identity/auth-service.ts';
 import { revokeSessions } from '../identity/sessions.ts';
+import { recordScopeChange } from '../sync/change-log.ts';
+import { enterTenant } from '../../platform/tenant.ts';
 import { activeMemberRoles } from './members.ts';
 
 export class MembershipService {
@@ -51,6 +53,9 @@ export class MembershipService {
         .where('status', '=', 'ACTIVE')
         .execute();
       if (role === 'ADMIN') await revokeSessions(tx, id, now, 'ROLE_CHANGED');
+      // Admin ↔ Teacher changes what the member syncs: their next pull resets its scope (F12 decision Q8, F03).
+      await enterTenant(tx, actor.organizationId);
+      await recordScopeChange(tx, actor.organizationId, id, now);
       await recordAudit(tx, {
         organizationId: actor.organizationId,
         actorUserId: actor.userId,
@@ -109,6 +114,9 @@ export class MembershipService {
         .where('organization_id', '=', actor.organizationId)
         .where('status', '=', 'ACTIVE')
         .execute();
+      // The flag widens or narrows the Teacher's sync scope (F12 decision Q8, F03).
+      await enterTenant(tx, actor.organizationId);
+      await recordScopeChange(tx, actor.organizationId, id, now);
       await recordAudit(tx, {
         organizationId: actor.organizationId,
         actorUserId: actor.userId,

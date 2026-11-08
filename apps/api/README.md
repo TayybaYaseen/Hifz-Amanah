@@ -23,7 +23,7 @@ default 1) is the oldest sync protocol the server accepts; older apps get `426 U
 
 ### Database role and row-level security (F12, ADR-016)
 
-Sync tables use Postgres row-level security with the `hifz_tenant` role ([`src/platform/tenant.ts`](src/platform/tenant.ts)).
+Sync tables (F12) and roster tables (F03) use Postgres row-level security with the `hifz_tenant` role ([`src/platform/tenant.ts`](src/platform/tenant.ts)).
 In staging and production:
 
 - The API must connect as a **non-superuser without `BYPASSRLS`** that is a **member of `hifz_tenant`**. Migration
@@ -95,6 +95,42 @@ The role is checked first, so `403` comes before any ID lookup. An ID outside th
 ID that does not exist (F02-AC7). Accounts now include `allClasses`. Deactivation is refused with `409 LAST_ADMIN`
 if it would leave no Owner or Admin.
 
+## Roster routes (F03)
+
+Classes, teacher assignments, students, and enrollments (US-010…012). Shapes in
+[`packages/contracts/src/roster.ts`](../../packages/contracts/src/roster.ts); pure rules in `packages/domain/roster`;
+code in [`src/modules/roster`](src/modules/roster); plan in [docs/handover/F03-plan.md](../../docs/handover/F03-plan.md).
+Owner, Admin, and Teacher only; Student and Parent get `403 FORBIDDEN`. A role without the capability gets `403`
+before anything is loaded; a resource outside the caller's madrasa or (for a Teacher) outside their classes is `404`,
+the same as a missing ID. Request schemas are strict (unknown keys are `fields.<key>: NOT_ALLOWED`). **There is no
+DELETE route**; the tables refuse DELETE for every role (migration 0007). Dates are `YYYY-MM-DD` in the madrasa's
+timezone.
+
+A Teacher's classes are those they are assigned to now, or every class with "all classes". A student is in a Teacher's
+scope while the student has an enrollment in one of those classes that has not ended (current or future-dated).
+
+| Route | Who | Body / query | Result |
+|---|---|---|---|
+| `GET /classes` | Owner, Admin, Teacher (own classes) | `?status=ACTIVE|INACTIVE|ALL` (default ALL) | `200 { items: ClassResponse[] }` sorted by name: `id, name, status, teachers[{userId, displayName}], activeStudentCount, canManage` |
+| `POST /classes` | Owner, Admin | `{ name, teacherIds? }` | `201` class; `CLASS_CREATED` audit. `400 fields.name: REQUIRED` (blank), `TAKEN` (an active class has that name, ignoring case, F03-AC14); `fields.teacherIds: INVALID` (not an active Teacher of this madrasa) |
+| `GET /classes/:id` | as list | — | `200` class |
+| `PATCH /classes/:id` | Owner, Admin | `{ name?, teacherIds? }` (`teacherIds` = the full new set) | `200`; `CLASS_UPDATED` audit with name from/to and teachers added/removed. Ended assignments are kept with `unassigned_at` |
+| `POST /classes/:id/deactivate` | Owner, Admin | — | `200`; `CLASS_DEACTIVATED` audit. Students stay enrolled (the app warns with their list first) |
+| `POST /classes/:id/reactivate` | Owner, Admin | — | `200`; `CLASS_REACTIVATED`. `400 fields.name: TAKEN` if an active class now uses the name |
+| `GET /roster/teachers` | Owner, Admin | — | `200 { items: [{userId, displayName}] }`: active Teachers, for the class form |
+| `GET /students` | Owner, Admin, Teacher (scope) | `?q=&classId=&status=ACTIVE|INACTIVE|ALL&cursor=&limit=` (default ACTIVE, 25; max 100) | `200 { items: StudentSummary[], nextCursor }`: keyset pages by name. `q` matches name or External Student ID (case-insensitive, wildcards literal); `classId` matches a not-yet-ended enrollment. `400 fields.cursor: INVALID` |
+| `POST /students` | Owner, Admin, Teacher (own class) | `{ name, classId, externalStudentId?, admissionDate?, privateNotes? }` (nothing else, DEC-B56) | `201` student; enrolled from `admissionDate` or today. `STUDENT_CREATED` audit (field names only). `404` for a class outside scope; `400 fields.classId: CLASS_INACTIVE`; `fields.externalStudentId: TAKEN` (unique per madrasa, ignoring case); `fields.admissionDate: INVALID` |
+| `GET /students/:id` | as list | — | `200 StudentResponse`: summary + `admissionDate, privateNotes` (staff only), `enrollments[]` oldest first, `canEdit, canManage` |
+| `PATCH /students/:id` | Owner, Admin, Teacher (scope) | `{ name?, externalStudentId?, admissionDate?, privateNotes? }` (null or blank clears) | `200`; `STUDENT_UPDATED` audit (field names only). The class is changed only by an enrollment |
+| `POST /students/:id/deactivate` · `/reactivate` | Owner, Admin | — | `200`; `STUDENT_DEACTIVATED` / `STUDENT_REACTIVATED`. Nothing is deleted; the enrollment is kept |
+| `POST /students/:id/enrollments` | Owner, Admin | `{ classId, startDate }` | `200` student. With an open enrollment this is a move: it ends `startDate − 1` (F03-AC11, AC18), `STUDENT_MOVED`; otherwise `STUDENT_ENROLLED`. `400 fields.classId: SAME_CLASS | CLASS_INACTIVE`, `fields.startDate: BEFORE_CURRENT_START | OVERLAPS_HISTORY | INVALID` |
+| `GET /entry/classes` | Owner, Admin, Teacher | — | `200 { items: [{id, name}] }`: active classes in scope (Daily/Bulk Entry pickers, F03-AC4) |
+| `GET /entry/classes/:id/students` | Owner, Admin, Teacher | `?date=` (default today) | `200 { date, items: [{id, name, externalStudentId}] }`: active students enrolled in that class on that date. `404` for a deactivated class |
+
+Sync scope: the roster supplies the sync module's scope provider ([`src/modules/roster/scope.ts`](src/modules/roster/scope.ts)),
+and writes `scope_changes` (next pull answers `scopeReset`) for each Teacher whose classes change: assignment added or
+removed, a student moved into or out of their class, "all classes" set or cleared, and Admin ↔ Teacher role changes.
+
 ## Sync routes (F12)
 
 Protocol v1, decisions in [ADR-015](../../docs/adr/ADR-015-sync-protocol-idempotency-conflicts.md); shapes in
@@ -157,11 +193,16 @@ F12 adds (all cleared by `/__test/reset`):
 - `GET /__test/sync/ops/:opId`: the stored result of one operation (no fields; `sync_ops` never stores them).
 - `GET /__test/sync/conflicts`: every conflict, oldest first, without the device/server values.
 
+F03 seeds the fixture classes, Teachers, and students of `e2e/fixtures/personas.ts` on every reset (each student enrolled
+from 90 days before today) and adds:
+- `GET /__test/roster/ids`: `{ classes: { A1, A2, B1 }, students: { S1, S2, S3, SB1 } }` ids of the seeded fixtures.
+
 ## Not yet built
 
 - The per-IP throttle (F17-AC13) and the F17 audit query API arrive with F17.
-- Row-level security (ADR-006, ADR-016) covers the sync tables only. The F01/F02 tables (`users`, `memberships`,
-  `audit_logs`, …) get it with F03; until then every query on them filters by the membership's organization.
+- Row-level security (ADR-006, ADR-016) covers the sync and roster tables. The F01/F02 tables (`users`, `memberships`,
+  `audit_logs`, …) do not have it yet: sign-in looks users up across madaris by User ID, so it needs a design decision
+  (open question in docs/handover/F03-plan.md). Every query on them filters by the membership's organization.
 - Rate limiting on `/sync/*` is not built (open item D4 in docs/handover/F12-plan.md §12).
 - F02: an operator CLI or console for creating workspaces (only test control does it today), and removing or demoting
   an Owner (who may do it is still open).
