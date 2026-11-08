@@ -17,6 +17,12 @@ const KNOWN_FIELD_ISSUES = new Set([
   'REQUIRED',
   'INVALID',
   'NOT_ALLOWED',
+  // F03 roster (packages/contracts/src/roster.ts ROSTER_FIELD_ISSUES)
+  'TAKEN',
+  'SAME_CLASS',
+  'BEFORE_CURRENT_START',
+  'OVERLAPS_HISTORY',
+  'CLASS_INACTIVE',
 ]);
 
 export function errorKeys(err: unknown): ErrorKeys {

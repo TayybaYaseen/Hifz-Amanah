@@ -76,8 +76,11 @@ test.describe('F02 · Organization and roles', { tag: '@F02' }, () => {
     // Waits for daily records (F05). Record S1 on a known date; admin.a changes the timezone; the record still has that report_date.
   });
 
-  test.fixme('F02-AC6 (US-008) a Teacher lists only students of assigned classes', async () => {
-    // Waits for classes, students, and assignments (F03). As teacher.a1 list students → S1, S2 only.
+  test('F02-AC6 (US-008) a Teacher lists only students of assigned classes', async ({ as }) => {
+    // As teacher.a1 list students → S1, S2 only (F03 supplies classes, students, and assignments).
+    const res = await (await as('teacher.a1')).get('/students?status=ALL');
+    expect(res.status()).toBe(200);
+    expect(((await res.json()).items as Array<{ name: string }>).map((s) => s.name)).toEqual(['Test Student One', 'Test Student Two']);
   });
 
   test.fixme('F02-AC7 (US-008) out-of-scope student, record, and report IDs return not found', async () => {

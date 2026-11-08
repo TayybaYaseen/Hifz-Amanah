@@ -1,7 +1,7 @@
 // The caller's sync scope (F12-AC7, NFR-OFF-010). Scope comes from the access module: Owner, Admin, and a
 // Teacher with "all classes" see the whole madrasa; any other Teacher sees the classes they are assigned to and
-// the students enrolled in them. Assignments and enrollments arrive with F03, which supplies a provider that
-// loads them; until then a Teacher without "all classes" has an empty scope (fail closed).
+// the students enrolled in them. The roster (F03) supplies the provider that loads them
+// (apps/api/src/modules/roster/scope.ts).
 import { accessActor, scopeOf } from '../access/policy.ts';
 import type { Actor } from '../identity/auth-service.ts';
 import type { ScopeKeys } from './handler.ts';
@@ -34,9 +34,6 @@ export function scopeProvider(loadRoster: (actor: Actor) => Promise<RosterScope>
     },
   };
 }
-
-/** F12 default: no roster tables yet, so no assignments. */
-export const rosterlessScope: SyncScopeProvider = scopeProvider(async () => ({ assignedClassIds: [], studentIds: [] }));
 
 /** Rows with no scope key (organization-wide data) are visible only to a whole-madrasa scope. */
 export function inScope(scope: SyncScope, keys: ScopeKeys): boolean {

@@ -17,7 +17,7 @@ import type { OrganizationService } from '../modules/organization/organization-s
 import type { SyncControl } from '../modules/sync/control-state.ts';
 import type { SyncRegistry } from '../modules/sync/handler.ts';
 import { newTotpSecret, totpForStep, totpStep } from '../modules/identity/totp.ts';
-import { TEST_PASSWORD } from '../../../../e2e/fixtures/personas.ts';
+import { TEST_PASSWORD, classes as fixtureClasses, madaris, students as fixtureStudents } from '../../../../e2e/fixtures/personas.ts';
 import { seedPersonas } from './seed.ts';
 
 /** Keeps every log line in memory so tests can prove secrets never reach the logs (F01-AC15). */
@@ -64,6 +64,11 @@ const NewWorkspaceInput = z.strictObject({
 });
 
 const TABLES = [
+  // F03 roster tables (row-level security as for the sync tables below).
+  'student_enrollments',
+  'students',
+  'class_teachers',
+  'classes',
   // F12 sync tables (RLS applies to them; the embedded test database connects as a superuser, which bypasses it).
   'sync_conflicts',
   'change_log',
@@ -181,6 +186,27 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
           if (step !== undefined) return { code: totpForStep(decryptSecret(deps.totpKey, row.secret_encrypted), step) };
           deps.clock.advance(30_000);
         }
+      });
+
+      // ---------- F03 · Roster ----------
+
+      // The ids of the seeded fixture classes and students, keyed as in e2e/fixtures/personas.ts (A1, S1, …).
+      scope.get('/roster/ids', async () => {
+        const orgs = await deps.db.selectFrom('organizations').select(['id', 'code']).execute();
+        const orgOf = (madrasa: keyof typeof madaris) => orgs.find((o) => o.code === madaris[madrasa].code)?.id ?? '';
+        const classRows = await deps.db.selectFrom('classes').select(['id', 'organization_id', 'name']).where('status', '=', 'ACTIVE').execute();
+        const studentRows = await deps.db.selectFrom('students').select(['id', 'organization_id', 'external_student_id']).execute();
+        const classIds: Record<string, string> = {};
+        for (const [key, c] of Object.entries(fixtureClasses)) {
+          const row = classRows.find((r) => r.organization_id === orgOf(c.madrasa) && r.name === c.name);
+          if (row) classIds[key] = row.id;
+        }
+        const studentIds: Record<string, string> = {};
+        for (const [key, st] of Object.entries(fixtureStudents)) {
+          const row = studentRows.find((r) => r.organization_id === orgOf(st.madrasa) && r.external_student_id === st.externalId);
+          if (row) studentIds[key] = row.id;
+        }
+        return { classes: classIds, students: studentIds };
       });
 
       // ---------- F12 · Sync (plan §5 "Test control") ----------

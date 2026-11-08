@@ -9,10 +9,12 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useLocale } from '../i18n/LocaleContext.tsx';
 import { OfflineScreen } from '../features/auth/OfflineScreen.tsx';
 import { useTranslation } from 'react-i18next';
-import type { AccountResponse, MeResponse } from '@hifz/contracts';
+import type { AccountResponse, ClassResponse, MeResponse, StudentResponse } from '@hifz/contracts';
 import { useSession } from '../auth/SessionContext.tsx';
 import { AppScreen, AppText, Button, Notice } from '../components/ui.tsx';
 import { AccountCreateScreen, AccountDetailScreen, AccountsScreen } from '../features/accounts/AccountsScreens.tsx';
+import { ClassDetailScreen, ClassFormScreen, ClassesScreen } from '../features/classes/ClassesScreens.tsx';
+import { StudentFormScreen, StudentProfileScreen, StudentsScreen } from '../features/students/StudentsScreens.tsx';
 import { ForgotPasswordScreen } from '../features/auth/ForgotPasswordScreen.tsx';
 import { SessionExpiredScreen } from '../features/auth/SessionExpiredScreen.tsx';
 import { SignInScreen } from '../features/auth/SignInScreen.tsx';
@@ -44,6 +46,13 @@ type AppStack = {
   AccountDetail: { account: AccountResponse };
   SyncQueue: undefined;
   ConflictReview: { conflictId: string };
+  // F03 roster (Owner, Admin, Teacher)
+  Classes: undefined;
+  ClassForm: { klass: ClassResponse | null };
+  ClassDetail: { klass: ClassResponse };
+  Students: { classId: string | null };
+  StudentForm: { student: StudentResponse | null; classId: string | null };
+  StudentProfile: { studentId: string };
 };
 
 /** Lets the sign-out sheet open the Sync Queue from outside the stack. */
@@ -182,6 +191,7 @@ function AuthNavigator({ lastLoginId }: { lastLoginId: string | null }) {
 function SignedInNavigator({ me }: { me: MeResponse }) {
   const { t } = useTranslation();
   const staff = me.role === 'OWNER' || me.role === 'ADMIN';
+  const roster = staff || me.role === 'TEACHER';
   return (
     <App.Navigator screenOptions={screenOptions}>
       <App.Screen name="Home" options={{ title: t('common.appName') }}>
@@ -194,6 +204,8 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
             onProfile={() => navigation.navigate('Profile')}
             onAccounts={() => navigation.navigate('Accounts')}
             onWorkspace={() => navigation.navigate('Workspace')}
+            onClasses={() => navigation.navigate('Classes')}
+            onStudents={() => navigation.navigate('Students', { classId: null })}
             onSyncQueue={() => navigation.navigate('SyncQueue')}
           />
         )}
@@ -211,6 +223,51 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
           </App.Screen>
           <App.Screen name="ConflictReview" options={{ title: t('conflict.title') }}>
             {({ navigation, route }) => <ConflictReviewScreen conflictId={route.params.conflictId} onDone={() => navigation.goBack()} />}
+          </App.Screen>
+        </>
+      ) : null}
+      {roster ? (
+        // F03 · Classes and students (US-010…012). Online only; the server enforces every permission.
+        <>
+          <App.Screen name="Classes" options={{ title: t('classes.title') }}>
+            {({ navigation }) => (
+              <ClassesScreen canAdd={staff} onAdd={() => navigation.navigate('ClassForm', { klass: null })} onOpen={(klass) => navigation.navigate('ClassDetail', { klass })} />
+            )}
+          </App.Screen>
+          <App.Screen name="ClassForm" options={{ title: t('classes.title') }}>
+            {({ navigation, route }) => <ClassFormScreen klass={route.params.klass} onSaved={() => navigation.goBack()} />}
+          </App.Screen>
+          <App.Screen name="ClassDetail" options={{ title: t('classes.title') }}>
+            {({ navigation, route }) => (
+              <ClassDetailScreen
+                klass={route.params.klass}
+                onEdit={(klass) => navigation.navigate('ClassForm', { klass })}
+                onStudents={(klass) => navigation.navigate('Students', { classId: klass.id })}
+              />
+            )}
+          </App.Screen>
+          <App.Screen name="Students" options={{ title: t('students.title') }}>
+            {({ navigation, route }) => (
+              <StudentsScreen
+                initialClassId={route.params.classId}
+                onAdd={() => navigation.navigate('StudentForm', { student: null, classId: route.params.classId })}
+                onOpen={(student) => navigation.navigate('StudentProfile', { studentId: student.id })}
+              />
+            )}
+          </App.Screen>
+          <App.Screen name="StudentForm" options={{ title: t('students.title') }}>
+            {({ navigation, route }) => (
+              <StudentFormScreen
+                student={route.params.student}
+                initialClassId={route.params.classId}
+                onSaved={(saved) => (route.params.student ? navigation.goBack() : navigation.replace('StudentProfile', { studentId: saved.id }))}
+              />
+            )}
+          </App.Screen>
+          <App.Screen name="StudentProfile" options={{ title: t('students.profileTitle') }}>
+            {({ navigation, route }) => (
+              <StudentProfileScreen studentId={route.params.studentId} onEdit={(student) => navigation.navigate('StudentForm', { student, classId: null })} />
+            )}
           </App.Screen>
         </>
       ) : null}

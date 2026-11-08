@@ -1,7 +1,9 @@
 // Shared Playwright fixtures for black-box API E2E tests.
 // Tests import { test, expect } from here, never from '@playwright/test' directly.
 import { test as base, expect, type APIRequestContext } from '@playwright/test';
-import { TEST_PASSWORD, loginIdOf, personas, type PersonaKey } from '../../fixtures/personas';
+import { TEST_PASSWORD, classes, loginIdOf, personas, type PersonaKey, type StudentKey } from '../../fixtures/personas';
+
+export type ClassKey = keyof typeof classes;
 
 export interface PushMessage {
   title: string;
@@ -16,8 +18,8 @@ export type Who = PersonaKey | string;
 
 // Test control (NFR-MNT-005): a test-only API, enabled only in local and staging with a secret
 // (apps/api/src/testing/control.ts). It provides seed reset, the OTP mail sink, clock control, audit and
-// text search, TOTP codes for the seeded Owner/Admin personas (FR-AUTH-016), operator workspace creation, and an
-// audit-failure switch (F02). AI and push stubs arrive with F15 and F16.
+// text search, TOTP codes for the seeded Owner/Admin personas (FR-AUTH-016), operator workspace creation, an
+// audit-failure switch (F02), and the seeded roster ids (F03). AI and push stubs arrive with F15 and F16.
 export interface TestControl {
   reset(): Promise<void>;
   latestOtp(who: Who): Promise<string | null>;
@@ -39,6 +41,8 @@ export interface TestControl {
   userIdOf(who: Who): Promise<string>;
   /** Counts a string in every database table and in the captured API logs. */
   search(text: string): Promise<{ database: number; logs: number | null }>;
+  /** Ids of the seeded fixture classes and students, keyed as in fixtures/personas.ts (A1, S1, …) (F03). */
+  rosterIds(): Promise<{ classes: Record<ClassKey, string>; students: Record<StudentKey, string> }>;
 }
 
 export interface Session {
@@ -98,6 +102,7 @@ export const test = base.extend<Fixtures>({
       totpFor: async (who) => (await json(await ctx.get(`totp/${id(who)}`))).code,
       userIdOf: async (who) => (await json(await ctx.get(`users/${id(who)}`))).id,
       search: async (text) => json(await ctx.post('search', { data: { text } })),
+      rosterIds: async () => json(await ctx.get('roster/ids')),
       setAiProvider: async () => notYet('AI provider stub (F15)'),
       aiProviderCalls: async () => notYet('AI provider stub (F15)'),
       setPushProviderFailing: async () => notYet('push stub (F16)'),

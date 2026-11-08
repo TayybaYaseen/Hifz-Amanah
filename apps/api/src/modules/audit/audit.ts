@@ -25,13 +25,24 @@ export type AuditAction =
   | 'ALL_CLASSES_SET'
   | 'ALL_CLASSES_CLEARED'
   // F12 · Offline sync
-  | 'SYNC_CONFLICT_RESOLVED';
+  | 'SYNC_CONFLICT_RESOLVED'
+  // F03 · Classes and students
+  | 'CLASS_CREATED'
+  | 'CLASS_UPDATED'
+  | 'CLASS_DEACTIVATED'
+  | 'CLASS_REACTIVATED'
+  | 'STUDENT_CREATED'
+  | 'STUDENT_UPDATED'
+  | 'STUDENT_DEACTIVATED'
+  | 'STUDENT_REACTIVATED'
+  | 'STUDENT_ENROLLED'
+  | 'STUDENT_MOVED';
 
 export interface AuditEvent {
   organizationId: string | null;
   actorUserId: string | null;
   action: AuditAction;
-  targetType: 'USER' | 'ORGANIZATION' | 'SYNC_CONFLICT';
+  targetType: 'USER' | 'ORGANIZATION' | 'SYNC_CONFLICT' | 'CLASS' | 'STUDENT';
   targetId: string | null;
   summary?: Record<string, unknown>;
   at: Date;

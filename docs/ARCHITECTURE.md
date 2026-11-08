@@ -249,11 +249,13 @@ identity / organization
                   data_categories jsonb)                              -- FR-AI-012/013
   report_templates(organization_id, logo_object_key, colors jsonb, headings jsonb, layout jsonb)
 
-roster
-  classes(id, organization_id, name, status)      -- active names unique per org, case-insensitive (FR-CLS-003)
-  class_teachers(organization_id, class_id, teacher_user_id, assigned_at, unassigned_at)
-  students(id, organization_id, external_student_id NULL, name, admission_date, status, …)
-  student_enrollments(id, organization_id, student_id, class_id, start_date, end_date)  -- one active per student (FR-STU-006)
+roster (as built in F03, migration 0007; RLS on all four; DELETE refused for every role)
+  classes(id, organization_id, name, status, deactivated_at, row_version)   -- active names unique per org, case-insensitive (FR-CLS-003)
+  class_teachers(id, organization_id, class_id, teacher_user_id, assigned_at, assigned_by, unassigned_at, unassigned_by)
+  students(id, organization_id, external_student_id NULL, name, admission_date NULL, private_notes NULL,   -- DEC-B56 fields only
+           status, deactivated_at, row_version)     -- external_student_id unique per org, case-insensitive
+  student_enrollments(id, organization_id, student_id, class_id, start_date, end_date NULL,   -- dates inclusive
+                      created_by, ended_at, ended_by)  -- one open per student (FR-STU-006); a move ends the old one the day before
   student_accounts(organization_id, student_id, user_id)               -- student login
   student_guardians(organization_id, student_id, guardian_user_id,
                     verified_by, verified_at, verification_method, revoked_at)   -- FR-PORT-007

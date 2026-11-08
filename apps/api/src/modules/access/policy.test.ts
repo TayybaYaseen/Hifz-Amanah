@@ -183,6 +183,7 @@ describe('F02 · role matrix (SRS §17.1)', () => {
     'teacher.allClasses.set': '✔✔———',
     'classes.manage': '✔✔———',
     'classes.view': '✔✔A——',
+    'students.view': '✔✔A——',
     'students.edit': '✔✔A——',
     'students.deactivateOrMove': '✔✔———',
     'guardians.manage': '✔✔———',

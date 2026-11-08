@@ -13,12 +13,16 @@ import { bearer, registerIdentityRoutes } from './modules/identity/routes.ts';
 import { MembershipService } from './modules/organization/membership-service.ts';
 import { OrganizationService } from './modules/organization/organization-service.ts';
 import { registerOrganizationRoutes } from './modules/organization/routes.ts';
+import { ClassService } from './modules/roster/class-service.ts';
+import { registerRosterRoutes } from './modules/roster/routes.ts';
+import { rosterScope } from './modules/roster/scope.ts';
+import { StudentService } from './modules/roster/student-service.ts';
 import { TokenService } from './modules/identity/tokens.ts';
 import { ConflictService } from './modules/sync/conflict-service.ts';
 import { SyncControl } from './modules/sync/control-state.ts';
 import { SyncRegistry, type SyncHandler } from './modules/sync/handler.ts';
 import { registerSyncRoutes } from './modules/sync/routes.ts';
-import { rosterlessScope, type SyncScopeProvider } from './modules/sync/scope.ts';
+import type { SyncScopeProvider } from './modules/sync/scope.ts';
 import { SyncService } from './modules/sync/sync-service.ts';
 import { registerTestControl, type LogSink } from './testing/control.ts';
 
@@ -32,7 +36,7 @@ export interface AppDeps {
   sleep?: (ms: number) => Promise<void>;
   /**
    * Test builds only (NODE_ENV=test): extra sync entity handlers, such as the integration tests' sync_probe
-   * (F12 decision Q1), and a scope provider standing in for F03's roster. No production handler exists in F12.
+   * (F12 decision Q1), and a scope provider replacing the roster's (F03). No production handler exists in F12.
    */
   testSync?: { handlers?: SyncHandler[]; scopes?: SyncScopeProvider };
 }
@@ -76,10 +80,17 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     memberships: new MembershipService(deps.db, deps.clock, accounts),
   });
 
+  // ---------- Roster (F03) ----------
+  registerRosterRoutes(app, {
+    authenticate: (request) => auth.authenticate(bearer(request)),
+    classes: new ClassService(deps.db, deps.clock),
+    students: new StudentService(deps.db, deps.clock),
+  });
+
   if (deps.testSync && deps.config.env !== 'test') throw new Error('Test sync handlers are allowed only when NODE_ENV=test');
   // F12: no production entity handler yet; F04/F05/F07/F08 register theirs here.
   const syncRegistry = new SyncRegistry(deps.testSync?.handlers ?? []);
-  const syncScopes = deps.testSync?.scopes ?? rosterlessScope;
+  const syncScopes = deps.testSync?.scopes ?? rosterScope(deps.db, deps.clock);
   const syncControl = new SyncControl(deps.config.syncMinProtocolVersion);
   const syncDeps = { db: deps.db, clock: deps.clock, registry: syncRegistry, scopes: syncScopes };
   registerSyncRoutes(app, {
