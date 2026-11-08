@@ -83,11 +83,25 @@ Teacher, Admin, and Owner only; Student and Parent stay online-only and read-onl
   this device" shows only after it commits. "Synced" shows only after the server answers `APPLIED` (F12-AC9).
 - **Local migrations (NFR-OFF-009, F12-AC16):** versioned and append-only, each in one transaction with its
   `PRAGMA user_version` bump. They never rewrite or delete `outbox` rows, only add columns. The unit tests run
-  every migration over a populated outbox.
+  every migration over a populated outbox. v1: `outbox`, `sync_meta`, `conflicts`, `discards`. v2: `outbox.sent_count`,
+  `sync_meta.last_server_time`, `discards.reason`, `deferred_changes`. v3: `row_sync_marks`,
+  `sync_meta.refetch_requested` / `refetch_done`, `conflicts.last_checked_at`.
+- **Saving edits:** a CREATE or COMMAND uses `outbox.saveWithOp`; every edit of an existing row **must** use
+  `outbox.saveWithUpdate` (or `enqueueUpdate` inside a transaction). It derives the base version (the row's
+  acknowledged `row_version`, or 1 with a dependency on the unsynced CREATE) and adds a dependency on the row's latest
+  unsynced operation. F04, F05, and F08 never build `baseVersion` themselves.
+- **Send order:** outbox `seq` order, dependencies first, and at most one operation per row at a time. A later edit
+  waits for the earlier edit of the same row ("Waiting: an earlier change to this record must sync first").
+- **Retry and discard:** Retry re-queues a `FAILED` change under a new `op_id` with its original `seq`, and is
+  refused when a newer change of the same record has already synced (the user can discard it instead). Discarding an
+  acknowledged edit makes the next pull start from a fresh snapshot, so the server's values come back.
+- **Conflicts:** each open conflict is re-checked with the server at most once every 5 minutes, at most 50 per run,
+  least recently checked first. A conflict that is no longer reachable turns its item into `FAILED` (`NOT_FOUND`).
 - **No entity tables yet.** Attendance (F04), daily records (F05), and homework (F08) add their tables as new local
   migrations and register them in `sync/registry.ts`. Until then the real app queues nothing; the engine is
   exercised with a test-only probe entity (`sync/testing/probe.ts`).
-- **Revocation and sign-out:** `403 ACCESS_REVOKED` locks the workspace and purges synced rows; unsynced operations
+- **Revocation and sign-out:** sign-out first refuses new saves, stops the sync engine, and waits for the run and saves
+  in flight before it counts unsynced changes. `403 ACCESS_REVOKED` locks the workspace and purges synced rows; unsynced operations
   stay visible but locked and are purged on sign-out or 30 days later (F12-AC20). "Sign out anyway" purges the
   synced cache and keeps unsynced operations locked to that account for up to 30 days (decision Q14). Purged rows
   are overwritten (`PRAGMA secure_delete`, WAL truncated).

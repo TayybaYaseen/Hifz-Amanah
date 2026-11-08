@@ -115,6 +115,15 @@ session with `401 SESSION_EXPIRED`.
 - **Per op, one transaction:** organization advisory lock, idempotent replay check (`sync_ops.op_hash`), `op_id`
   claim, dependencies, scope (out of scope = `NOT_FOUND`), the handler's strict schema, conflict detection against
   `change_log`; then apply or store a conflict. One refused op never rolls back the others.
+- **Dependencies:** an op is `RETRY DEPENDENCY_PENDING` until each `dependsOn` op of the same user is `APPLIED`, or
+  its conflict is `RESOLVED`, **and** that op's record exists in the organization. F04/F05 must decide what happens
+  to the dependents of a natural-key create-create conflict resolved with `KEEP_SERVER` (decision Q11), whose record
+  is never created.
+- **Own edits and `seq` (migration `0006_sync_ops_seq.sql`):** `sync_ops.seq` stores the op's client outbox `seq`
+  (nullable, not unique, not part of `op_hash`). In the conflict check, a change since the base counts as a server
+  change if its `op_id` is NULL, it came from another user or device, its `seq` is NULL, or its `seq` is greater than
+  the incoming op's `seq`. So this device's own earlier edits are excluded, but an older edit arriving after a newer
+  one becomes a conflict instead of overwriting it (NFR-OFF-006).
 - **No entity is synced in production yet.** Each feature registers a `SyncHandler`
   ([`src/modules/sync/handler.ts`](src/modules/sync/handler.ts)) for its entities: attendance (F04), daily records,
   portions, attempts (F05), mistakes and notes (F07), homework (F08). Until then they are `ENTITY_NOT_SUPPORTED`.

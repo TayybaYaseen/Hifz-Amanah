@@ -2,10 +2,14 @@
 
 - **Status:** Accepted 2026-11-08. The user accepted the F12 plan's recommendations and technical choices
   ([`docs/handover/F12-plan.md`](../handover/F12-plan.md) §10 "Answers"). Refines ADR-003 and ADR-004.
+  Amended the same day after the re-review (commits `6c72d6d`, `7133af0`): per-row send order, the client `seq` in
+  the own-change rule (migration 0006), the record-exists dependency check, Retry keeping its `seq`, and
+  `CONFLICT_GONE`.
 - **Feature:** F12 (US-051…US-054). **Requirements:** NFR-OFF-001…011, FR-SYNC-006…009, FR-HW-017 (contract only),
   DEC-B18, DEC-B29, DEC-B42.
 - **Code:** `packages/contracts/src/sync.ts`, `packages/domain/sync/*`, `apps/api/src/modules/sync/*`,
-  `apps/api/migrations/0004_sync.sql`, `0005_sync_hardening.sql`, `apps/mobile/src/sync/*`.
+  `apps/api/migrations/0004_sync.sql`, `0005_sync_hardening.sql`, `0006_sync_ops_seq.sql`,
+  `apps/mobile/src/sync/*`.
 
 ## Context
 
@@ -33,17 +37,31 @@ cursor stays correct when `BIGSERIAL` values commit out of order.
      dependency or conflict check. The real claim at the end (`ON CONFLICT DO NOTHING`) re-checks it for concurrent
      pushes and rolls the whole op back if it lost.
 4. **Dependencies (F12-AC4).** An op waits (`RETRY DEPENDENCY_PENDING`) until each `dependsOn` op of the same user is
-   `APPLIED`, or is a `CONFLICT` whose conflict has since been `RESOLVED`. On the device, an `UPDATE` of a row whose
-   `CREATE` has not synced yet is queued with `dependsOn = [create op]` and `baseVersion = 1`.
+   `APPLIED`, or is a `CONFLICT` whose conflict has since been `RESOLVED`, **and** the dependency's record exists in
+   the organization (loaded through its handler in the same tenant transaction). The existence check matters once a
+   `CREATE` can conflict: a natural-key create-create conflict (decision Q11) resolved with `KEEP_SERVER` leaves the
+   device's record never created, so its dependents stay `DEPENDENCY_PENDING` and are never applied against a
+   missing record. **F04/F05 must decide** what happens to those dependents (for example re-point them to the
+   server's record, or fail them for the user) when they add that conflict.
+   On the device, every edit of an existing row is queued through `Outbox.enqueueUpdate` / `saveWithUpdate`, which
+   derive the base version and dependencies: base = the row's acknowledged `row_version`, or `baseVersion = 1` with
+   `dependsOn` the unsynced `CREATE` when the row was never acknowledged; plus, in both cases, `dependsOn` the row's
+   latest unsynced op. F04, F05 and F08 must use them and never build `baseVersion` themselves.
 5. **Client IDs (F12-AC3).** A `CREATE` keeps the client UUIDv7 as the primary key. An ID already used in any
    organization is `REJECTED ID_TAKEN` without detail.
 6. **Conflict detection** (pure, `@hifz/domain/sync`):
    - Each entity declares its fields as `MEANINGFUL` or `SAFE_MERGE`; **an unlisted field is meaningful**
      (decision Q4). The only safe-merge field named in the docs is display order (`position`), where the server value
      wins (F12-AC13).
-   - The server computes "changed since `baseVersion`" from `change_log.changed_fields`, **excluding changes made by
-     the same user on the same device** (a device's own successive offline edits never conflict with each other).
-     Changes with no op (conflict resolutions) always count. The base is never rebased.
+   - The server computes "changed since `baseVersion`" from `change_log.changed_fields`, **excluding the same user's
+     and device's own earlier edits** (a device's own successive offline edits never conflict with each other).
+     `sync_ops.seq` (migration 0006) stores the client's outbox `seq`. A change **counts as a server change** when
+     its `op_id` is NULL (e.g. a conflict resolution), it came from another user or another device, its stored `seq`
+     is NULL (stored before migration 0006), or its `seq` is **greater** than the incoming op's `seq` (a later edit
+     from this device that reached the server first, e.g. after a retry or backoff). So an older edit arriving late
+     becomes an explicit conflict and never silently overwrites a newer one (NFR-OFF-006). An equal `seq` is the
+     same outbox entry retried under a new `op_id` and counts as own. `seq` is per device workspace (account +
+     organization), is not unique, and is not part of `op_hash`. The base is never rebased.
    - A meaningful field, or a **coupled group** (decision Q5, e.g. attempt status + completed quantity + quality +
      mistakes), changed on both sides to different values is a conflict. Coupled groups must be sent whole
      (`VALIDATION … GROUP_INCOMPLETE`), and resolution picks whole groups. Disjoint changes apply on top of the
@@ -76,8 +94,25 @@ cursor stays correct when `BIGSERIAL` values commit out of order.
     load/insert/update, audit hook). Until then the entity is `REJECTED ENTITY_NOT_SUPPORTED`. In F12 the only
     handler is the test-only `sync_probe`, registered by integration tests (decision Q1).
 12. **Client side.** Outbox order, backoff 2 s × 2 up to 5 min with full jitter, no retry limit; `SYNCED` only from
-    an `APPLIED` result (F12-AC9). Tapping **Retry** on a `FAILED` item queues the same change as a **new `op_id`**
-    (the old one would only replay its stored refusal), re-points dependents, and records the old op in `discards`.
+    an `APPLIED` result or a resolved conflict (F12-AC9).
+    - **Per-row send order** (`nextSendable`, `@hifz/domain/sync`; NFR-OFF-006). Besides its dependencies, an op is
+      held while an op on the same `(entity, entityId)` with an earlier `seq` is not `SYNCED`, so at most one op per
+      row goes out per push and a later edit never reaches the server before an earlier one. Hold reasons, highest
+      precedence first: `WAITING_FOR_RECORD` (a dependency or an earlier same-row op is `FAILED` or
+      `ACTION_REQUIRED`), `WAITING_FOR_DEPENDENCY` (a dependency is pending or syncing), `WAITING_FOR_EARLIER_EDIT`
+      (an earlier same-row op is pending or syncing), `BACKOFF`.
+    - **Retry** on a `FAILED` item queues the same change under a **new `op_id`** (the old one would only replay its
+      stored refusal) but its **original `seq`** and save time, re-points dependents, and records the old op in
+      `discards` (reason `RETRIED`). Retry is refused (`NEWER_SYNCED`) when a later edit of the same row from this
+      device has already synced (local `row_sync_marks`); the user can discard the item instead.
+    - **`CONFLICT_GONE`** domain event: an item whose own conflict is no longer reachable (`404`, out of scope,
+      decision Q8) goes from `ACTION_REQUIRED` to `FAILED` with failure `NOT_FOUND`; it is never `SYNCED`.
+    - **Discard** of an acknowledged `UPDATE`/`COMMAND`, with no pulled server change held back for that row, asks
+      the next pull to start from a fresh snapshot, so the server's values replace the discarded local ones.
+    - **Conflict reconciliation** checks each open conflict with the server at most once every 5 minutes, at most
+      50 per run, least recently checked first.
+    - **Sign-out quiesces first:** new saves are refused, the engine starts no new run, and the run and saves in
+      flight finish before unsynced work is counted and the cache purged.
 
 ## Consequences
 

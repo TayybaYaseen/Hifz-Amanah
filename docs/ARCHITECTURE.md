@@ -315,12 +315,15 @@ reporting / platform
   report_published(organization_id, student_id, period_kind, period_start, published_by, published_at,
                    updated_after_publish_at NULL)                      -- FR-RPT-010
   report_cache(organization_id, student_id, period_kind, period_start, source_seq, payload jsonb)
-  -- sync tables as built in F12 (migrations 0004/0005, ADR-015); RLS forced on all four (ADR-016)
+  -- sync tables as built in F12 (migrations 0004/0005/0006, ADR-015); RLS forced on all four (ADR-016)
   change_log(seq BIGSERIAL, organization_id, entity, entity_id, row_version, op[UPSERT|REMOVE],
              changed_fields text[], student_id NULL, class_id NULL,       -- scope keys at change time (F12-AC7)
              actor_user_id, op_id NULL, at)                                -- append-only (trigger)
   sync_ops(op_id UUID PRIMARY KEY, organization_id, user_id, device_id, entity, entity_id,
-           op_hash bytea, status[APPLIED|CONFLICT|REJECTED], result jsonb, received_at)  -- RETRY never stored
+           op_hash bytea, seq bigint NULL, status[APPLIED|CONFLICT|REJECTED], result jsonb, received_at)
+           -- RETRY never stored; seq = the client's outbox seq (0006), NULL on older rows, not unique.
+           -- Conflict check: a change since the base counts as a server change if its op_id is NULL, it came from
+           -- another user or device, its seq is NULL, or its seq > the incoming op's seq (own earlier edits excluded)
   sync_conflicts(id, organization_id, entity, entity_id, base_version, server_version,
                  device_fields jsonb, server_fields jsonb, conflict_fields text[],
                  student_id NULL, class_id NULL, caused_by_user_id, op_id,
@@ -461,14 +464,17 @@ SQLite (per signed-in account + organization; local migrations in apps/mobile/sr
          row_version, conflict_id, label, sent_count, created_at, synced_at)
   sync_meta(last_pull_cursor, last_success_at, last_server_time, protocol_version, schema_version,
             workspace_state[ACTIVE|LOCKED_REVOKED], revoked_at, signed_out_at, upgrade_required_at,
-            last_cleanup_at, org_time_zone, next_seq)
-  conflicts(local copy of server conflicts for review UI)
+            last_cleanup_at, org_time_zone, next_seq, refetch_requested, refetch_done)
+  conflicts(local copy of server conflicts for review UI; last_checked_at for reconciliation)
   discards(local record of discarded or superseded operations, with reason)
   deferred_changes(pulled server changes held back while the row has unsynced local edits)
+  row_sync_marks(entity, entity_id, last_synced_seq)   -- highest acknowledged seq per row; Retry refuses older changes
 SQLite device index (one per install): device_id; workspaces(db_name, user, org, role, state[ACTIVE|HELD|LOCKED_REVOKED], since)
 ```
 
-**Save path (NFR-OFF-002):** the entity write and the outbox insert happen in **one SQLite transaction**. The UI shows "Saved on device" only after that commit. "Synced" appears only after the server acknowledges the operation (FR-SYNC-007, `design.md` §8).
+**Local migrations (F12):** v1 creates `outbox`, `sync_meta`, `conflicts`, `discards`. v2 adds `outbox.sent_count`, `sync_meta.last_server_time`, `discards.reason`, and the `deferred_changes` table. v3 adds `row_sync_marks`, the `sync_meta.refetch_requested` / `refetch_done` counters, and `conflicts.last_checked_at`. All are additive and keep the outbox intact (F12-AC16).
+
+**Save path (NFR-OFF-002):** the entity write and the outbox insert happen in **one SQLite transaction**. The UI shows "Saved on device" only after that commit. "Synced" appears only after the server acknowledges the operation (FR-SYNC-007, `design.md` §8). A CREATE or COMMAND is saved with `saveWithOp`; every edit of an existing row goes through `saveWithUpdate` / `enqueueUpdate`, which derive the base version and dependencies (ADR-015 §4). F04, F05, and F08 must use them.
 
 ### 8.2 Protocol
 
@@ -491,12 +497,13 @@ sequenceDiagram
 ```
 
 - **Idempotency:** `op_id` (a client UUID) is the primary key of `sync_ops`. A replayed operation returns the stored result and creates no duplicate (NFR-OFF-004).
-- **Ordering:** operations carry `depends_on`. The server rejects an operation whose dependency has not been applied, using the retryable error `DEPENDENCY_PENDING`. The client sends operations in outbox order.
-- **Retry:** exponential backoff with jitter. A `FAILED` operation stays visible with its reason (NFR-OFF-007).
+- **Ordering:** operations carry `depends_on`. The server rejects an operation whose dependency has not been applied (or whose conflict is resolved but whose record does not exist), using the retryable error `DEPENDENCY_PENDING`. The client sends operations in outbox order, holds an operation while an earlier edit of the same row is unsynced (`WAITING_FOR_EARLIER_EDIT`), and sends at most one operation per row at a time (ADR-015 §12).
+- **Retry:** exponential backoff with jitter. A `FAILED` operation stays visible with its reason (NFR-OFF-007). A manual Retry keeps the original `seq` under a new `op_id`, and is refused once a newer edit of the same row has synced.
 - **Versioning:** `protocolVersion` is checked on every request. The server answers `UPGRADE_REQUIRED` for unsupported clients, and pending operations are kept.
 - **Conflicts (FR-SYNC-008):** these fields are "meaningful": attempt status, quantities, quality, mistakes, attendance status, and homework status/portions. If one of them changed on both sides since `base_version`, a conflict is created. Last-write-wins is never used for them. Non-meaningful fields (e.g. display ordering) may use a documented safe merge. An authorized user resolves the conflict in the Conflict Review screen. The resolution is an online request (`POST /sync/conflicts/:id/resolve`, F12 decision Q6) applied as a new audited change (`SYNC_CONFLICT_RESOLVED`). Protocol details, the one-open-conflict-per-row rule, and the per-organization lock that keeps the pull cursor gap-free are in ADR-015.
 - **Revocation (NFR-OFF-010, FR-SYNC-009):** if push or pull returns `ACCESS_REVOKED`, the app stops syncing that workspace and locks its cached data. Unsynced operations stay visible but cannot be sent. Synced data is purged at once. Unsynced operations stay locked and visible, and are purged on sign-out or after 30 days (NFR-OFF-011). The app lock (PIN or fingerprint) is required for Owner/Admin and optional for Teachers; it locks after 5 minutes in the background. Synced daily records older than 120 days are removed from the device cache.
-- **Sign-out with pending operations** shows a warning (`design.md` §4.13).
+- **Sign-out with pending operations** shows a warning (`design.md` §4.13). Sign-out first quiesces the workspace: new saves are refused, the sync engine starts no new run, and the run and saves in flight finish before the unsynced count and the purge.
+- **Conflict reconciliation (client):** each open conflict is checked with the server at most once every 5 minutes, at most 50 per run, least recently checked first. A conflict that is no longer reachable moves its item to `FAILED NOT_FOUND` (domain event `CONFLICT_GONE`). Discarding an acknowledged edit makes the next pull start from a fresh snapshot, so the server's values come back.
 - **Local schema upgrades** run in a transaction and are tested with a populated outbox (NFR-OFF-009).
 
 ### 8.3 What works offline
@@ -726,7 +733,7 @@ App (online, Teacher/Admin) → POST /analytics/{studentId}/ai-recommendation
 | ADR-012 | Authentication built into the API; TOTP two-factor sign-in for Owner/Admin | Approved 2026-10-30 |
 | ADR-013 | AWS Mumbai hosting with S3 and SES; Expo Push Service for Android push | Approved 2026-10-30 |
 | ADR-014 | Quantity rules chosen by section: Sabaq = `LINES` over a single-Surah range with `total_lines`; Sabqi/Manzil unchanged (extends ADR-005; no conversion) | Approved 2026-11-01 (SRS DEC-B60…B64) |
-| ADR-015 | Sync protocol v1: `op_hash` idempotency, stored terminal results, `RETRY` not stored, one open conflict per row, per-organization advisory lock for a gap-free pull cursor ([docs/adr/ADR-015](adr/ADR-015-sync-protocol-idempotency-conflicts.md); refines ADR-003/004) | Accepted 2026-11-08 (F12 plan §10 answers) |
+| ADR-015 | Sync protocol v1: `op_hash` idempotency, stored terminal results, `RETRY` not stored, one open conflict per row, per-organization advisory lock for a gap-free pull cursor ([docs/adr/ADR-015](adr/ADR-015-sync-protocol-idempotency-conflicts.md); refines ADR-003/004) | Accepted 2026-11-08 (F12 plan §10 answers); amended 2026-11-08 after the re-review (per-row send order, client `seq` in the own-change rule, Retry keeps `seq`, `CONFLICT_GONE`) |
 | ADR-016 | Row-level security pattern: `hifz_tenant` role, `SET LOCAL ROLE` + `app.current_org_id` per transaction, `FORCE` RLS ([docs/adr/ADR-016](adr/ADR-016-postgres-row-level-security-pattern.md); implements ADR-006) | Accepted 2026-11-08 (F12 decision Q9) |
 
 ### 19.1 Implementation gates (closed 2026-10-30)

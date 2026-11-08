@@ -350,7 +350,10 @@ revoked; display-order merge = server value; terminal results stored in `sync_op
 | 6 | API E2E F12-AC14 and AC15 real; F01-AC22 now expects `403 ACCESS_REVOKED` | `c20127e` |
 | 7 | Review fixes: API/domain and migration 0005 | `e3d6804` |
 | 7 | Review fixes: mobile and security hardening (local migration v2) | `a3cf972` |
-| 8 | Docs: `apps/api/README.md`, `apps/mobile/README.md`, ADR-015, ADR-016, ARCHITECTURE §4, §6.3, §8.1, §8.2, §15, §19, this section | not committed |
+| 8 | Docs: `apps/api/README.md`, `apps/mobile/README.md`, ADR-015, ADR-016, ARCHITECTURE §4, §6.3, §8.1, §8.2, §15, §19, this section | `59aaba0` |
+| 9 | Re-review fixes: per-row send order, client `seq` in the own-change rule (migration 0006), record-exists dependency check, `CONFLICT_GONE` | `6c72d6d` |
+| 9 | Re-review fixes, mobile: Retry keeps `seq`, `enqueueUpdate`/`saveWithUpdate`, refetch after discard, throttled reconciliation, sign-out quiesce (local migration v3) | `7133af0` |
+| 9 | Docs update: ADR-015, ARCHITECTURE §6.3, §8.1, §8.2, both READMEs, this section | not committed |
 
 ### Deviations from this plan
 
@@ -361,18 +364,30 @@ revoked; display-order merge = server value; terminal results stored in `sync_op
   (`student_id`, `class_id`), used to list a Teacher's conflicts within scope.
 - **Migration `0005_sync_hardening.sql`:** the tenant role may update only `status`, `resolved_by`, `resolved_at`,
   `resolution` on `sync_conflicts`.
-- **Server conflict check ignores the same user and device's own earlier edits**; a dependency counts as met once its
-  conflict is resolved; coupled groups must be sent whole.
+- **Server conflict check ignores the same user and device's own earlier edits.** Migration `0006_sync_ops_seq.sql`
+  stores the client `seq` on `sync_ops`; a change counts as a server change if its `op_id` is NULL, it came from
+  another user or device, its `seq` is NULL, or its `seq` is greater than the incoming op's `seq` (ADR-015 §6).
+  Coupled groups must be sent whole.
+- **Dependencies:** a dependency counts as met only when it is `APPLIED` or its conflict is `RESOLVED`, **and** its
+  record exists. F04/F05 must decide what happens to the dependents of a natural-key create-create conflict resolved
+  with `KEEP_SERVER` (Q11), whose record is never created.
+- **Domain:** per-row send order with hold reason `WAITING_FOR_EARLIER_EDIT`; at most one op per row per push;
+  precedence `WAITING_FOR_RECORD` > `WAITING_FOR_DEPENDENCY` > `WAITING_FOR_EARLIER_EDIT` > `BACKOFF`. New event
+  `CONFLICT_GONE` (`ACTION_REQUIRED` own conflict → `FAILED NOT_FOUND`).
 - **Mobile:** `deferred_changes` table (pulled changes held while a row has unsynced edits); **Retry re-queues the
-  change under a new `op_id`** (the old one would replay its stored refusal); an UPDATE after an unsynced CREATE is
-  queued with `dependsOn` the create and `baseVersion` 1. Drizzle is not used yet (a small SQL driver over
-  `expo-sqlite`; `node:sqlite` in tests).
+  change under a new `op_id` with its original `seq`** (the old `op_id` would replay its stored refusal), and is
+  refused when a newer edit of the same row has already synced (`row_sync_marks`); edits are queued through
+  `enqueueUpdate`/`saveWithUpdate` (F04/F05/F08 must use them), which set the base to the acknowledged
+  `row_version`, or to 1 with `dependsOn` the unsynced CREATE, plus `dependsOn` the row's latest unsynced op;
+  discarding an acknowledged UPDATE triggers a snapshot refetch; conflict reconciliation every 5 min per conflict,
+  max 50 per run, rotated; sign-out quiesces the engine and blocks saves. Local migrations v2 and v3 (ARCHITECTURE
+  §8.1). Drizzle is not used yet (a small SQL driver over `expo-sqlite`; `node:sqlite` in tests).
 
 ### Results
 
 - **F12 gate: PENDING**, as expected in §9. API E2E F12-AC14 and F12-AC15 pass; the other F12 API tests stay
   `test.fixme` (Q2) and every mobile flow stays pending (no real entities yet; DEC-B55; no emulator here).
-- `npm run docs:check` and `npm run e2e:trace`: OK (slice 8).
+- `npm run docs:check` and `npm run e2e:trace`: OK (slice 8, and again after the slice 9 docs update).
 
 ### Open items for the user
 
@@ -386,7 +401,7 @@ revoked; display-order merge = server value; terminal results stored in `sync_op
 | D6 | **`queue-and-sign-out.yaml` step 2** expects a temporary 503 to show "Failed" with Retry; the app keeps the item "Pending, retrying automatically" (F12-AC6, NFR-OFF-007). Change the flow or the app |
 | D7 | A reactivated account's workspace stays locked on the device until that user signs out |
 | D8 | Android 12+ device-to-device transfer is not blocked by `allowBackup: false`; needs `dataExtractionRules` |
-| D9 | Domain gap: `@hifz/domain/sync` `transition` has no `ACTION_REQUIRED → FAILED` event for a conflict that is no longer reachable (`404`, out of scope, Q8). The engine writes `FAILED` directly (`conflictGone` in `apps/mobile/src/sync/engine.ts`); add a `CONFLICT_GONE` event |
+| D9 | **Resolved** (`6c72d6d`, `7133af0`): the domain `transition` has a `CONFLICT_GONE` event (`ACTION_REQUIRED` own conflict → `FAILED NOT_FOUND`), and the engine applies it instead of writing `FAILED` directly |
 | D10 | Doc inconsistency: F12-AC18, NFR-OFF-011, and ARCHITECTURE §8.2 say "PIN or fingerprint"; decision Q12 makes the PIN required with fingerprint as a shortcut. SRS/spec wording needs the user's approval to change |
 | D11 | Doc inconsistency: F01-AC22 E2E now expects `403 ACCESS_REVOKED` (not `401`) for a deactivated account's session; confirm the F01 spec wording |
 | — | DEC-B55 (application ID) and DEC-B45 (AI provider) stay Deferred |
