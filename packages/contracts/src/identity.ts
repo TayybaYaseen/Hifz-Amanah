@@ -72,6 +72,19 @@ export const ERROR_CODES = [
   'REAUTH_REQUIRED',
   'RATE_LIMITED',
   'INTERNAL',
+  // Sync (F12; plan docs/handover/F12-plan.md §5).
+  /** 403: the membership was revoked or the account deactivated; the app locks the workspace. */
+  'ACCESS_REVOKED',
+  /** 426: the app's sync protocol version is below the server's minimum. */
+  'UPGRADE_REQUIRED',
+  'DEPENDENCY_PENDING',
+  'OP_ID_REUSED',
+  'ID_TAKEN',
+  'ENTITY_NOT_SUPPORTED',
+  /** 409: the server row changed since the conflict was opened. */
+  'CONFLICT_STALE',
+  /** 409: the conflict was already resolved. */
+  'CONFLICT_CLOSED',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

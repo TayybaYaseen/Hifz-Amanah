@@ -18,6 +18,15 @@ const STATUS: Record<ErrorCode, number> = {
   LAST_ADMIN: 409,
   RATE_LIMITED: 429,
   INTERNAL: 500,
+  // Sync (F12). The per-operation codes normally travel inside push results, not as HTTP errors.
+  ACCESS_REVOKED: 403,
+  UPGRADE_REQUIRED: 426,
+  DEPENDENCY_PENDING: 409,
+  OP_ID_REUSED: 409,
+  ID_TAKEN: 409,
+  ENTITY_NOT_SUPPORTED: 400,
+  CONFLICT_STALE: 409,
+  CONFLICT_CLOSED: 409,
 };
 
 const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
@@ -35,6 +44,14 @@ const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
   LAST_ADMIN: LAST_ADMIN_MESSAGE,
   RATE_LIMITED: 'Too many requests. Try again later',
   INTERNAL: 'Something went wrong',
+  ACCESS_REVOKED: 'Your access to this madrasa was removed',
+  UPGRADE_REQUIRED: 'Update the app to keep syncing',
+  DEPENDENCY_PENDING: 'Waiting for a related change to sync first',
+  OP_ID_REUSED: 'This change could not be accepted',
+  ID_TAKEN: 'This change could not be accepted',
+  ENTITY_NOT_SUPPORTED: 'This kind of change cannot sync yet',
+  CONFLICT_STALE: 'The record changed again. Review the latest version',
+  CONFLICT_CLOSED: 'This conflict was already resolved',
 };
 
 export class AppError extends Error {
