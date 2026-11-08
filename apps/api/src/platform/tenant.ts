@@ -18,6 +18,13 @@
 //
 // RLS is defense in depth: queries still filter by organization_id explicitly, and authorization stays in the
 // access policy (ARCHITECTURE.md §7.2).
+//
+// DEPLOYMENT REQUIREMENT: the role the API connects as in staging and production must be a NON-superuser
+// WITHOUT BYPASSRLS, and a member of `hifz_tenant` (the migration grants it to the migrating role with
+// `GRANT hifz_tenant TO CURRENT_USER`; grant it separately if the API connects as a different role). A superuser
+// or BYPASSRLS login would make any query outside withTenant() see every tenant's rows; with a normal login such
+// a query sees none (fail closed, test/sync/rls.test.ts). The embedded development/test database is the only
+// place the API connects as a superuser.
 import { sql } from 'kysely';
 import type { Db, Tx } from './db.ts';
 

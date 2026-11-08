@@ -2,7 +2,7 @@
 // The author of the conflicting change, or an Owner/Admin, picks a version or merges per field. The result is a
 // new change the server applies (and audits) on top of the current row; the conflict is then closed.
 // Authorization is the API's job; this module is pure.
-import { groupOf, valuesEqual, type EntityFieldSpec, type FieldValues } from './fields.ts';
+import { groupOf, missingGroupMembers, valuesEqual, type EntityFieldSpec, type FieldValues } from './fields.ts';
 
 export const CONFLICT_CHOICES = ['KEEP_DEVICE', 'KEEP_SERVER', 'MERGE'] as const;
 export type ConflictChoiceKind = (typeof CONFLICT_CHOICES)[number];
@@ -49,7 +49,9 @@ export type ResolveErrorCode =
   /** Different picks inside one coupled group. */
   | 'PICK_SPLITS_GROUP'
   /** Picks given with KEEP_DEVICE or KEEP_SERVER. */
-  | 'PICKS_NOT_ALLOWED';
+  | 'PICKS_NOT_ALLOWED'
+  /** The device version holds only part of a coupled group (refused at push since F12 review; never resolvable). */
+  | 'GROUP_INCOMPLETE';
 
 export type ResolveResult =
   | {
@@ -62,17 +64,28 @@ export type ResolveResult =
   | { ok: false; code: ResolveErrorCode; fields: string[] };
 
 /**
- * The fields shown side by side: every field the device set whose value differs from the server's, plus any
- * conflicting field the device did not set (shown so the user sees the server's change; it keeps the server value).
+ * The fields compared side by side: every field the device set whose value differs from the server's, plus every
+ * conflicting field, each widened to its whole coupled group (a group is shown and picked as a unit, plan Q5).
+ */
+function comparedFields(conflict: ConflictRecord, spec: EntityFieldSpec): string[] {
+  const fields = new Set<string>();
+  const add = (field: string) => {
+    for (const member of groupOf(spec, field)) fields.add(member);
+  };
+  for (const field of Object.keys(conflict.device)) {
+    if (!valuesEqual(conflict.device[field], conflict.server[field])) add(field);
+  }
+  for (const field of conflict.conflictFields) add(field);
+  return [...fields];
+}
+
+/**
+ * The fields shown side by side (see {@link comparedFields}). A conflicting field the device did not set is
+ * shown so the user sees the server's change; it keeps the server value.
  */
 export function fieldDiff(conflict: ConflictRecord, spec: EntityFieldSpec): FieldDiff[] {
   const conflicting = new Set(conflict.conflictFields);
-  const fields = new Set<string>();
-  for (const field of Object.keys(conflict.device)) {
-    if (!valuesEqual(conflict.device[field], conflict.server[field])) fields.add(field);
-  }
-  for (const field of conflict.conflictFields) fields.add(field);
-  return [...fields].map((field) => {
+  return comparedFields(conflict, spec).map((field) => {
     const group = groupOf(spec, field);
     return {
       field,
@@ -84,9 +97,13 @@ export function fieldDiff(conflict: ConflictRecord, spec: EntityFieldSpec): Fiel
   });
 }
 
-/** Fields the user picks for: those the device set with a value different from the server's. */
-function pickable(conflict: ConflictRecord): string[] {
-  return Object.keys(conflict.device).filter((f) => !valuesEqual(conflict.device[f], conflict.server[f]));
+/**
+ * Fields the user picks for: the compared fields the device set. Coupled groups are whole on the device (the API
+ * refuses partial groups at push), so a group is always pickable as a unit and KEEP_DEVICE writes the device's
+ * whole group, never a mix with the server's other members.
+ */
+function pickable(conflict: ConflictRecord, spec: EntityFieldSpec): string[] {
+  return comparedFields(conflict, spec).filter((f) => Object.hasOwn(conflict.device, f));
 }
 
 /**
@@ -101,7 +118,11 @@ export function resolve(
   if (conflict.status !== 'OPEN') return { ok: false, code: 'CONFLICT_CLOSED', fields: [] };
   if (options.currentServerVersion !== conflict.serverVersion) return { ok: false, code: 'CONFLICT_STALE', fields: [] };
 
-  const fields = pickable(conflict);
+  // Defensive: a device version holding part of a coupled group can never be resolved per field (plan Q5).
+  const incomplete = missingGroupMembers(options.spec, Object.keys(conflict.device));
+  if (incomplete.length > 0) return { ok: false, code: 'GROUP_INCOMPLETE', fields: incomplete };
+
+  const fields = pickable(conflict, options.spec);
   let picks: Record<string, FieldPick>;
   if (choice.choice === 'MERGE') {
     const given = choice.picks;

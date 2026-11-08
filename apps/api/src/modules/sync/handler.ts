@@ -26,7 +26,9 @@ export type FieldsSchema = z.ZodType<Record<string, unknown>>;
 
 export interface AppliedChange {
   actor: Actor;
-  opType: 'CREATE' | 'UPDATE' | 'RESOLVE';
+  // Conflict resolutions are audited by the conflict service (SYNC_CONFLICT_RESOLVED), not through this hook. F05
+  // decides whether entity handlers also need a resolution audit and adds the op type then.
+  opType: 'CREATE' | 'UPDATE';
   entityId: string;
   rowVersion: number;
   /** Fields written by this change (names and values; the handler decides what is safe to audit). */

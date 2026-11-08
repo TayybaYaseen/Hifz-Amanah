@@ -78,6 +78,8 @@ export const ERROR_CODES = [
   /** 426: the app's sync protocol version is below the server's minimum. */
   'UPGRADE_REQUIRED',
   'DEPENDENCY_PENDING',
+  /** Push RETRY code: the row has an open sync conflict; the change waits until it is resolved (decision Q7). */
+  'CONFLICT_OPEN',
   'OP_ID_REUSED',
   'ID_TAKEN',
   'ENTITY_NOT_SUPPORTED',

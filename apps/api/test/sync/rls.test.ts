@@ -157,9 +157,72 @@ describe('F12 · row-level security (decision Q9)', () => {
       const result = await tx.updateTable('sync_conflicts').set({ status: 'RESOLVED', resolved_at: new Date(), resolved_by: userA }).where('organization_id', '=', orgB).executeTakeFirst();
       expect(Number(result.numUpdatedRows)).toBe(0);
     });
+    // Since 0005 the tenant role cannot write organization_id at all (column grant), before RLS is even reached.
     await expect(
       withTenant(s.h.db, orgA, (tx) => tx.updateTable('sync_conflicts').set({ organization_id: orgB }).where('organization_id', '=', orgA).execute()),
-    ).rejects.toThrow(/row-level security/);
+    ).rejects.toThrow(/permission denied/);
+  });
+
+  it('F12 unit (review L7): the tenant role may only close a conflict; its versions, record, and author are fixed', async () => {
+    const forbidden = [
+      { device_fields: '{}' },
+      { server_fields: '{}' },
+      { conflict_fields: [] as string[] },
+      { entity_id: uuidv7() },
+      { caused_by_user_id: userA },
+      { base_version: 9 },
+      { server_version: 9 },
+    ];
+    for (const set of forbidden) {
+      await expect(
+        withTenant(s.h.db, orgA, (tx) => tx.updateTable('sync_conflicts').set(set).where('organization_id', '=', orgA).execute()),
+        Object.keys(set)[0],
+      ).rejects.toThrow(/permission denied/);
+    }
+    // The columns resolve() writes stay updatable.
+    await withTenant(s.h.db, orgA, async (tx) => {
+      const result = await tx
+        .updateTable('sync_conflicts')
+        .set({ status: 'RESOLVED', resolved_by: userA, resolved_at: new Date(), resolution: JSON.stringify({ choice: 'KEEP_SERVER', picks: {} }) })
+        .where('organization_id', '=', orgA)
+        .executeTakeFirst();
+      expect(Number(result.numUpdatedRows)).toBe(1);
+    });
+  });
+
+  it('F12 unit (review M3): a non-superuser role with full privileges sees no tenant rows outside withTenant (fail closed)', async () => {
+    // Stands in for a production API login: NOSUPERUSER, NOBYPASSRLS, every privilege on the sync tables. Without a
+    // tenant setting it must see nothing; with one, only that madrasa. Role names are cluster-wide: unique per run.
+    const role = `hifz_rls_probe_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e6).toString(36)}`;
+    await sql.raw(`CREATE ROLE ${role} NOLOGIN NOSUPERUSER NOBYPASSRLS`).execute(s.h.db);
+    try {
+      await sql.raw(`GRANT ALL PRIVILEGES ON ${TABLES.join(', ')} TO ${role}`).execute(s.h.db);
+      await sql.raw(`GRANT USAGE ON SEQUENCE change_log_seq_seq TO ${role}`).execute(s.h.db);
+      const asRole = <T>(fn: (tx: Tx) => Promise<T>) =>
+        s.h.db.transaction().execute(async (tx) => {
+          await sql.raw(`SET LOCAL ROLE ${role}`).execute(tx);
+          return fn(tx);
+        });
+      for (const table of TABLES) {
+        const { rows } = await asRole((tx) => sql<{ n: string }>`SELECT count(*) AS n FROM ${sql.table(table)}`.execute(tx));
+        expect(Number(rows[0]!.n), table).toBe(0);
+        // Even an explicit filter on a real organization finds nothing without the tenant setting.
+        const filtered = await asRole((tx) => sql<{ n: string }>`SELECT count(*) AS n FROM ${sql.table(table)} WHERE organization_id = ${orgA}`.execute(tx));
+        expect(Number(filtered.rows[0]!.n), table).toBe(0);
+        const scoped = await asRole(async (tx) => {
+          await sql`SELECT set_config('app.current_org_id', ${orgA}, true)`.execute(tx);
+          return sql<{ organization_id: string }>`SELECT DISTINCT organization_id FROM ${sql.table(table)}`.execute(tx);
+        });
+        expect(scoped.rows.map((r) => r.organization_id), table).toEqual([orgA]);
+      }
+      // Full privileges do not include writing another madrasa's rows either.
+      await expect(
+        asRole((tx) => sql`INSERT INTO scope_changes (organization_id, user_id, at) VALUES (${orgB}, ${userB}, now())`.execute(tx)),
+      ).rejects.toThrow(/row-level security/);
+    } finally {
+      await sql.raw(`DROP OWNED BY ${role}`).execute(s.h.db);
+      await sql.raw(`DROP ROLE ${role}`).execute(s.h.db);
+    }
   });
 });
 

@@ -1,6 +1,9 @@
 // F12 · Queue-item state machine (FR-SYNC-007, F12-AC8, F12-AC9, F12-AC6).
 // PENDING → SYNCING → SYNCED | FAILED | ACTION_REQUIRED. SYNCED is reached only from a server acknowledgement:
 // an APPLIED result, or the server confirming that the item's conflict was resolved.
+// ACTION_REQUIRED has two forms: the item's own conflict (CONFLICT result, conflictId set; CONFLICT_RESOLVED →
+// SYNCED), or held behind another operation's open conflict on the same row (RETRY CONFLICT_OPEN, decision Q7;
+// conflictId null, failure CONFLICT_OPEN; CONFLICT_CLEARED → PENDING and sent again).
 import { nextAttemptAt } from './backoff.ts';
 
 export const QUEUE_STATES = ['PENDING', 'SYNCING', 'SYNCED', 'FAILED', 'ACTION_REQUIRED'] as const;
@@ -42,7 +45,24 @@ export type QueueEvent =
   /** The user taps Retry on a failed item (after correcting it, or as is). */
   | { type: 'RETRY' }
   /** The server confirmed the conflict for this item was resolved (POST /sync/conflicts/:id/resolve). */
-  | { type: 'CONFLICT_RESOLVED'; rowVersion: number };
+  | { type: 'CONFLICT_RESOLVED'; rowVersion: number }
+  /**
+   * The open conflict that held this item (RETRY CONFLICT_OPEN: another operation's conflict on the same row) is
+   * no longer open, so the item is sent again. The resend may apply, or become its own explicit conflict.
+   */
+  | { type: 'CONFLICT_CLEARED' };
+
+/**
+ * RETRY code meaning "the row has an open conflict" (decision Q7): the item is held as ACTION_REQUIRED, without a
+ * conflict of its own and without a backoff, until {@link QueueEvent} CONFLICT_CLEARED. Same value as the
+ * contracts' OP_RETRY_CODES entry.
+ */
+export const CONFLICT_OPEN = 'CONFLICT_OPEN';
+
+/** True for an item held because its row has someone else's open conflict (not its own conflict). */
+export function isHeldByOpenConflict(item: QueueItemStatus): boolean {
+  return item.state === 'ACTION_REQUIRED' && item.conflictId === null && item.failure?.code === CONFLICT_OPEN;
+}
 
 export interface TransitionContext {
   nowMs: number;
@@ -109,6 +129,11 @@ export function transition(item: QueueItemStatus, event: QueueEvent, ctx: Transi
             failure: result.fields === undefined ? { code: result.code } : { code: result.code, fields: result.fields },
           };
         case 'RETRY':
+          // The row has an open conflict (Q7): held as action required, not retried on a timer, so its fields
+          // stay on the device until the conflict is resolved (never dropped).
+          if (result.code === CONFLICT_OPEN) {
+            return { ...item, state: 'ACTION_REQUIRED', nextAttemptAt: null, failure: { code: CONFLICT_OPEN }, conflictId: null };
+          }
           return backToPending(item, result.code, ctx);
         default: {
           const unknown: never = result;
@@ -131,8 +156,14 @@ export function transition(item: QueueItemStatus, event: QueueEvent, ctx: Transi
       return { ...item, state: 'PENDING', attempts: 0, nextAttemptAt: null, failure: null };
 
     case 'CONFLICT_RESOLVED':
-      if (item.state !== 'ACTION_REQUIRED') throw invalid();
+      // Only an item whose own operation caused the conflict is settled by its resolution.
+      if (item.state !== 'ACTION_REQUIRED' || item.conflictId === null) throw invalid();
       return { ...item, state: 'SYNCED', rowVersion: event.rowVersion, conflictId: null };
+
+    case 'CONFLICT_CLEARED':
+      // Back to pending at once, with no backoff penalty: the wait was not this item's failure.
+      if (!isHeldByOpenConflict(item)) throw invalid();
+      return { ...item, state: 'PENDING', attempts: 0, nextAttemptAt: null, failure: null };
 
     default: {
       const unknown: never = event;

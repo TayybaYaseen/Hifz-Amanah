@@ -65,6 +65,21 @@ export function groupOf(spec: EntityFieldSpec, field: string): readonly string[]
 }
 
 /**
+ * Coupled groups travel whole (plan Q5): an operation that sets any member of a group must set all of them, so
+ * neither detection nor resolution can combine one side's members with the other side's. Returns the members
+ * missing from partially set groups, in group order (empty when every touched group is complete).
+ */
+export function missingGroupMembers(spec: EntityFieldSpec, keys: Iterable<string>): string[] {
+  const present = new Set(keys);
+  const missing: string[] = [];
+  for (const group of spec.groups) {
+    if (!group.some((member) => present.has(member))) continue;
+    for (const member of group) if (!present.has(member)) missing.push(member);
+  }
+  return missing;
+}
+
+/**
  * Field classes of the test-only `sync_probe` entity (plan §7, Q1): `label` and `status` meaningful,
  * `position` safe (display order). Registered by the API only in test builds.
  */

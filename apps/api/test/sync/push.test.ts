@@ -3,7 +3,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { sql } from 'kysely';
 import { v7 as uuidv7 } from 'uuid';
-import { CLASS_A1, CLASS_A2, count, op, probeRow, push, pushOk, resend, startSyncHarness, type SyncHarness } from './support.ts';
+import { CLASS_A1, CLASS_A2, count, op, orgIdOf, OTHER_DEVICE, probeRow, push, pushOk, resend, startSyncHarness, type SyncHarness } from './support.ts';
 
 let s: SyncHarness;
 
@@ -115,6 +115,109 @@ describe('F12 · push: dependencies, validation, scope', () => {
     expect(results[1]).toEqual({ opId: dependent.opId, status: 'RETRY', code: 'DEPENDENCY_PENDING' });
   });
 
+  it('F12-AC4 (US-052) a dependency that became a conflict is met once that conflict is resolved (review H4)', async () => {
+    const admin = await s.h.signIn('admin.a');
+    const teacher = await s.h.signIn('teacher.a1');
+    const record = op();
+    const other = op();
+    await pushOk(s.h, admin, [record, other]);
+    await pushOk(s.h, admin, [op({ opType: 'UPDATE', entityId: record.entityId as string, baseVersion: 1, fields: { status: 'DONE' } })]);
+    const conflicting = op({ opType: 'UPDATE', entityId: record.entityId as string, baseVersion: 1, fields: { status: 'HELD' } });
+    const dependent = op({ opType: 'UPDATE', entityId: other.entityId as string, baseVersion: 1, fields: { label: 'After' }, dependsOn: [conflicting.opId as string] });
+    const [conflict, waiting] = await pushOk(s.h, teacher, [conflicting, dependent]);
+    expect(conflict).toMatchObject({ status: 'CONFLICT' });
+    expect(waiting).toEqual({ opId: dependent.opId, status: 'RETRY', code: 'DEPENDENCY_PENDING' });
+
+    const resolved = await s.h.call('POST', `/sync/conflicts/${(conflict as { conflictId: string }).conflictId}/resolve`, teacher, { choice: 'KEEP_SERVER' });
+    expect(resolved.statusCode).toBe(200);
+    expect(await pushOk(s.h, teacher, [resend(dependent)])).toEqual([{ opId: dependent.opId, status: 'APPLIED', rowVersion: 2, entityId: other.entityId }]);
+    expect((await probeRow(s.h, other.entityId as string))!.label).toBe('After');
+  });
+
+  it('F12-AC4 (US-052) an UPDATE of a record whose CREATE is unsynced depends on the CREATE and is based on version 1', async () => {
+    // The rule for the app: dependsOn = [the CREATE's opId], baseVersion = 1 (the version the CREATE is applied at).
+    const teacher = await s.h.signIn('teacher.a1');
+    const create = op();
+    const id = create.entityId as string;
+    const first = op({ opType: 'UPDATE', entityId: id, baseVersion: 1, fields: { status: 'DONE' }, dependsOn: [create.opId as string] });
+    const second = op({ opType: 'UPDATE', entityId: id, baseVersion: 1, fields: { status: 'HELD', label: 'Edited twice' }, dependsOn: [create.opId as string] });
+    // Sent before the CREATE: held, nothing stored.
+    expect(await pushOk(s.h, teacher, [first])).toEqual([{ opId: first.opId, status: 'RETRY', code: 'DEPENDENCY_PENDING' }]);
+    const results = await pushOk(s.h, teacher, [resend(create), resend(first), resend(second)]);
+    expect(results).toEqual([
+      { opId: create.opId, status: 'APPLIED', rowVersion: 1, entityId: id },
+      { opId: first.opId, status: 'APPLIED', rowVersion: 2, entityId: id },
+      { opId: second.opId, status: 'APPLIED', rowVersion: 3, entityId: id },
+    ]);
+    expect(await probeRow(s.h, id)).toMatchObject({ status: 'HELD', label: 'Edited twice' });
+    expect(await count(s.h, 'sync_conflicts')).toBe(0);
+  });
+
+  it('F12 unit (review L8): an op id stored by another madrasa is OP_ID_REUSED even when its dependency is pending or its row has an open conflict', async () => {
+    const adminB = await s.h.signIn('admin.b');
+    const foreign = op({ fields: { label: 'B', status: 'OPEN' } });
+    await pushOk(s.h, adminB, [foreign]);
+
+    const teacher = await s.h.signIn('teacher.a1');
+    const waiting = { ...op({ dependsOn: [uuidv7()] }), opId: foreign.opId };
+    expect(await pushOk(s.h, teacher, [waiting])).toEqual([{ opId: foreign.opId, status: 'REJECTED', code: 'OP_ID_REUSED' }]);
+
+    // A row of Madrasa A with an open conflict.
+    const admin = await s.h.signIn('admin.a');
+    const record = op();
+    await pushOk(s.h, admin, [record]);
+    await pushOk(s.h, admin, [op({ opType: 'UPDATE', entityId: record.entityId as string, baseVersion: 1, fields: { status: 'DONE' } })]);
+    const [opened] = await pushOk(s.h, teacher, [op({ opType: 'UPDATE', entityId: record.entityId as string, baseVersion: 1, fields: { status: 'HELD' } })]);
+    expect(opened).toMatchObject({ status: 'CONFLICT' });
+    const held = { ...op({ opType: 'UPDATE', entityId: record.entityId as string, baseVersion: 2, fields: { label: 'L' } }), opId: foreign.opId };
+    expect(await pushOk(s.h, teacher, [held])).toEqual([{ opId: foreign.opId, status: 'REJECTED', code: 'OP_ID_REUSED' }]);
+    // The probe stored nothing: Madrasa B's operation is the only row with that op id, unchanged.
+    const { rows } = await sql<{ organization_id: string; status: string }>`SELECT organization_id, status FROM sync_ops WHERE op_id = ${foreign.opId as string}`.execute(s.h.db);
+    expect(rows).toEqual([{ organization_id: await orgIdOf(s.h, 'admin.b'), status: 'APPLIED' }]);
+  });
+});
+
+describe('F12 · push: repeated offline edits (review H3)', () => {
+  it('F12-AC11 (US-054) two successive edits of one row from the same device and base version both apply', async () => {
+    const teacher = await s.h.signIn('teacher.a1');
+    const create = op();
+    await pushOk(s.h, teacher, [create]);
+    const id = create.entityId as string;
+    const first = op({ opType: 'UPDATE', entityId: id, baseVersion: 1, fields: { status: 'DONE' } });
+    const second = op({ opType: 'UPDATE', entityId: id, baseVersion: 1, fields: { status: 'HELD' } });
+    expect(await pushOk(s.h, teacher, [first])).toEqual([{ opId: first.opId, status: 'APPLIED', rowVersion: 2, entityId: id }]);
+    expect(await pushOk(s.h, teacher, [second])).toEqual([{ opId: second.opId, status: 'APPLIED', rowVersion: 3, entityId: id }]);
+    expect((await probeRow(s.h, id))!.status).toBe('HELD');
+    expect(await count(s.h, 'sync_conflicts')).toBe(0);
+  });
+
+  it('F12-AC11 (US-054) another user’s change in between still conflicts with the device’s later edit', async () => {
+    const teacher = await s.h.signIn('teacher.a1');
+    const admin = await s.h.signIn('admin.a');
+    const create = op();
+    await pushOk(s.h, teacher, [create]);
+    const id = create.entityId as string;
+    await pushOk(s.h, teacher, [op({ opType: 'UPDATE', entityId: id, baseVersion: 1, fields: { label: 'Mine' } })]);
+    await pushOk(s.h, admin, [op({ opType: 'UPDATE', entityId: id, baseVersion: 2, fields: { status: 'DONE' } })]);
+    const later = op({ opType: 'UPDATE', entityId: id, baseVersion: 1, fields: { status: 'HELD' } });
+    const [result] = await pushOk(s.h, teacher, [later]);
+    expect(result).toMatchObject({ opId: later.opId, status: 'CONFLICT' });
+    expect(await probeRow(s.h, id)).toMatchObject({ status: 'DONE', label: 'Mine' });
+  });
+
+  it('F12-AC11 (US-054) the same user’s edit from another device is not "own" and still conflicts', async () => {
+    const teacher = await s.h.signIn('teacher.a1');
+    const create = op();
+    await pushOk(s.h, teacher, [create]);
+    const id = create.entityId as string;
+    await pushOk(s.h, teacher, [op({ opType: 'UPDATE', entityId: id, baseVersion: 1, fields: { status: 'DONE' } })], OTHER_DEVICE);
+    const [result] = await pushOk(s.h, teacher, [op({ opType: 'UPDATE', entityId: id, baseVersion: 1, fields: { status: 'HELD' } })]);
+    expect(result).toMatchObject({ status: 'CONFLICT' });
+    expect((await probeRow(s.h, id))!.status).toBe('DONE');
+  });
+});
+
+describe('F12 · push: dependencies, validation, scope (continued)', () => {
   it('F12 unit: an entity with no registered handler is REJECTED ENTITY_NOT_SUPPORTED', async () => {
     const teacher = await s.h.signIn('teacher.a1');
     const attendance = op({ entity: 'attendance_record', fields: { status: 'PRESENT' } });

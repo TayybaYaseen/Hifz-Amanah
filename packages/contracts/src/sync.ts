@@ -45,8 +45,12 @@ export type OpResultStatus = (typeof OP_RESULT_STATUSES)[number];
 export const OP_REJECT_CODES = ['VALIDATION', 'NOT_FOUND', 'ENTITY_NOT_SUPPORTED', 'ID_TAKEN', 'OP_ID_REUSED'] as const;
 export type OpRejectCode = (typeof OP_REJECT_CODES)[number];
 
-/** Temporary refusals; not stored, the client sends the operation again later. */
-export const OP_RETRY_CODES = ['DEPENDENCY_PENDING'] as const;
+/**
+ * Temporary refusals; not stored, the client sends the operation again later. DEPENDENCY_PENDING: retried with
+ * backoff. CONFLICT_OPEN: the row has an open conflict (decision Q7); the client holds the operation as action
+ * required, without backoff, and sends it again once that conflict is resolved.
+ */
+export const OP_RETRY_CODES = ['DEPENDENCY_PENDING', 'CONFLICT_OPEN'] as const;
 export type OpRetryCode = (typeof OP_RETRY_CODES)[number];
 
 export const CHANGE_OPS = ['UPSERT', 'REMOVE_FROM_DEVICE'] as const;

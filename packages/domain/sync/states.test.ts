@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { BACKOFF, backoffCeiling, nextAttemptAt, nextAttemptDelay } from './backoff.ts';
-import { initialQueueStatus, InvalidQueueTransitionError, QUEUE_STATES, transition, type QueueEvent, type QueueItemStatus } from './states.ts';
+import { initialQueueStatus, InvalidQueueTransitionError, isHeldByOpenConflict, QUEUE_STATES, transition, type QueueEvent, type QueueItemStatus } from './states.ts';
 import { isUuidV7, uuidV7 } from './ids.ts';
 
 const ctx = { nowMs: 1_000_000, random: () => 0.5 };
@@ -31,6 +31,8 @@ describe('F12 · queue-item states', () => {
       { type: 'INTERRUPTED' },
       { type: 'RETRY' },
       { type: 'RESULT', result: { status: 'RETRY', code: 'DEPENDENCY_PENDING' } },
+      { type: 'RESULT', result: { status: 'RETRY', code: 'CONFLICT_OPEN' } },
+      { type: 'CONFLICT_CLEARED' },
       { type: 'RESULT', result: { status: 'REJECTED', code: 'NOT_FOUND' } },
       { type: 'RESULT', result: { status: 'CONFLICT', conflictId: 'c' } },
     ];
@@ -65,6 +67,24 @@ describe('F12 · queue-item states', () => {
     expect(transition(failed, { type: 'RETRY' }, ctx)).toMatchObject({ state: 'PENDING', failure: null, attempts: 0 });
     const conflicted = transition(syncing(), { type: 'RESULT', result: { status: 'CONFLICT', conflictId: 'c' } }, ctx);
     expect(transition(conflicted, { type: 'CONFLICT_RESOLVED', rowVersion: 7 }, ctx)).toMatchObject({ state: 'SYNCED', rowVersion: 7, conflictId: null });
+  });
+
+  it('F12-AC11 (US-054) an edit held by another operation’s open conflict is action required until the conflict clears, then pending again', () => {
+    const held = transition(syncing(), { type: 'RESULT', result: { status: 'RETRY', code: 'CONFLICT_OPEN' } }, ctx);
+    expect(held).toEqual({ state: 'ACTION_REQUIRED', attempts: 0, nextAttemptAt: null, failure: { code: 'CONFLICT_OPEN' }, rowVersion: null, conflictId: null });
+    expect(isHeldByOpenConflict(held)).toBe(true);
+    // Not this item's conflict: resolving does not mark it synced; clearing sends it again with no backoff.
+    expect(() => transition(held, { type: 'CONFLICT_RESOLVED', rowVersion: 3 }, ctx)).toThrow(InvalidQueueTransitionError);
+    expect(() => transition(held, { type: 'SEND' }, ctx)).toThrow(InvalidQueueTransitionError);
+    const cleared = transition(held, { type: 'CONFLICT_CLEARED' }, ctx);
+    expect(cleared).toEqual(initialQueueStatus());
+    // The item's own conflict is not "cleared"; and CONFLICT_CLEARED is refused from any other state.
+    const own = transition(syncing(), { type: 'RESULT', result: { status: 'CONFLICT', conflictId: 'c' } }, ctx);
+    expect(isHeldByOpenConflict(own)).toBe(false);
+    expect(() => transition(own, { type: 'CONFLICT_CLEARED' }, ctx)).toThrow(InvalidQueueTransitionError);
+    for (const state of QUEUE_STATES.filter((s) => s !== 'ACTION_REQUIRED')) {
+      expect(() => transition({ ...initialQueueStatus(), state }, { type: 'CONFLICT_CLEARED' }, ctx)).toThrow(InvalidQueueTransitionError);
+    }
   });
 
   it('F12 unit: invalid transitions are refused', () => {

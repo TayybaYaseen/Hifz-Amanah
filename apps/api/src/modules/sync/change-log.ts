@@ -60,21 +60,48 @@ export async function appendChange(tx: Tx, entry: ChangeEntry): Promise<void> {
  * Records that a user's scope changed (class assigned or unassigned), so their next pull answers
  * `scopeReset: true` (NFR-OFF-010, decision Q8). Called by the roster module (F03) in the same transaction as
  * the assignment change, which must be a tenant transaction.
+ *
+ * F03 MUST call it once for EVERY Teacher whose scope the change affects, not only the Teacher being assigned or
+ * unassigned: a class assigned or unassigned (that Teacher), the "all classes" flag set or cleared (that Teacher),
+ * and every enrollment change that moves a student into or out of a class (each Teacher assigned to the old class
+ * and each assigned to the new one; a student deactivated or reactivated likewise). A missed call leaves a device
+ * holding rows outside its user's scope until the next full sign-in (F12-AC7, FR-SYNC-009).
  */
 export async function recordScopeChange(tx: Tx, organizationId: string, userId: string, at: Date): Promise<void> {
   await lockOrganization(tx, organizationId);
   await tx.insertInto('scope_changes').values({ organization_id: organizationId, user_id: userId, at }).execute();
 }
 
-/** Fields changed on the server since `baseVersion` (exclusive), from the change log. */
-export async function changedSince(tx: Tx, organizationId: string, entity: string, entityId: string, baseVersion: number): Promise<string[]> {
+/**
+ * Fields changed on the server since `baseVersion` (exclusive), from the change log, leaving out changes made by
+ * the same user on the same device (`self`): a device that edits one row several times offline sends every edit
+ * from the base it last pulled, and its own earlier edits are not a conflict with its later ones (review H3).
+ * Changes without a sync operation (conflict resolutions, op_id NULL) and changes from any other user or device
+ * always count. The base version is never rebased.
+ */
+export async function changedSince(
+  tx: Tx,
+  organizationId: string,
+  entity: string,
+  entityId: string,
+  baseVersion: number,
+  self: { userId: string; deviceId: string },
+): Promise<string[]> {
   const rows = await tx
     .selectFrom('change_log')
-    .select('changed_fields')
-    .where('organization_id', '=', organizationId)
-    .where('entity', '=', entity)
-    .where('entity_id', '=', entityId)
-    .where('row_version', '>', baseVersion)
+    .leftJoin('sync_ops', 'sync_ops.op_id', 'change_log.op_id')
+    .select('change_log.changed_fields')
+    .where('change_log.organization_id', '=', organizationId)
+    .where('change_log.entity', '=', entity)
+    .where('change_log.entity_id', '=', entityId)
+    .where('change_log.row_version', '>', baseVersion)
+    .where((eb) =>
+      eb.or([
+        eb('sync_ops.op_id', 'is', null),
+        eb('sync_ops.user_id', '!=', self.userId),
+        eb('sync_ops.device_id', '!=', self.deviceId),
+      ]),
+    )
     .execute();
   return [...new Set(rows.flatMap((r) => r.changed_fields))];
 }

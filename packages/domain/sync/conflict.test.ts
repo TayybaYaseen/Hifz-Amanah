@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { detect } from './conflict.ts';
 import { closeConflict, fieldDiff, resolve, type ConflictRecord } from './resolve.ts';
-import { classOf, defineFieldSpec, FieldSpecError, groupOf, SYNC_PROBE_FIELDS, valuesEqual } from './fields.ts';
+import { classOf, defineFieldSpec, FieldSpecError, groupOf, missingGroupMembers, SYNC_PROBE_FIELDS, valuesEqual } from './fields.ts';
 
 // Illustrative specs: the real field names arrive with F04/F05/F08. Coupled groups follow plan Q5.
 const attemptSpec = defineFieldSpec({
@@ -126,7 +126,8 @@ describe('F12 · resolution', () => {
   const conflict: ConflictRecord = {
     status: 'OPEN',
     serverVersion: 4,
-    device: { status: 'PARTIAL', completed: half, remarks: 'device remark' },
+    // Coupled groups travel whole (Q5): the device version holds every member of the attempt-outcome group.
+    device: { status: 'PARTIAL', completed: half, quality: 3, mistakes: [], remarks: 'device remark' },
     server: { status: 'COMPLETED', completed: full, quality: 1, mistakes: [], remarks: 'server remark' },
     conflictFields: ['status', 'completed', 'quality', 'mistakes'],
   };
@@ -137,15 +138,16 @@ describe('F12 · resolution', () => {
     const device = resolve(conflict, { choice: 'KEEP_DEVICE' }, opts);
     expect(device).toEqual({
       ok: true,
-      changes: { status: 'PARTIAL', completed: half, remarks: 'device remark' },
-      picks: { status: 'DEVICE', completed: 'DEVICE', remarks: 'DEVICE' },
+      changes: { status: 'PARTIAL', completed: half, quality: 3, mistakes: [], remarks: 'device remark' },
+      picks: { status: 'DEVICE', completed: 'DEVICE', quality: 'DEVICE', mistakes: 'DEVICE', remarks: 'DEVICE' },
     });
 
     const server = resolve(conflict, { choice: 'KEEP_SERVER' }, opts);
-    expect(server).toEqual({ ok: true, changes: {}, picks: { status: 'SERVER', completed: 'SERVER', remarks: 'SERVER' } });
+    expect(server).toEqual({ ok: true, changes: {}, picks: { status: 'SERVER', completed: 'SERVER', quality: 'SERVER', mistakes: 'SERVER', remarks: 'SERVER' } });
 
-    const merged = resolve(conflict, { choice: 'MERGE', picks: { status: 'SERVER', completed: 'SERVER', remarks: 'DEVICE' } }, opts);
-    expect(merged).toEqual({ ok: true, changes: { remarks: 'device remark' }, picks: { status: 'SERVER', completed: 'SERVER', remarks: 'DEVICE' } });
+    const groupServer = { status: 'SERVER', completed: 'SERVER', quality: 'SERVER', mistakes: 'SERVER' } as const;
+    const merged = resolve(conflict, { choice: 'MERGE', picks: { ...groupServer, remarks: 'DEVICE' } }, opts);
+    expect(merged).toEqual({ ok: true, changes: { remarks: 'device remark' }, picks: { ...groupServer, remarks: 'DEVICE' } });
 
     const closed = closeConflict(conflict);
     expect(closed.status).toBe('RESOLVED');
@@ -154,18 +156,19 @@ describe('F12 · resolution', () => {
   });
 
   it('F12-AC12 (US-054) a coupled group must be picked as a unit', () => {
-    const split = resolve(conflict, { choice: 'MERGE', picks: { status: 'DEVICE', completed: 'SERVER', remarks: 'DEVICE' } }, opts);
-    expect(split).toEqual({ ok: false, code: 'PICK_SPLITS_GROUP', fields: ['status', 'completed'] });
+    const split = resolve(conflict, { choice: 'MERGE', picks: { status: 'DEVICE', completed: 'SERVER', quality: 'DEVICE', mistakes: 'DEVICE', remarks: 'DEVICE' } }, opts);
+    expect(split).toEqual({ ok: false, code: 'PICK_SPLITS_GROUP', fields: ['status', 'completed', 'quality', 'mistakes'] });
   });
 
   it('F12 unit: a merge needs a pick for every differing field and no others', () => {
-    expect(resolve(conflict, { choice: 'MERGE', picks: { status: 'DEVICE', completed: 'DEVICE' } }, opts)).toEqual({
+    const group = { status: 'DEVICE', completed: 'DEVICE', quality: 'DEVICE', mistakes: 'DEVICE' } as const;
+    expect(resolve(conflict, { choice: 'MERGE', picks: group }, opts)).toEqual({
       ok: false,
       code: 'PICK_MISSING',
       fields: ['remarks'],
     });
     expect(
-      resolve(conflict, { choice: 'MERGE', picks: { status: 'DEVICE', completed: 'DEVICE', remarks: 'DEVICE', label: 'DEVICE' } }, opts),
+      resolve(conflict, { choice: 'MERGE', picks: { ...group, remarks: 'DEVICE', label: 'DEVICE' } }, opts),
     ).toEqual({ ok: false, code: 'PICK_UNKNOWN_FIELD', fields: ['label'] });
   });
 
@@ -186,9 +189,46 @@ describe('F12 · resolution', () => {
     const diff = fieldDiff(conflict, spec);
     expect(diff.map((d) => d.field).sort()).toEqual(['completed', 'mistakes', 'quality', 'remarks', 'status']);
     const quality = diff.find((d) => d.field === 'quality')!;
-    expect(quality).toMatchObject({ device: undefined, server: 1, conflicting: true });
+    expect(quality).toMatchObject({ device: 3, server: 1, conflicting: true });
     expect(quality.group).toEqual(['status', 'completed', 'quality', 'mistakes']);
     expect(diff.find((d) => d.field === 'remarks')).toMatchObject({ conflicting: false, group: null });
+  });
+
+  it('F12-AC12 (US-054) the comparison and the picks cover whole coupled groups, so KEEP_DEVICE never writes a partial group (Q5)', () => {
+    // Only status differs inside the group; the device still carries the whole group.
+    const oneMember: ConflictRecord = {
+      status: 'OPEN',
+      serverVersion: 4,
+      device: { status: 'NOT_REMEMBERED', completed: full, quality: 1, mistakes: [] },
+      server: { status: 'COMPLETED', completed: full, quality: 1, mistakes: [] },
+      conflictFields: ['status', 'completed', 'quality', 'mistakes'],
+    };
+    const diff = fieldDiff(oneMember, spec);
+    expect(diff.map((d) => d.field)).toEqual(['status', 'completed', 'quality', 'mistakes']);
+    const allDevice = { status: 'DEVICE', completed: 'DEVICE', quality: 'DEVICE', mistakes: 'DEVICE' } as const;
+    // Every field shown is pickable, and a MERGE pick for the whole group is accepted.
+    expect(resolve(oneMember, { choice: 'MERGE', picks: allDevice }, opts)).toMatchObject({ ok: true, picks: allDevice });
+    expect(resolve(oneMember, { choice: 'MERGE', picks: { status: 'DEVICE' } }, opts)).toEqual({
+      ok: false,
+      code: 'PICK_MISSING',
+      fields: ['completed', 'quality', 'mistakes'],
+    });
+    const kept = resolve(oneMember, { choice: 'KEEP_DEVICE' }, opts);
+    expect(kept).toEqual({ ok: true, changes: oneMember.device, picks: allDevice });
+  });
+
+  it('F12 unit: a device version holding part of a coupled group cannot be resolved (GROUP_INCOMPLETE)', () => {
+    const partial: ConflictRecord = { ...conflict, device: { status: 'PARTIAL', completed: half, remarks: 'device remark' } };
+    for (const choice of [{ choice: 'KEEP_DEVICE' }, { choice: 'KEEP_SERVER' }, { choice: 'MERGE', picks: {} }] as const) {
+      expect(resolve(partial, choice, opts)).toEqual({ ok: false, code: 'GROUP_INCOMPLETE', fields: ['quality', 'mistakes'] });
+    }
+  });
+
+  it('F12 unit: missingGroupMembers names the members a partially set group lacks', () => {
+    expect(missingGroupMembers(spec, ['status', 'remarks'])).toEqual(['completed', 'quality', 'mistakes']);
+    expect(missingGroupMembers(spec, ['status', 'completed', 'quality', 'mistakes'])).toEqual([]);
+    expect(missingGroupMembers(spec, ['remarks'])).toEqual([]);
+    expect(missingGroupMembers(spec, [])).toEqual([]);
   });
 });
 
@@ -279,7 +319,9 @@ describe('F12 · conflict properties', () => {
 
   it('F12 unit (property): KEEP_SERVER changes nothing and KEEP_DEVICE restores every device value', () => {
     fc.assert(
-      fc.property(row, row, subset, (server, device, localKeys) => {
+      fc.property(row, row, subset, (server, device, keys) => {
+        // Operations carry whole coupled groups (Q5; partial groups are refused at push).
+        const localKeys = [...new Set(keys.flatMap((k) => [...groupOf(propSpec, k)]))];
         const local = Object.fromEntries(localKeys.map((k) => [k, device[k]]));
         const conflict: ConflictRecord = { status: 'OPEN', serverVersion: 1, device: local, server, conflictFields: [] };
         const opts = { spec: propSpec, currentServerVersion: 1 };

@@ -2,17 +2,18 @@
 // AC15; plan docs/handover/F12-plan.md §5). Conflict rules live in @hifz/domain/sync; this service persists.
 //
 // Per operation, in ONE tenant transaction (platform/tenant.ts; RLS on): lock the organization's change log,
-// look the op up in sync_ops (idempotent replay), check dependencies, authorize (out of scope = NOT_FOUND),
+// look the op up in sync_ops (idempotent replay), probe the op_id claim (another madrasa's op_id = OP_ID_REUSED),
+// check dependencies, authorize (out of scope = NOT_FOUND),
 // validate (handler's strict schema), compare base_version via change_log + `detect`, then either apply
 // (bump row_version, append change_log, audit, store the result) or store a conflict and the result.
 // Each op commits on its own, in request order, so one rejected op never rolls back the others.
 import { v7 as uuidv7 } from 'uuid';
-import { sql } from 'kysely';
+import { sql, type Insertable } from 'kysely';
 import { PullQuery, PushRequest, type Change, type OpResult, type PullResponse, type PushResponse, type SyncOp } from '@hifz/contracts';
-import { detect } from '@hifz/domain/sync';
+import { detect, missingGroupMembers } from '@hifz/domain/sync';
 import type { Clock } from '../../platform/clock.ts';
-import type { Db, Tx } from '../../platform/db.ts';
-import { AppError, issueFields, parse } from '../../platform/errors.ts';
+import type { Db, SyncOpsTable, Tx } from '../../platform/db.ts';
+import { AppError, issueFields, parse, sanitizeError } from '../../platform/errors.ts';
 import { withTenant } from '../../platform/tenant.ts';
 import { projectFor } from '../access/projection.ts';
 import { accessActor, authorize } from '../access/policy.ts';
@@ -53,15 +54,7 @@ class OpIdTakenElsewhere extends Error {}
 const rejected = (opId: string, code: Extract<OpResult, { status: 'REJECTED' }>['code'], fields?: Record<string, string>): OpResult =>
   fields ? { opId, status: 'REJECTED', code, fields } : { opId, status: 'REJECTED', code };
 
-/**
- * Database errors can carry row values in their detail ("Failing row contains …"). Never let them reach the
- * logs: keep only the SQLSTATE (FR-AUD-003, NFR-REL-004).
- */
-function sanitize(error: unknown): unknown {
-  if (error instanceof AppError) return error;
-  const code = typeof error === 'object' && error !== null && 'code' in error ? String((error as { code: unknown }).code) : 'unknown';
-  return new Error(`sync operation failed (${code})`);
-}
+type StoredStatus = SyncOpsTable['status'];
 
 const num = (value: string | number): number => Number(value);
 
@@ -87,6 +80,18 @@ export class SyncService {
   private async pushOne(actor: Actor, deviceId: string, op: SyncOp, scope: SyncScope): Promise<OpResult> {
     const hash = opHash(op);
     const org = actor.organizationId;
+    const claim = (status: StoredStatus, result: OpResult | Record<string, never>) => ({
+      op_id: op.opId,
+      organization_id: org,
+      user_id: actor.userId,
+      device_id: deviceId,
+      entity: op.entity,
+      entity_id: op.entityId,
+      op_hash: hash,
+      status,
+      result: JSON.stringify(result),
+      received_at: this.d.clock.now(),
+    });
     try {
       return await withTenant(this.d.db, org, async (tx) => {
         // Organization first, then rows: one lock order for every sync write (see change-log.ts).
@@ -98,55 +103,75 @@ export class SyncService {
           if (stored.user_id === actor.userId && Buffer.from(stored.op_hash).equals(hash)) return stored.result as OpResult;
           return rejected(op.opId, 'OP_ID_REUSED');
         }
+        // An op_id stored by another organization is invisible under RLS but still unique: probe the claim before
+        // anything else, so such an op is OP_ID_REUSED and never DEPENDENCY_PENDING or CONFLICT_OPEN. The probe is
+        // rolled back (RETRY results are never stored); the real claim below re-checks it for concurrent pushes.
+        if (await this.opIdTakenElsewhere(tx, claim('REJECTED', {}))) return rejected(op.opId, 'OP_ID_REUSED');
         if (await this.dependencyPending(tx, actor, op)) return { opId: op.opId, status: 'RETRY', code: 'DEPENDENCY_PENDING' };
 
-        const result = await this.decide(tx, actor, op, scope);
+        const result = await this.decide(tx, actor, deviceId, op, scope);
         if (result.status === 'RETRY') return result;
         const claimed = await tx
           .insertInto('sync_ops')
-          .values({
-            op_id: op.opId,
-            organization_id: org,
-            user_id: actor.userId,
-            device_id: deviceId,
-            entity: op.entity,
-            entity_id: op.entityId,
-            op_hash: hash,
-            status: result.status,
-            result: JSON.stringify(result),
-            received_at: this.d.clock.now(),
-          })
+          .values(claim(result.status, result))
           .onConflict((oc) => oc.column('op_id').doNothing())
           .returning('op_id')
           .executeTakeFirst();
-        // The op_id is stored by another organization (invisible under RLS): undo everything this op did.
+        // The op_id was stored meanwhile by another organization (invisible under RLS): undo everything this op did.
         if (!claimed) throw new OpIdTakenElsewhere();
         return result;
       });
     } catch (error) {
       if (error instanceof OpIdTakenElsewhere) return rejected(op.opId, 'OP_ID_REUSED');
-      throw sanitize(error);
+      throw sanitizeError(error);
     }
   }
 
-  /** An op waits until every op it depends on is APPLIED for this user (F12-AC4). Not stored: RETRY. */
-  private async dependencyPending(tx: Tx, actor: Actor, op: SyncOp): Promise<boolean> {
-    if (op.dependsOn.length === 0) return false;
-    const applied = await tx
-      .selectFrom('sync_ops')
-      .select('op_id')
-      .where('op_id', 'in', op.dependsOn)
-      .where('user_id', '=', actor.userId)
-      .where('status', '=', 'APPLIED')
-      .execute();
-    return applied.length < op.dependsOn.length;
+  /** True when the op_id is already used by another organization's operation (inserts and rolls back). */
+  private async opIdTakenElsewhere(tx: Tx, row: Insertable<SyncOpsTable>): Promise<boolean> {
+    await sql`SAVEPOINT sync_op_claim`.execute(tx);
+    const probe = await tx.insertInto('sync_ops').values(row).onConflict((oc) => oc.column('op_id').doNothing()).returning('op_id').executeTakeFirst();
+    await sql`ROLLBACK TO SAVEPOINT sync_op_claim`.execute(tx);
+    return !probe;
   }
 
-  private async decide(tx: Tx, actor: Actor, op: SyncOp, scope: SyncScope): Promise<OpResult> {
+  /**
+   * An op waits until every op it depends on is settled for this user (F12-AC4): APPLIED, or a CONFLICT whose
+   * conflict has since been RESOLVED (the resolution wrote the row, which is never deleted, so the record the
+   * dependent needs exists). Not stored: RETRY.
+   */
+  private async dependencyPending(tx: Tx, actor: Actor, op: SyncOp): Promise<boolean> {
+    if (op.dependsOn.length === 0) return false;
+    const settled = await tx
+      .selectFrom('sync_ops')
+      .select('sync_ops.op_id')
+      .where('sync_ops.op_id', 'in', op.dependsOn)
+      .where('sync_ops.user_id', '=', actor.userId)
+      .where((eb) =>
+        eb.or([
+          eb('sync_ops.status', '=', 'APPLIED'),
+          eb.and([
+            eb('sync_ops.status', '=', 'CONFLICT'),
+            eb.exists(
+              eb
+                .selectFrom('sync_conflicts')
+                .select('sync_conflicts.id')
+                .whereRef('sync_conflicts.op_id', '=', 'sync_ops.op_id')
+                .where('sync_conflicts.organization_id', '=', actor.organizationId)
+                .where('sync_conflicts.status', '=', 'RESOLVED'),
+            ),
+          ]),
+        ]),
+      )
+      .execute();
+    return settled.length < op.dependsOn.length;
+  }
+
+  private async decide(tx: Tx, actor: Actor, deviceId: string, op: SyncOp, scope: SyncScope): Promise<OpResult> {
     const handler = this.d.registry.get(op.entity);
     if (!handler) return rejected(op.opId, 'ENTITY_NOT_SUPPORTED');
     if (op.opType === 'COMMAND' || !handler.opTypes.includes(op.opType)) return rejected(op.opId, 'VALIDATION', { opType: 'NOT_SUPPORTED' });
-    return op.opType === 'CREATE' ? this.create(tx, actor, op, handler, scope) : this.update(tx, actor, op, handler, scope);
+    return op.opType === 'CREATE' ? this.create(tx, actor, op, handler, scope) : this.update(tx, actor, deviceId, op, handler, scope);
   }
 
   private async create(tx: Tx, actor: Actor, op: SyncOp, handler: SyncHandler, scope: SyncScope): Promise<OpResult> {
@@ -175,16 +200,22 @@ export class SyncService {
     return { opId: op.opId, status: 'APPLIED', rowVersion: 1, entityId: op.entityId };
   }
 
-  private async update(tx: Tx, actor: Actor, op: SyncOp, handler: SyncHandler, scope: SyncScope): Promise<OpResult> {
+  private async update(tx: Tx, actor: Actor, deviceId: string, op: SyncOp, handler: SyncHandler, scope: SyncScope): Promise<OpResult> {
     const parsed = handler.updateSchema.safeParse(op.fields);
     if (!parsed.success) return rejected(op.opId, 'VALIDATION', issueFields(parsed.error));
+    // Coupled groups travel whole (decision Q5): a partial group could never be compared or resolved as a unit.
+    const missing = missingGroupMembers(handler.fieldSpec, Object.keys(parsed.data));
+    if (missing.length > 0) return rejected(op.opId, 'VALIDATION', Object.fromEntries(missing.map((field) => [field, 'GROUP_INCOMPLETE'])));
     const org = actor.organizationId;
     const row = await handler.load(tx, org, op.entityId, { forUpdate: true });
     if (!row || !inScope(scope, row.keys)) return rejected(op.opId, 'NOT_FOUND');
     const base = op.baseVersion ?? 0;
     if (base > row.rowVersion) return rejected(op.opId, 'VALIDATION', { baseVersion: 'INVALID' });
 
-    // One open conflict per row (decision Q7): further edits are action required against the same conflict.
+    // One open conflict per row (decision Q7): any further edit of the row, by anyone, waits as action required
+    // until that conflict is resolved. RETRY is not stored, so the edit keeps its own fields on the device and is
+    // sent again afterwards (it may then apply, or become its own explicit conflict). Never folded into the open
+    // conflict, never dropped.
     const open = await tx
       .selectFrom('sync_conflicts')
       .select('id')
@@ -193,9 +224,10 @@ export class SyncService {
       .where('entity_id', '=', op.entityId)
       .where('status', '=', 'OPEN')
       .executeTakeFirst();
-    if (open) return { opId: op.opId, status: 'CONFLICT', conflictId: open.id };
+    if (open) return { opId: op.opId, status: 'RETRY', code: 'CONFLICT_OPEN' };
 
-    const serverChanged = base === row.rowVersion ? [] : await changedSince(tx, org, op.entity, op.entityId, base);
+    // Changes made since the base by OTHER users or devices; this device's own earlier edits are not a conflict.
+    const serverChanged = base === row.rowVersion ? [] : await changedSince(tx, org, op.entity, op.entityId, base, { userId: actor.userId, deviceId });
     const outcome = detect({ local: parsed.data, server: row.fields, serverChanged }, handler.fieldSpec);
     const at = this.d.clock.now();
 

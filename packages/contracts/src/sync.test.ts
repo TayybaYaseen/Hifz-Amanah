@@ -8,6 +8,7 @@ import {
   ConflictListResponse,
   CONFLICT_CHOICES,
   ERROR_CODES,
+  OP_RETRY_CODES,
   FIELD_PICKS,
   OpResult,
   PROTOCOL_VERSION,
@@ -114,6 +115,7 @@ describe('F12 · push contract', () => {
       { opId: v7(2), status: 'CONFLICT', conflictId: DEVICE },
       { opId: v7(3), status: 'REJECTED', code: 'VALIDATION', fields: { label: 'INVALID' } },
       { opId: v7(4), status: 'RETRY', code: 'DEPENDENCY_PENDING' },
+      { opId: v7(5), status: 'RETRY', code: 'CONFLICT_OPEN' },
     ];
     expect(PushResponse.parse({ results, serverTime: NOW })).toEqual({ results, serverTime: NOW });
     expect(OpResult.safeParse({ opId: v7(1), status: 'APPLIED', rowVersion: 1 }).success).toBe(false);
@@ -195,7 +197,7 @@ describe('F12 · contract and domain agree', () => {
     expect(PROTOCOL_VERSION).toBe(1);
     expect(SYNC_ENTITIES).toContain('sync_probe');
     expect(SYNC_ENTITIES).not.toContain('student');
-    for (const code of ['ACCESS_REVOKED', 'UPGRADE_REQUIRED', 'DEPENDENCY_PENDING', 'OP_ID_REUSED', 'ID_TAKEN', 'ENTITY_NOT_SUPPORTED', 'CONFLICT_STALE', 'CONFLICT_CLOSED']) {
+    for (const code of ['ACCESS_REVOKED', 'UPGRADE_REQUIRED', 'DEPENDENCY_PENDING', 'CONFLICT_OPEN', 'OP_ID_REUSED', 'ID_TAKEN', 'ENTITY_NOT_SUPPORTED', 'CONFLICT_STALE', 'CONFLICT_CLOSED']) {
       expect(ERROR_CODES).toContain(code);
     }
     expect(UUID_V7_PATTERN.source).toBe(domain.UUID_V7_PATTERN.source);
@@ -207,5 +209,10 @@ describe('F12 · contract and domain agree', () => {
     const sending = domain.transition(status, { type: 'SEND' }, ctx);
     const applied = OpResult.parse({ opId: v7(1), status: 'APPLIED', rowVersion: 1, entityId: v7(2) });
     expect(domain.transition(sending, { type: 'RESULT', result: applied }, ctx).state).toBe('SYNCED');
+    // Every retry code is an error code, and CONFLICT_OPEN is the domain's "held by an open conflict" code.
+    for (const code of OP_RETRY_CODES) expect(ERROR_CODES).toContain(code);
+    expect(OP_RETRY_CODES).toContain(domain.CONFLICT_OPEN);
+    const held = OpResult.parse({ opId: v7(1), status: 'RETRY', code: 'CONFLICT_OPEN' });
+    expect(domain.transition(sending, { type: 'RESULT', result: held }, ctx).state).toBe('ACTION_REQUIRED');
   });
 });

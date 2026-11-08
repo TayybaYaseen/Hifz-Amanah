@@ -87,15 +87,46 @@ describe('F12 · conflict detection', () => {
     expect(await count(s.h, 'sync_conflicts')).toBe(0);
   });
 
-  it('F12 unit (decision Q7): a row with an open conflict answers further edits with that conflict, never a second one', async () => {
+  it('F12-AC11 (US-054) (decision Q7) further edits of a row with an open conflict are RETRY CONFLICT_OPEN: held, not stored, no second conflict', async () => {
     const { id, result, teacher } = await openConflict();
     const later = op({ opType: 'UPDATE', entityId: id, baseVersion: 2, fields: { label: 'Later' } });
-    expect(await pushOk(s.h, teacher, [later])).toEqual([{ opId: later.opId, status: 'CONFLICT', conflictId: result.conflictId }]);
+    expect(await pushOk(s.h, teacher, [later])).toEqual([{ opId: later.opId, status: 'RETRY', code: 'CONFLICT_OPEN' }]);
+    // Another user (here an Admin) is held the same way; the edit is never folded into someone else's conflict.
     const admin = await s.h.signIn('admin.a');
     const another = op({ opType: 'UPDATE', entityId: id, baseVersion: 2, fields: { status: 'OPEN' } });
-    expect((await pushOk(s.h, admin, [another]))[0]).toMatchObject({ status: 'CONFLICT', conflictId: result.conflictId });
+    expect(await pushOk(s.h, admin, [another])).toEqual([{ opId: another.opId, status: 'RETRY', code: 'CONFLICT_OPEN' }]);
+    // Nothing stored: no sync_ops row, no second conflict, the row unchanged.
+    for (const held of [later, another]) expect((await s.h.control('GET', `/sync/ops/${held.opId}`)).statusCode).toBe(404);
+    expect(await count(s.h, 'sync_ops', sql`op_id IN (${later.opId as string}, ${another.opId as string})`)).toBe(0);
     expect(await count(s.h, 'sync_conflicts')).toBe(1);
-    expect((await probeRow(s.h, id))!.label).toBe('Probe');
+    expect(await probeRow(s.h, id)).toMatchObject({ label: 'Probe', status: 'DONE' });
+    // Held again on every resend while the conflict stays open.
+    expect(await pushOk(s.h, teacher, [resend(later)])).toEqual([{ opId: later.opId, status: 'RETRY', code: 'CONFLICT_OPEN' }]);
+    expect(result.status).toBe('CONFLICT');
+  });
+
+  it('F12-AC11 (US-054) (decision Q7) after the conflict is resolved, a held edit applies or becomes its own explicit conflict; its fields are never dropped', async () => {
+    const { id, result, teacher, admin } = await openConflict();
+    const disjoint = op({ opType: 'UPDATE', entityId: id, baseVersion: 2, fields: { label: 'Held label' } });
+    const clashing = op({ opType: 'UPDATE', entityId: id, baseVersion: 2, fields: { status: 'OPEN' } });
+    expect((await pushOk(s.h, teacher, [disjoint]))[0]).toMatchObject({ status: 'RETRY', code: 'CONFLICT_OPEN' });
+    expect((await pushOk(s.h, admin, [clashing]))[0]).toMatchObject({ status: 'RETRY', code: 'CONFLICT_OPEN' });
+
+    // The Admin resolves for the device: status HELD (version 3).
+    const res = await s.h.call('POST', `/sync/conflicts/${result.conflictId}/resolve`, admin, { choice: 'KEEP_DEVICE' });
+    expect(res.json()).toEqual({ rowVersion: 3 });
+
+    // The held label edit (a field nobody else changed since its base) now applies.
+    expect(await pushOk(s.h, teacher, [resend(disjoint)])).toEqual([{ opId: disjoint.opId, status: 'APPLIED', rowVersion: 4, entityId: id }]);
+    // The held status edit meets the resolution's status change: a new, explicit conflict holding its fields.
+    const [again] = await pushOk(s.h, admin, [resend(clashing)]);
+    expect(again).toMatchObject({ opId: clashing.opId, status: 'CONFLICT' });
+    const second = again as { conflictId: string };
+    expect(second.conflictId).not.toBe(result.conflictId);
+    const stored = await s.h.db.selectFrom('sync_conflicts').selectAll().where('id', '=', second.conflictId).executeTakeFirstOrThrow();
+    expect(stored).toMatchObject({ status: 'OPEN', device_fields: { status: 'OPEN' }, conflict_fields: ['status'], caused_by_user_id: await s.h.userId('admin.a') });
+    expect([Number(stored.base_version), Number(stored.server_version)]).toEqual([2, 4]);
+    expect(await probeRow(s.h, id)).toMatchObject({ status: 'HELD', label: 'Held label' });
   });
 });
 
@@ -226,5 +257,33 @@ describe('F12 · privacy of conflict data', () => {
     expect(s.h.logSink.lines.some((line) => line.includes(SECRET))).toBe(false);
     const { rows } = await sql<{ n: string }>`SELECT count(*) AS n FROM audit_logs WHERE summary::text LIKE ${`%${SECRET}%`}`.execute(s.h.db);
     expect(Number(rows[0]!.n)).toBe(0);
+  });
+});
+
+describe('F12 · privacy of database errors (review security M2)', () => {
+  it('F12 unit: a database error while resolving logs only its SQLSTATE, never the row values (note bodies) in its detail', async () => {
+    const SECRET = 'Private-note-body-5529';
+    const { result, teacher } = await openConflict({ firstFields: { note: 'Server-side-note-3307' }, secondFields: { note: SECRET } });
+    expect(result.status).toBe('CONFLICT');
+    // Force the resolution's UPDATE to fail with a check violation, whose detail is "Failing row contains (… note …)".
+    await sql`ALTER TABLE sync_probe ADD CONSTRAINT sync_probe_short_note CHECK (note IS NULL OR length(note) < 5) NOT VALID`.execute(s.h.db);
+    try {
+      s.h.logSink.clear();
+      const res = await s.h.call('POST', `/sync/conflicts/${result.conflictId}/resolve`, teacher, { choice: 'KEEP_DEVICE' });
+      expect(res.statusCode).toBe(500);
+      expect(res.json().error.code).toBe('INTERNAL');
+      expect(res.body).not.toContain(SECRET);
+      const logged = s.h.logSink.lines.join('\n');
+      expect(logged).toContain('unhandled error');
+      expect(logged).toContain('23514');
+      expect(logged).not.toContain(SECRET);
+      expect(logged).not.toContain('Failing row');
+      expect(logged).not.toContain('sync_probe_short_note');
+    } finally {
+      await sql`ALTER TABLE sync_probe DROP CONSTRAINT sync_probe_short_note`.execute(s.h.db);
+    }
+    // Nothing was resolved.
+    const conflict = await s.h.db.selectFrom('sync_conflicts').select('status').where('id', '=', result.conflictId!).executeTakeFirstOrThrow();
+    expect(conflict.status).toBe('OPEN');
   });
 });

@@ -4,11 +4,14 @@ import { sql } from 'kysely';
 import { v7 as uuidv7 } from 'uuid';
 import type { LightMyRequestResponse } from 'fastify';
 import { TEST_PASSWORD, loginIdOf, type PersonaKey } from '../../../../e2e/fixtures/personas.ts';
+import type { SyncHandler } from '../../src/modules/sync/handler.ts';
 import { scopeProvider } from '../../src/modules/sync/scope.ts';
 import { startHarness, type Harness } from '../support/harness.ts';
 import { syncProbeHandler } from '../support/sync-probe.ts';
 
 export const DEVICE = '0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b';
+/** A second device of the same user (H3: only this device's own earlier edits are not a conflict). */
+export const OTHER_DEVICE = '0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2c';
 /** Synthetic class ids (F03 adds real classes). */
 export const CLASS_A1 = '0190a1b2-c3d4-7e5f-8a6b-000000000a01';
 export const CLASS_A2 = '0190a1b2-c3d4-7e5f-8a6b-000000000a02';
@@ -19,11 +22,12 @@ export interface SyncHarness {
   assignments: Map<string, string[]>;
 }
 
-export async function startSyncHarness(): Promise<SyncHarness> {
+/** `handlers` replaces the default sync_probe handler (e.g. a variant with another field spec; test-only). */
+export async function startSyncHarness(handlers: SyncHandler[] = [syncProbeHandler]): Promise<SyncHarness> {
   const assignments = new Map<string, string[]>();
   const h = await startHarness({
     testSync: {
-      handlers: [syncProbeHandler],
+      handlers,
       scopes: scopeProvider(async (actor) => ({ assignedClassIds: assignments.get(actor.userId) ?? [], studentIds: [] })),
     },
   });
@@ -62,13 +66,13 @@ export function op(input: OpInput = {}): Record<string, unknown> {
 /** Same operation, new batch position (a resend from the outbox). */
 export const resend = (o: Record<string, unknown>) => ({ ...o, seq: ++seq });
 
-export async function push(h: Harness, token: string, ops: Record<string, unknown>[], protocolVersion = 1): Promise<LightMyRequestResponse> {
-  return h.call('POST', '/sync/push', token, { protocolVersion, deviceId: DEVICE, ops });
+export async function push(h: Harness, token: string, ops: Record<string, unknown>[], protocolVersion = 1, deviceId = DEVICE): Promise<LightMyRequestResponse> {
+  return h.call('POST', '/sync/push', token, { protocolVersion, deviceId, ops });
 }
 
 /** Pushes and returns the per-op results (asserting the request itself succeeded). */
-export async function pushOk(h: Harness, token: string, ops: Record<string, unknown>[]): Promise<Array<Record<string, unknown>>> {
-  const res = await push(h, token, ops);
+export async function pushOk(h: Harness, token: string, ops: Record<string, unknown>[], deviceId = DEVICE): Promise<Array<Record<string, unknown>>> {
+  const res = await push(h, token, ops, 1, deviceId);
   if (res.statusCode !== 200) throw new Error(`push failed ${res.statusCode}: ${res.body}`);
   return res.json().results;
 }
