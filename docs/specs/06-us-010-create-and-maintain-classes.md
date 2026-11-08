@@ -6,7 +6,7 @@
 | **User story** | US-010 |
 | **Feature** | [F03 · Classes and students](06-f03-classes-students.md) |
 | **Epic** | EPIC 3 — Classes and Students ([user-stories.md](../user-stories.md)) |
-| **Status** | draft |
+| **Status** | Approved |
 | **Priority** | Not specified in the source documents (SRS, user-stories.md, feature specs). None is assigned here. |
 | **Split from** | `docs/specs/F03-classes-students.md` on 2026-10-30 |
 
