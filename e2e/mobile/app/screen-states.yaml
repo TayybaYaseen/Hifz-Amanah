@@ -2,7 +2,7 @@
 # Covers: APP-STATE-01…06
 # Run for each main screen: Teacher Home, Students, Student profile, Daily Entry, Bulk Entry, Homework, Reports,
 # Sync queue, Settings, Student home, Parent home.
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: APP screen states — loading, empty, success, error, offline, permission revoked
 tags:
   - pending

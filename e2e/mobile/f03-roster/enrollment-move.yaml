@@ -1,6 +1,6 @@
 # F03 · Classes and students — mobile E2E (docs/specs/06-f03-classes-students.md; design.md §4.6)
 # Covers: F03-AC11, F03-AC12, F03-AC13
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F03 enrollment — move a student and keep history
 tags:
   - pending

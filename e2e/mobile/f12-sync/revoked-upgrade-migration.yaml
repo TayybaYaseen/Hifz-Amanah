@@ -1,6 +1,6 @@
 # F12 · Offline and synchronization — mobile E2E (docs/specs/04-f12-offline-sync.md; design.md §4.13)
 # Covers: F12-AC14, F12-AC15, F12-AC16, F12-AC7
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F12 sync edges — access revoked, upgrade required, local DB upgrade keeps outbox
 tags:
   - pending

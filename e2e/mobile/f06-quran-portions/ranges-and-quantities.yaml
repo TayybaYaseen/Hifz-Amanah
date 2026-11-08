@@ -1,6 +1,6 @@
 # F06 · Quran portions and metadata — mobile E2E (docs/specs/07-f06-quran-portions-metadata.md; design.md §5.3)
 # Covers: F06-AC5, F06-AC6, F06-AC7, F06-AC8, F06-AC9, F06-AC10, F06-AC11, F06-AC12, F06-AC13, F06-AC14, F06-AC15
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F06 portions — Para and Ayat validation, presets, remaining, units never mixed
 tags:
   - pending

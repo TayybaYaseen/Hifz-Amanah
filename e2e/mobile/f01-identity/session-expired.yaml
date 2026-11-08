@@ -5,7 +5,7 @@
 # daily entry and the sync queue (F05, F12). Those screens do not exist yet, so this flow keeps the `pending` tag
 # and the F01 gate stays PENDING until it can run in full. The F01-observable steps are already written below;
 # the F05/F12 steps are marked TODO.
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F01 session — expired session prompts sign-in and keeps unsynced changes
 tags:
   - pending

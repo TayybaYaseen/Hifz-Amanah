@@ -13,15 +13,15 @@ database and sync: `expo-sqlite`, `@react-native-community/netinfo` (connectivit
 | Task | Command (from `apps/mobile`) |
 |---|---|
 | Metro dev server | `npm start` |
-| Build and run on an emulator or device (needs the Android SDK and a JDK) | `APP_ID=<id> APP_VARIANT=development npm run android` |
+| Build and run on an emulator or device (needs the Android SDK and a JDK) | `APP_VARIANT=development npm run android` |
 | Bundle the JavaScript for Android, without a device (checks the whole app compiles) | `npm run bundle:android` |
 | Typecheck | `npm run typecheck` (also part of the root `npm run typecheck`) |
 | Unit tests (session, errors, catalogues, direction, local DB, outbox, sync engine, retention, app lock) | root `npm test` |
 
 - **The app is Android only** (`platforms: ['android']`). Opening `http://localhost:8081` in a browser shows a JSON
   manifest: that is Metro's answer to an Android client, not an error. There is no web build.
-- **`APP_ID`** is the Android application ID. **DEFERRED: DEC-B55.** Builds and Maestro flows take it from the
-  environment until it is chosen.
+- The Android application ID is **`com.hifzamanah.app`** (SRS §17 DEC-B55, decided 2026-11-08), set in `app.config.ts`. It must
+  never change after the first Play release.
 - **`EXPO_PUBLIC_API_URL`** sets the API address. The default is `http://10.0.2.2:3000`: the host machine as seen from
   the Android emulator, where `npm run api:e2e-server` listens.
 - **`APP_VARIANT=development`** allows plain HTTP for that local API. Release builds allow HTTPS only.
@@ -157,7 +157,7 @@ Teacher, Admin, and Owner only; Student and Parent stay online-only and read-onl
 - **Built:** local DB and migrations, outbox, sync engine, sync banner, Sync Queue, Conflict Review, sign-out
   warning, workspace-locked screen, app lock. Strings in `en`, `ur`, `ur-Latn`.
 - **Mobile E2E:** the five `e2e/mobile/f12-sync` flows stay pending. They need real entities (F04, F05, F08), a device
-  or emulator, and the application ID (DEC-B55). None has run.
+  or emulator. None has run.
 - **Open items** (details in `docs/handover/F12-plan.md` §12):
   - The device database is not encrypted (SQLCipher, D1). Sync and PIN screens have no `FLAG_SECURE` (D2). The
     revoked, offline, and session-expired screens are not behind the app lock (D3).

@@ -48,7 +48,7 @@ A story is done only when `npm run e2e:gate -- US-<nnn>` passes. Merge a feature
 - Do not treat the planning documents as proof that code already exists.
 - Do not override source requirements. Escalate conflicts with exact sections.
 - Do not change approved decisions (SRS §17, e.g. auth, quality scale, timezone, week start, Quran metadata, Mushaf, numeric limits) without a new user-approved decision. Product decisions go in `SRS.md` §17 only after the user approves them.
-- Do not invent the Deferred items: the AI provider vendor (DEC-B45) and the Android application ID (DEC-B55). Keep them configurable and marked `// DEFERRED: <DEC-ID>`.
+- Do not invent the Deferred item: the AI provider vendor (DEC-B45). Keep it configurable and marked `// DEFERRED: <DEC-ID>`.
 - Keep deterministic domain logic in `packages/domain`, separate from AI and presentation.
 - Do not delete or weaken pre-written tests to make a gate pass.
 - Do not approve a task without tests and security review appropriate to its risk.

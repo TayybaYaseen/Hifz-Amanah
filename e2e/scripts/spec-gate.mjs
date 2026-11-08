@@ -7,7 +7,8 @@
 // Usage: node e2e/scripts/spec-gate.mjs US-022   (one story spec)
 //        node e2e/scripts/spec-gate.mjs F05      (every story in a feature)
 //        node e2e/scripts/spec-gate.mjs APP      (app-wide release gate)
-// Steps 3–4 need a reachable API (E2E_API_URL, default http://localhost:3000), the Maestro CLI, and APP_ID.
+// Steps 3–4 need a reachable API (E2E_API_URL, default http://localhost:3000), the Maestro CLI, and a device or
+// emulator with the app installed. Flows target the Android application ID com.hifzamanah.app (SRS §17 DEC-B55).
 //
 // Result and exit code. Only PASS exits 0, so nothing but a full pass completes a spec.
 //   PASS        0  every test for the selection ran and passed
@@ -68,7 +69,6 @@ if (apiTests.length) {
   }
 }
 if (mobileFlows.length) {
-  if (!process.env.APP_ID) missing.push('APP_ID is not set (DEFERRED: DEC-B55)');
   if (spawnSync('maestro', ['--version'], { shell: process.platform === 'win32', stdio: 'ignore' }).status !== 0) {
     missing.push('the Maestro CLI is not installed');
   }
@@ -96,7 +96,7 @@ if (apiTests.length) {
 // 4. Mobile E2E — flows carry one tag per story they cover.
 if (mobileFlows.length) {
   const tags = arg === 'APP' ? 'APP' : stories.join(',');
-  const mobile = run('maestro', ['test', 'e2e/mobile', '--include-tags', tags, '-e', `APP_ID=${process.env.APP_ID}`]);
+  const mobile = run('maestro', ['test', 'e2e/mobile', '--include-tags', tags]);
   if (mobile.status !== 0) stop('FAIL', 'mobile E2E flows failed');
 }
 

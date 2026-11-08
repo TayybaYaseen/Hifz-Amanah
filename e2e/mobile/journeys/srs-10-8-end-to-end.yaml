@@ -2,7 +2,7 @@
 # Covers: SRS-10.8-1…9 (F03, F05, F06, F07, F08, F09, F10)
 # Step 1 follows SRS §10.8 as corrected on 2026-10-30 (DEC-B04): the Admin creates the class and assigns the Teacher,
 # and the Teacher adds the student.
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: JOURNEY SRS 10.8 — class to guardian view
 tags:
   - pending

@@ -673,7 +673,7 @@ App (online, Teacher/Admin) → POST /analytics/{studentId}/ai-recommendation
 | `staging` | Production-like, synthetic data, used for acceptance testing |
 | `production` | AWS Mumbai: managed Postgres with daily backups kept 30 days + 7-day PITR (NFR-PRV-005), S3, SES; a tested restore runbook (NFR-REL-001/002). Sized for 20 madaris / 200 teachers / 5,000 students; targets in NFR-PERF-006 |
 
-- **Mobile distribution:** EAS Build → Play Console internal/closed/production tracks. Minimum Android 8.0 (API 26) or the Expo SDK minimum, and the device matrix in NFR-COMP-001. **The Android application ID is Deferred** until the domain is registered (DEC-B55).
+- **Mobile distribution:** EAS Build → Play Console internal/closed/production tracks. Minimum Android 8.0 (API 26) or the Expo SDK minimum, and the device matrix in NFR-COMP-001. **The Android application ID is `com.hifzamanah.app`** (DEC-B55, decided 2026-11-08); it never changes after the first release.
 - **Observability:** structured JSON logs with redaction, error tracking for app and API (Sentry or equivalent, with PII scrubbing), and metrics for sync failures, conflict rate, job failures, AI usage/cost, and push failures.
 
 ---
@@ -752,7 +752,6 @@ Every SRS §13 gate and every design.md §11 item (D1–D8) is closed; SRS §17 
 - **Excel `_meta` sheet and 200-row batches:** §11 (D7).
 
 **Deferred:**
-- The Android application ID (DEC-B55).
 - The AI provider vendor (DEC-B45, Phase 7). The provider adapter interface in §12 keeps it swappable.
 
 ---

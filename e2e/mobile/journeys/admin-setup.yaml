@@ -1,7 +1,7 @@
 # Cross-feature journey — a new madrasa from first sign-in to the first report
 # Covers: APP-JOURNEY-SETUP (F01, F02, F03, F04, F06, F13)
 # The platform operator creates the madrasa and its first Owner beforehand (FR-ORG-001; test control does this).
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: JOURNEY admin setup — settings, accounts, classes, students, timetable, template
 tags:
   - pending

@@ -1,8 +1,8 @@
 // Expo app config. Android-first (SRS §3.2); minimum Android 8.0 / API 26 (DEC-B52).
 import type { ExpoConfig } from 'expo/config';
 
-// DEFERRED: DEC-B55 — the Android application ID is not chosen yet. Builds read it from APP_ID.
-const applicationId = process.env.APP_ID;
+// Android application ID, decided 2026-11-08 (SRS §17 DEC-B55). It must never change after the first release.
+const applicationId = 'com.hifzamanah.app';
 // Development builds talk to a local API over plain HTTP; release builds use HTTPS only (ARCHITECTURE.md §7.5).
 const development = process.env.APP_VARIANT === 'development';
 // A production build must point at an HTTPS API; it never falls back to the local development address.
@@ -22,7 +22,7 @@ const config: ExpoConfig = {
   newArchEnabled: true,
   splash: { image: './assets/splash-icon.png', resizeMode: 'contain', backgroundColor: '#FAF8F0' },
   android: {
-    ...(applicationId ? { package: applicationId } : {}),
+    package: applicationId,
     // NFR-OFF-010, F12-AC20 (security review H1): no Google auto-backup of app data, so the SQLite workspaces
     // (student records, unsynced changes) and the device index are not copied to the cloud. Note: on Android 12+
     // this flag does not stop device-to-device transfer; that needs `dataExtractionRules` (not configured yet).

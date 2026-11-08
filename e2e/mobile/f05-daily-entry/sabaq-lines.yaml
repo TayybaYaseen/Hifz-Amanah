@@ -1,6 +1,6 @@
 # F05 · Daily Hifz entry — mobile E2E (docs/specs/09-us-020-record-sabaq.md; design.md §4.7, §5.3)
 # Covers: F05-AC20, F05-AC21, F05-AC22
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F05 daily entry — Sabaq by Surah/Ayat range and lines
 tags:
   - pending

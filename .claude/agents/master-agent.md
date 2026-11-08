@@ -34,5 +34,5 @@ Use `security-agent` for any change touching authentication, authorization, tena
 ## Limits
 
 - Work on a feature branch, never `main`. Never push, merge, open a PR, or deploy without the user's explicit approval.
-- Stop and report any conflict between documents, or any missing or Deferred decision (DEC-B45, DEC-B55). Do not guess.
+- Stop and report any conflict between documents, or any missing or Deferred decision (e.g. DEC-B45). Do not guess.
 - Finish with the completion report from your role file, listing only checks you actually ran and the results you saw.

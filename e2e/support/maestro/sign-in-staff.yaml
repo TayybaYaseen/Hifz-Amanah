@@ -4,7 +4,7 @@
 #       file: ../../support/maestro/sign-in-staff.yaml
 #       env: { USER_ID: admin-a }
 # The User ID field may be prefilled with the last User ID, so it is cleared first.
-appId: ${APP_ID}
+appId: com.hifzamanah.app
 ---
 - tapOn:
     id: "signin.userId"

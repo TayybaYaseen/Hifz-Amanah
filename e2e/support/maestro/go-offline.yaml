@@ -1,4 +1,4 @@
 # Subflow: turn on airplane mode so the app has no connection.
-appId: ${APP_ID}
+appId: com.hifzamanah.app
 ---
 - setAirplaneMode: enabled

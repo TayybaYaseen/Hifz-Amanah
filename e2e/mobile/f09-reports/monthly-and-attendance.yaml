@@ -1,6 +1,6 @@
 # F09 · Weekly and monthly reports — mobile E2E (docs/specs/12-f09-weekly-monthly-reports.md; design.md §4.10, §4.14)
 # Covers: F09-AC2, F09-AC8, F09-AC9, F09-AC10, F09-AC11, F09-AC12, F09-AC13
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F09 monthly report — sections, homework measures, difficulty, attendance categories
 tags:
   - pending
