@@ -10,6 +10,7 @@ import { LanguagePicker } from '../../components/LanguagePicker.tsx';
 import { AppScreen, AppText, Button, Card, Field, Notice } from '../../components/ui.tsx';
 import { colors } from '../../theme/tokens.ts';
 import { RecoveryCodesView } from '../auth/TwoFactorSetupScreen.tsx';
+import { AppLockSettingsCard } from '../app-lock/AppLockSettingsCard.tsx';
 
 type Status = { tone: 'error' | 'success'; text: string } | null;
 
@@ -179,6 +180,9 @@ export function ProfileScreen({ me }: { me: MeResponse }) {
           )}
         </Card>
       ) : null}
+
+      {/* F12-AC18: app lock for Teacher/Admin/Owner (renders nothing for Student/Parent). */}
+      <AppLockSettingsCard />
 
       <LanguagePicker onChange={saveLocale} />
     </AppScreen>

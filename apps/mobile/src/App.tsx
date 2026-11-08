@@ -12,7 +12,9 @@ import type { Locale } from '@hifz/contracts';
 import { SessionProvider } from './auth/SessionContext.tsx';
 import { initI18n } from './i18n/i18n.ts';
 import { LocaleProvider, initialLocale } from './i18n/LocaleContext.tsx';
-import { RootNavigator } from './navigation/RootNavigator.tsx';
+import { RootNavigator, navigationRef } from './navigation/RootNavigator.tsx';
+import { AppLockProvider } from './app-lock/AppLockContext.tsx';
+import { SyncProvider } from './sync/SyncContext.tsx';
 
 export default function App() {
   const [fontsLoaded] = useFonts({ Inter_400Regular, Inter_600SemiBold, NotoNastaliqUrdu_400Regular });
@@ -32,9 +34,13 @@ export default function App() {
     <SafeAreaProvider>
       <LocaleProvider initial={locale}>
         <SessionProvider>
-          <NavigationContainer>
-            <RootNavigator />
-          </NavigationContainer>
+          <SyncProvider>
+            <AppLockProvider>
+              <NavigationContainer ref={navigationRef}>
+                <RootNavigator />
+              </NavigationContainer>
+            </AppLockProvider>
+          </SyncProvider>
         </SessionProvider>
       </LocaleProvider>
       <StatusBar style="dark" />

@@ -1,32 +1,28 @@
 // More menu (design.md §3.2). Accounts is shown to Owner/Admin only; the server enforces it regardless.
 // Madrasa settings is shown to everyone: editable for Owner/Admin, read-only for other roles (F02-AC4).
-import { useState } from 'react';
+// F12: Sync queue for Teacher/Admin/Owner; sign-out warns first while changes wait to sync (F12-AC10).
 import { useTranslation } from 'react-i18next';
 import type { MeResponse } from '@hifz/contracts';
-import { useSession } from '../../auth/SessionContext.tsx';
 import { AppScreen, Button } from '../../components/ui.tsx';
+import { useSync } from '../../sync/SyncContext.tsx';
 
-export function MoreScreen({ me, onProfile, onAccounts, onWorkspace }: { me: MeResponse; onProfile: () => void; onAccounts: () => void; onWorkspace: () => void }) {
+export function MoreScreen({ me, onProfile, onAccounts, onWorkspace, onSyncQueue }: {
+  me: MeResponse;
+  onProfile: () => void;
+  onAccounts: () => void;
+  onWorkspace: () => void;
+  onSyncQueue: () => void;
+}) {
   const { t } = useTranslation();
-  const { session } = useSession();
-  const [busy, setBusy] = useState(false);
+  const sync = useSync();
   const staff = me.role === 'OWNER' || me.role === 'ADMIN';
   return (
     <AppScreen testID="more.screen">
       <Button testID="more.profile" variant="secondary" label={t('more.profile')} onPress={onProfile} />
       <Button testID="more.workspace" variant="secondary" label={t('more.workspace')} onPress={onWorkspace} />
       {staff ? <Button testID="more.accounts" variant="secondary" label={t('more.accounts')} onPress={onAccounts} /> : null}
-      {/* TODO(F12): warn before signing out while changes are waiting to sync (design.md §4.13). */}
-      <Button
-        testID="settings.signOut"
-        variant="destructive"
-        label={t('more.signOut')}
-        busy={busy}
-        onPress={() => {
-          setBusy(true);
-          void session.signOut();
-        }}
-      />
+      {sync.enabled ? <Button testID="more.syncQueue" variant="secondary" label={t('more.syncQueue')} onPress={onSyncQueue} /> : null}
+      <Button testID="settings.signOut" variant="destructive" label={t('more.signOut')} onPress={sync.requestSignOut} />
     </AppScreen>
   );
 }
