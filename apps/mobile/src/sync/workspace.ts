@@ -96,6 +96,19 @@ export function signOutAction(input: { remaining: number; locked: boolean }): Si
   return input.remaining > 0 ? 'HOLD' : 'DELETE';
 }
 
+/**
+ * Review N6: the first step of every sign-out. New saves are refused, the engine starts no new run, and this
+ * resolves only once the run in flight and the saves already running have finished, so the unsynced count and the
+ * purge that follow see the final state of the queue.
+ */
+export async function quiesceForSignOut(parts: {
+  engine: { stop(): void; idle(): Promise<void> } | null;
+  outbox: { block(): Promise<void> };
+}): Promise<void> {
+  parts.engine?.stop();
+  await Promise.all([parts.outbox.block(), parts.engine?.idle()]);
+}
+
 /** Records a server time from a pull; it only ever moves forward. */
 export async function noteServerTime(db: SqlExecutor, serverTime: string): Promise<void> {
   const ms = Date.parse(serverTime);

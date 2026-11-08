@@ -8,7 +8,8 @@ import { ApiFailure } from '../api/client.ts';
 import { prepareForDelete } from '../local-db/driver.ts';
 import { nodeDatabaseFiles } from '../local-db/testing/nodeDriver.ts';
 import { runMigrations } from '../local-db/migrations.ts';
-import { DiscardNotAllowedError } from './engine.ts';
+import { nextSendable } from '@hifz/domain/sync';
+import { DiscardNotAllowedError, RECONCILE_INTERVAL_MS } from './engine.ts';
 import { discardable } from './outbox.ts';
 import { effectiveNow } from './retention.ts';
 import { lockWorkspace, readMeta, signOutAction } from './workspace.ts';
@@ -93,6 +94,7 @@ async function create(outbox: Setup['outbox'], label: string, dependsOn: string[
 
 const respond = (fn: (op: PushRequest['ops'][number]) => OpResult) => (req: PushRequest) => ({ results: req.ops.map(fn), serverTime: now() });
 const ROW = '01934f5e-8a00-7000-8000-000000000101';
+const ROW_2 = '01934f5e-8a00-7000-8000-000000000102';
 
 describe('F12 · held behind an open conflict (decision Q7, review B1)', () => {
   it('F12-AC11 (US-054) a follow-up edit of a row with an open conflict is held, then sent again once it is resolved', async () => {
@@ -108,14 +110,18 @@ describe('F12 · held behind an open conflict (decision Q7, review B1)', () => {
       return open ? { opId: op.opId, status: 'RETRY', code: 'CONFLICT_OPEN' } : { opId: op.opId, status: 'APPLIED', rowVersion: 3, entityId: op.entityId };
     });
     await engine.syncNow();
+    const pushes = transport.pushes.length;
     const second = await edit(outbox, ROW, 1, { label: 'Renamed' });
     await engine.syncNow();
 
+    // Domain per-row order (review N1/N2): the follow-up edit waits on the device behind the earlier edit's open
+    // conflict (WAITING_FOR_RECORD); it is never sent while that conflict is open, and never synced.
     const held = (await outbox.get(second))!;
-    expect(held.status).toMatchObject({ state: 'ACTION_REQUIRED', conflictId: null, failure: { code: 'CONFLICT_OPEN' }, nextAttemptAt: null });
+    expect(held.status).toMatchObject({ state: 'PENDING', conflictId: null, failure: null });
+    expect(held.sentCount).toBe(0);
     expect(held.syncedAt).toBeNull();
-    // Held items are not resent on their own (no timer retry, no backoff).
-    const pushes = transport.pushes.length;
+    const plan = nextSendable((await outbox.list()).map((i) => ({ ...i, state: i.status.state })));
+    expect(plan.held).toEqual([expect.objectContaining({ reason: 'WAITING_FOR_RECORD', blockedBy: [first] })]);
     await engine.syncNow({ ignoreBackoff: true });
     expect(transport.pushes.length).toBe(pushes);
 
@@ -240,6 +246,8 @@ describe('F12 · conflicts closed elsewhere (review H2)', () => {
     s.conflicts.answer = (id) => detail(id, ROW, 'OPEN', 2);
     await s.engine.syncNow();
     expect((await s.outbox.get(opId))!.status).toMatchObject({ state: 'ACTION_REQUIRED', conflictId: CONFLICT_1 });
+    // That run already checked the conflict once; the next automatic check is due after the interval (review N5).
+    s.clock.advance(RECONCILE_INTERVAL_MS);
     return opId;
   }
 
@@ -291,8 +299,10 @@ describe('F12 · conflicts closed elsewhere (review H2)', () => {
   it('F12 unit (review L2): the local conflict keeps its op_id; resolving moves only that operation', async () => {
     const s = await setup();
     await serverRow(s.db, ROW, 1, { label: 'Probe', status: 'OPEN', position: 1 });
+    await serverRow(s.db, ROW_2, 1, { label: 'Probe 2', status: 'OPEN', position: 1 });
     const a = await edit(s.outbox, ROW, 1, { status: 'DONE' });
-    const b = await edit(s.outbox, ROW, 1, { label: 'Other' });
+    // Another row (one row's edits go out one at a time, so both can only be in one push on different rows).
+    const b = await edit(s.outbox, ROW_2, 1, { label: 'Other' });
     // A misbehaving replay names the same conflict for both operations.
     s.transport.onPush = respond((op) => ({ opId: op.opId, status: 'CONFLICT', conflictId: CONFLICT_1 }));
     await s.engine.syncNow();
@@ -326,7 +336,9 @@ describe('F12 · retry and discard (review M1, M5)', () => {
     const again = items.find((i) => i.entityId === record.id)!;
     expect(again.opId).not.toBe(record.opId);
     expect(again).toMatchObject({ opType: 'CREATE', fields: failed.fields, createdAt: failed.createdAt });
-    expect(again.seq).toBeGreaterThan((await outbox.get(portion.opId))!.seq);
+    // Review N2: the new op_id keeps the ORIGINAL seq, so it stays ahead of every later change.
+    expect(again.seq).toBe(failed.seq);
+    expect(again.seq).toBeLessThan((await outbox.get(portion.opId))!.seq);
     // Its dependent now waits for the new operation, and both sync in dependency order.
     expect((await outbox.get(portion.opId))!.dependsOn).toEqual([again.opId]);
     const sent = transport.pushes.flatMap((p) => p.ops.map((o) => o.opId));

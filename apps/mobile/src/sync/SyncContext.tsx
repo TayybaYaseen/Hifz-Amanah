@@ -18,7 +18,7 @@ import { Outbox, type OutboxItem } from './outbox.ts';
 import { secureRandomBytes } from './platform.ts';
 import { appRegistry, type EntityRegistry } from './registry.ts';
 import { httpSyncApi, type ConflictApi } from './transport.ts';
-import { holdForSignOut, lockWorkspace, readMeta, resumeHeld, setOrgTimeZone, signOutAction, type WorkspaceMeta } from './workspace.ts';
+import { holdForSignOut, lockWorkspace, quiesceForSignOut, readMeta, resumeHeld, setOrgTimeZone, signOutAction, type WorkspaceMeta } from './workspace.ts';
 
 const TIMER_MS = 30_000;
 const EMPTY_COUNTS: Record<QueueState, number> = { PENDING: 0, SYNCING: 0, SYNCED: 0, FAILED: 0, ACTION_REQUIRED: 0 };
@@ -52,7 +52,10 @@ export interface SyncContextValue {
   /** Held changes that resumed at this sign-in (one-time notice), or null. */
   restoredCount: number | null;
   dismissRestored(): void;
-  /** For features (F04/F05/F08) to save with `saveWithOp`. Null for Student/Parent. */
+  /**
+   * For features (F04/F05/F08) to save: `saveWithOp` for a CREATE or COMMAND, `saveWithUpdate` for every edit of an
+   * existing row (it derives the base version and per-row dependencies, review N3). Null for Student/Parent.
+   */
   outbox: Outbox | null;
   registry: EntityRegistry;
   conflicts: ConflictApi;
@@ -155,7 +158,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         }
         const db = await openWorkspaceDb(expoDatabaseFiles, entry.dbName);
         const clock = () => Date.now();
-        const outbox = new Outbox(db, { clock, newId: createIdSource(clock, secureRandomBytes) });
+        const outbox = new Outbox(db, { clock, newId: createIdSource(clock, secureRandomBytes), registry: appRegistry });
         let engine: SyncEngine | null = null;
         if (target.live) {
           const api = httpSyncApi(session);
@@ -297,8 +300,9 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     const ws = workspaceRef.current;
     try {
       if (ws) {
-        // Stop first, so no save or sync result lands between the count below and the purge.
-        ws.engine?.stop();
+        // Review N6: refuse new saves, stop the engine, and wait for the run and saves in flight, so no save or
+        // sync result lands between the count below and the purge.
+        await quiesceForSignOut({ engine: ws.engine, outbox: ws.outbox });
         const index = await deviceIndex();
         const remaining = await ws.outbox.unsyncedCount();
         const isLocked = (await readMeta(ws.db)).workspaceState === 'LOCKED_REVOKED' || state.kind === 'revoked';

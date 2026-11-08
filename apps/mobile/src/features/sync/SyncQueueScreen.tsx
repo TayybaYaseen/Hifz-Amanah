@@ -10,7 +10,7 @@ import { errorKeys } from '../../api/errors.ts';
 import { AppScreen, AppText, Button, Card, Notice } from '../../components/ui.tsx';
 import { ConfirmSheet, SyncBanner, useFormatDateTime, useItemLabel } from '../../components/sync.tsx';
 import { isolate } from '../../i18n/direction.ts';
-import { DiscardNotAllowedError } from '../../sync/engine.ts';
+import { DiscardNotAllowedError, RetryNotAllowedError } from '../../sync/engine.ts';
 import type { OutboxItem } from '../../sync/outbox.ts';
 import { SYNCED_LISTED_MS } from '../../sync/retention.ts';
 import { useSync } from '../../sync/SyncContext.tsx';
@@ -36,7 +36,15 @@ export function SyncQueueScreen({ onReview }: { onReview: (conflictId: string) =
       (i) => i.status.state !== 'SYNCED' || (i.syncedAt !== null && now - Date.parse(i.syncedAt) < SYNCED_LISTED_MS),
     );
     const plan = nextSendable(
-      sync.items.map((i) => ({ opId: i.opId, seq: i.seq, state: i.status.state, dependsOn: i.dependsOn, nextAttemptAt: i.status.nextAttemptAt })),
+      sync.items.map((i) => ({
+        opId: i.opId,
+        entity: i.entity,
+        entityId: i.entityId,
+        seq: i.seq,
+        state: i.status.state,
+        dependsOn: i.dependsOn,
+        nextAttemptAt: i.status.nextAttemptAt,
+      })),
       { nowMs: now },
     );
     const byId = new Map(sync.items.map((i) => [i.opId, i]));
@@ -63,6 +71,19 @@ export function SyncQueueScreen({ onReview }: { onReview: (conflictId: string) =
       await sync.syncNow();
     } finally {
       setBusy(false);
+    }
+  };
+
+  const retry = async (item: OutboxItem) => {
+    setNotice(null);
+    try {
+      await sync.retry(item.opId);
+    } catch (err) {
+      // Review N2: a newer change of this record already synced; this older one can only be discarded.
+      setNotice({
+        tone: 'error',
+        text: err instanceof RetryNotAllowedError && err.reason === 'NEWER_SYNCED' ? t('syncQueue.retryNewerSynced') : t('errors.INTERNAL'),
+      });
     }
   };
 
@@ -175,7 +196,7 @@ export function SyncQueueScreen({ onReview }: { onReview: (conflictId: string) =
                     label={itemLabel(item)}
                     registry={sync.registry}
                     hold={holds.get(item.opId)}
-                    onRetry={() => void sync.retry(item.opId)}
+                    onRetry={() => void retry(item)}
                     onDiscard={() => setDiscarding(item)}
                     onReview={(() => {
                       // Its own conflict, or (held, Q7) the conflict this phone caused on the same record. A held

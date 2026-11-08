@@ -51,6 +51,8 @@ export function QueueItemCard({ item, label, registry, hold, lockedView = false,
         if (hold?.reason === 'WAITING_FOR_RECORD' || hold?.reason === 'WAITING_FOR_DEPENDENCY') {
           if (hold.waitingFor) return t('syncQueue.next.waitingFor', { label: hold.waitingFor });
         }
+        // An earlier change of the same record goes first (domain per-row order, review N1/N2).
+        if (hold?.reason === 'WAITING_FOR_EARLIER_EDIT') return t('syncQueue.next.waitingForEarlier');
         if (item.status.nextAttemptAt && item.status.nextAttemptAt > Date.now()) {
           return t('syncQueue.next.retryAt', { time: formatTime(new Date(item.status.nextAttemptAt).toISOString()) });
         }

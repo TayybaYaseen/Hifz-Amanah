@@ -97,11 +97,29 @@ export class DiscardNotAllowedError extends Error {
 export const PULL_INTERVAL_MS = 5 * 60_000;
 /** At most this many runs back to back for one trigger (held items resent, reconciliation follow-ups). */
 const MAX_ROUNDS = 5;
-/** Conflicts checked with the server per run. */
-const MAX_RECONCILE = 50;
+/** Conflicts checked with the server per run (the least recently checked first, review N5). */
+export const MAX_RECONCILE = 50;
+/** A conflict is checked with the server at most once in this long by the automatic reconciliation (review N5). */
+export const RECONCILE_INTERVAL_MS = 5 * 60_000;
 
+export type RetryRefusal =
+  /** A newer change of the same record made on this device has already synced (review N2). */
+  'NEWER_SYNCED';
+
+export class RetryNotAllowedError extends Error {
+  readonly reason: RetryRefusal;
+  constructor(message: string, reason: RetryRefusal) {
+    super(message);
+    this.name = 'RetryNotAllowedError';
+    this.reason = reason;
+  }
+}
+
+/** The row (entity, entityId) feeds the domain's per-row ordering: an operation waits while an earlier one on the same row is not SYNCED. */
 const toOrderable = (item: OutboxItem): OrderableOp => ({
   opId: item.opId,
+  entity: item.entity,
+  entityId: item.entityId,
   seq: item.seq,
   state: item.status.state,
   dependsOn: item.dependsOn,
@@ -208,6 +226,19 @@ export class SyncEngine {
     this.stopped = true;
   }
 
+  /**
+   * Resolves once no run is in progress (review N6). After `stop()` no new run starts, so sign-out awaits this
+   * before it counts unsynced changes and purges: no push result or pulled change can land after the count.
+   */
+  async idle(): Promise<void> {
+    while (this.current) {
+      await this.current.then(
+        () => undefined,
+        () => undefined,
+      );
+    }
+  }
+
   /** Connectivity from NetInfo. Regaining it triggers a run. */
   setOnline(online: boolean): void {
     const regained = online && !this.snapshot.online;
@@ -238,6 +269,8 @@ export class SyncEngine {
       this.again = { ignoreBackoff: ignoreBackoff || (this.again?.ignoreBackoff ?? false) };
       return this.current;
     }
+    // Stopped (signing out, workspace closing): no new run starts (review N6).
+    if (this.stopped) return Promise.resolve(this.snapshot.lastOutcome ?? 'OK');
     const run = (async () => {
       this.update({ running: true });
       let outcome: SyncOutcome;
@@ -368,6 +401,7 @@ export class SyncEngine {
                   [result.rowVersion, item.entityId, result.rowVersion],
                 );
               }
+              await this.markRowSynced(tx, item);
               // An operation on this row was applied, so the row has no open conflict any more.
               await this.rowSettled(tx, item.entity, item.entityId);
               break;
@@ -427,7 +461,13 @@ export class SyncEngine {
   }
 
   private async pullAll(): Promise<SyncOutcome> {
-    let cursor = (await readMeta(this.d.db)).lastPullCursor;
+    // Review N4: a discard asked for the server's values again; this pull starts from a fresh snapshot, and the
+    // request counts as done only once that pull has finished (a pull interrupted half-way starts over).
+    const start = await this.d.db.get<{ last_pull_cursor: string | null; refetch_requested: number; refetch_done: number }>(
+      'SELECT last_pull_cursor, refetch_requested, refetch_done FROM sync_meta WHERE id = 1',
+    );
+    const refetch = Number(start?.refetch_requested ?? 0);
+    let cursor = refetch > Number(start?.refetch_done ?? 0) ? null : (start?.last_pull_cursor ?? null);
     let rebootstrapped = false;
     for (let page = 0; page < 10_000; page++) {
       if (this.stopped) return 'OK';
@@ -454,6 +494,7 @@ export class SyncEngine {
       await this.d.db.transaction(async (tx) => {
         for (const change of changes) await this.applyChange(tx, change);
         await tx.run('UPDATE sync_meta SET last_pull_cursor = ? WHERE id = 1', [nextCursor]);
+        if (!response.hasMore) await tx.run('UPDATE sync_meta SET refetch_done = MAX(refetch_done, ?) WHERE id = 1', [refetch]);
         await noteServerTime(tx, response.serverTime);
       });
       this.d.onServerTime?.(response.serverTime);
@@ -556,11 +597,37 @@ export class SyncEngine {
    */
   private async reconcileConflicts(): Promise<SyncOutcome> {
     if (!this.d.conflicts) return 'OK';
-    const ids = new Set<string>();
-    for (const item of await this.d.outbox.list()) {
-      if (item.status.state === 'ACTION_REQUIRED' && item.status.conflictId !== null) ids.add(item.status.conflictId);
-    }
-    for (const id of [...ids].slice(0, MAX_RECONCILE)) {
+    const nowMs = this.d.clock();
+    // Review N5: each conflict at most once every RECONCILE_INTERVAL_MS, least recently checked first, at most
+    // MAX_RECONCILE per run, so conflicts beyond the first 50 are reached in later runs.
+    const due = await this.d.db.transaction(async (tx) => {
+      const owners = new Map<string, OutboxItem>();
+      for (const item of await this.d.outbox.list(tx)) {
+        if (item.status.state === 'ACTION_REQUIRED' && item.status.conflictId !== null && !owners.has(item.status.conflictId)) {
+          owners.set(item.status.conflictId, item);
+        }
+      }
+      if (owners.size === 0) return [];
+      // A conflict whose local record was purged (scope reset) is recorded again, so its check time is kept.
+      for (const [conflictId, item] of owners) {
+        await tx.run(
+          `INSERT INTO conflicts (conflict_id, op_id, entity, entity_id, status, label, created_at)
+           VALUES (?, ?, ?, ?, 'OPEN', ?, ?) ON CONFLICT (conflict_id) DO NOTHING`,
+          [conflictId, item.opId, item.entity, item.entityId, item.label, this.nowIso()],
+        );
+      }
+      const rows = await tx.all<{ conflict_id: string; last_checked_at: string | null }>('SELECT conflict_id, last_checked_at FROM conflicts');
+      const checkedAt = new Map(rows.map((r) => [r.conflict_id, r.last_checked_at === null ? null : Date.parse(r.last_checked_at)]));
+      const picked = [...owners.keys()]
+        .map((id) => ({ id, at: checkedAt.get(id) ?? null }))
+        .filter(({ at }) => at === null || Number.isNaN(at) || at > nowMs || nowMs - at >= RECONCILE_INTERVAL_MS)
+        .sort((a, b) => (a.at ?? -Infinity) - (b.at ?? -Infinity) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+        .slice(0, MAX_RECONCILE)
+        .map(({ id }) => id);
+      for (const id of picked) await tx.run('UPDATE conflicts SET last_checked_at = ? WHERE conflict_id = ?', [this.nowIso(), id]);
+      return picked;
+    });
+    for (const id of due) {
       if (this.stopped) return 'OK';
       const outcome = await this.reconcileConflict(id);
       if (outcome !== 'OK') return outcome;
@@ -613,6 +680,7 @@ export class SyncEngine {
       ]);
       // Only the operation that caused this conflict is settled; other items on the row keep their own state.
       await this.apply(tx, item, { type: 'CONFLICT_RESOLVED', rowVersion: Math.max(rowVersion, Number(deferred?.row_version ?? 0)) });
+      await this.markRowSynced(tx, item);
       await this.rowSettled(tx, item.entity, item.entityId);
       this.followUp = true;
     });
@@ -625,11 +693,11 @@ export class SyncEngine {
       const item = await this.conflictItem(tx, conflictId);
       await tx.run('DELETE FROM conflicts WHERE conflict_id = ?', [conflictId]);
       if (!item) return;
-      // DOMAIN GAP: @hifz/domain/sync `transition` has no ACTION_REQUIRED → FAILED event (conflict gone, Q8), so
-      // the status is written directly. FAILED is never SYNCED; the user can retry (a new operation) or discard.
-      const failed: QueueItemStatus = { ...item.status, state: 'FAILED', nextAttemptAt: null, failure: { code: 'NOT_FOUND' }, conflictId: null };
-      await this.d.outbox.writeStatus(tx, item.opId, failed);
-      // Items held behind it are sent again; the server answers for each of them (NOT_FOUND if out of scope).
+      // Domain CONFLICT_GONE: ACTION_REQUIRED (own conflict) → FAILED NOT_FOUND. FAILED is never SYNCED; the user can
+      // retry (a new op_id, same seq) or discard. Later edits of the row stay held behind it (per-row order).
+      await this.apply(tx, item, { type: 'CONFLICT_GONE' });
+      // Items the server held behind it (CONFLICT_OPEN) go back to PENDING; the server answers for each of them
+      // (NOT_FOUND if out of scope) once the per-row order lets them go.
       await this.clearHeld(tx, await this.d.outbox.unsyncedForRow(item.entity, item.entityId, tx));
     });
     this.d.outbox.notify();
@@ -638,38 +706,59 @@ export class SyncEngine {
   // ---------- User actions ----------
 
   /**
-   * The user taps Retry on a FAILED item (review M1). The server keeps a terminal result per op_id, so resending
-   * the same op_id would only replay that result. Retry therefore queues the same change again as a NEW operation
-   * (new UUIDv7 op_id, next seq, same entity, fields, base version, and dependencies, the original save time), in
-   * one transaction that also re-points its dependents to the new op_id and records the old one in `discards`
-   * with reason RETRIED.
+   * The user taps Retry on a FAILED item (review M1, N2). The server keeps a terminal result per op_id, so
+   * resending the same op_id would only replay that result. Retry therefore queues the same change again under a
+   * NEW op_id but its ORIGINAL seq (and save time, entity, fields, base version, dependencies), in one transaction
+   * that also re-points its dependents to the new op_id and records the old one in `discards` with reason RETRIED.
+   * Keeping the seq means the retried change still comes before every later change this device made to the row,
+   * so it can never be applied after (and over) a newer edit.
+   *
+   * Refused with RetryNotAllowedError('NEWER_SYNCED') when a later change of the same row from this device has
+   * already synced: replaying the older change now would either overwrite the newer one or conflict with it.
+   * The user can discard it instead (FAILED is always discardable).
    */
   async retry(opId: string): Promise<void> {
     const done = await this.d.db.transaction(async (tx) => {
       const item = await this.d.outbox.get(opId, tx);
       if (!item || item.status.state !== 'FAILED') return false;
-      const { opId: newOpId } = await this.d.outbox.enqueue(tx, {
-        entity: item.entity,
-        entityId: item.entityId,
-        opType: item.opType,
-        ...(item.command ? { command: item.command } : {}),
-        baseVersion: item.baseVersion,
-        fields: item.fields,
-        dependsOn: item.dependsOn,
-        label: item.label,
-      });
-      await tx.run('UPDATE outbox SET created_at = ? WHERE op_id = ?', [item.createdAt, newOpId]);
-      for (const dependent of await this.d.outbox.dependents(opId, tx)) {
+      if (await this.newerSynced(tx, item)) {
+        throw new RetryNotAllowedError('A newer change of this record has already synced', 'NEWER_SYNCED');
+      }
+      const dependents = await this.d.outbox.dependents(opId, tx);
+      await this.recordDiscard(tx, item, 'RETRIED');
+      const newOpId = await this.d.outbox.requeue(tx, item);
+      for (const dependent of dependents) {
         const deps = dependent.dependsOn.map((d) => (d === opId ? newOpId : d));
         await tx.run('UPDATE outbox SET depends_on = ? WHERE op_id = ?', [JSON.stringify(deps), dependent.opId]);
       }
-      await this.recordDiscard(tx, item, 'RETRIED');
-      await tx.run('DELETE FROM outbox WHERE op_id = ?', [opId]);
       return true;
     });
     if (!done) return;
     this.d.outbox.notify();
     this.requestSync('manual');
+  }
+
+  /** A change of the same row with a later seq has synced (still listed, or remembered in row_sync_marks). */
+  private async newerSynced(tx: SqlExecutor, item: OutboxItem): Promise<boolean> {
+    const listed = await tx.get<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM outbox WHERE entity = ? AND entity_id = ? AND state = 'SYNCED' AND seq > ?",
+      [item.entity, item.entityId, item.seq],
+    );
+    if (Number(listed?.n ?? 0) > 0) return true;
+    const mark = await tx.get<{ last_synced_seq: number }>('SELECT last_synced_seq FROM row_sync_marks WHERE entity = ? AND entity_id = ?', [
+      item.entity,
+      item.entityId,
+    ]);
+    return mark !== null && mark !== undefined && Number(mark.last_synced_seq) > item.seq;
+  }
+
+  /** Remembers the highest seq of this device's operations the server acknowledged on the row (review N2). */
+  private async markRowSynced(tx: SqlExecutor, item: OutboxItem): Promise<void> {
+    await tx.run(
+      `INSERT INTO row_sync_marks (entity, entity_id, last_synced_seq) VALUES (?, ?, ?)
+       ON CONFLICT (entity, entity_id) DO UPDATE SET last_synced_seq = MAX(last_synced_seq, excluded.last_synced_seq)`,
+      [item.entity, item.entityId, item.seq],
+    );
   }
 
   private async recordDiscard(tx: SqlExecutor, item: OutboxItem, reason: 'DISCARDED' | 'RETRIED'): Promise<void> {
@@ -686,6 +775,7 @@ export class SyncEngine {
    * other unsynced items depend on it. The discard is recorded locally in `discards`.
    */
   async discard(opId: string): Promise<void> {
+    let refetch = false;
     await this.d.db.transaction(async (tx) => {
       const item = await this.d.outbox.get(opId, tx);
       if (!item) return;
@@ -699,10 +789,25 @@ export class SyncEngine {
       const dependents = await this.d.outbox.dependents(opId, tx);
       if (dependents.length > 0) throw new DiscardNotAllowedError('Other changes depend on this one', 'DEPENDENTS', dependents.length);
       await this.recordDiscard(tx, item, 'DISCARDED');
-      await this.d.registry.get(item.entity)?.onDiscard?.(tx, { entityId: item.entityId, opType: item.opType });
+      const handler = this.d.registry.get(item.entity);
+      await handler?.onDiscard?.(tx, { entityId: item.entityId, opType: item.opType });
       await tx.run('DELETE FROM outbox WHERE op_id = ?', [opId]);
+      const deferred = await tx.get<{ n: number }>('SELECT COUNT(*) AS n FROM deferred_changes WHERE entity = ? AND entity_id = ?', [item.entity, item.entityId]);
       await this.applyDeferred(tx, item.entity, item.entityId);
+      // Review N4: a discarded UPDATE/COMMAND left values in the local row that the server never had. With a
+      // server change kept aside, that change restores the row (now, or once the row's other unsynced changes
+      // settle). Without one, the server's current values are fetched again: the next pull starts from a fresh
+      // snapshot, which rewrites every synced row at its server version. A row never acknowledged is re-read
+      // anyway once its CREATE is applied (the pull delivers the applied version).
+      if (item.opType !== 'CREATE' && handler && Number(deferred?.n ?? 0) === 0) {
+        const row = await tx.get<{ row_version: number | null }>(`SELECT row_version FROM ${handler.table} WHERE id = ?`, [item.entityId]);
+        if (row && row.row_version !== null && row.row_version !== undefined) {
+          await tx.run('UPDATE sync_meta SET refetch_requested = refetch_requested + 1 WHERE id = 1');
+          refetch = true;
+        }
+      }
     });
     this.d.outbox.notify();
+    if (refetch) this.requestSync('save');
   }
 }

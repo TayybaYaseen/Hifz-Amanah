@@ -288,6 +288,7 @@ export const urLatn: Messages = {
     next: {
       PENDING: "Phone online hone par bheji jaye gi.",
       waitingFor: "Record ka intezar: pehle {label} ka sync hona zaroori hai.",
+      waitingForEarlier: "Intezar: is record ki pichhli tabdeeli ka pehle sync hona zaroori hai.",
       retryAt: "Khudkaar dobara koshish: {time}",
       SYNCING: "Server ko bheji ja rahi hai…",
       SYNCED: "Server ko mausool: {time}",
@@ -309,6 +310,7 @@ export const urLatn: Messages = {
     discarded: "Tabdeeli khatam kar di gayi.",
     discardBlocked: "Is par munhasir doosri tabdeeliyan: {count}. Pehle unhein khatam karein.",
     discardMaybeSent: "Ho sakta hai yeh tabdeeli server tak pohanch chuki ho, is liye ise yahan khatam nahin kiya ja sakta. Pehle sync karein, phir zaroorat ho to record durust karein.",
+    retryNewerSynced: "Is record ki ek nayi tabdeeli pehle hi sync ho chuki hai, is liye yeh purani tabdeeli dobara nahin bheji ja sakti. Ise khatam karein, phir zaroorat ho to record durust karein.",
     emptyTitle: "Sync ke liye kuch baqi nahin",
     emptyBody: "Aap ki mehfooz ki hui tabdeeliyan server tak pohanchne tak yahan nazar aati hain.",
     loadError: "Is phone par sync ki qataar nahin parhi ja saki. Dobara koshish karein.",

@@ -62,8 +62,8 @@ export async function probeDb(path?: string): Promise<SqlDriver> {
   return db;
 }
 
-export function makeOutbox(db: SqlDriver, clock: FakeClock) {
-  return new Outbox(db, { clock: clock.read, newId: createIdSource(clock.read, testRandomBytes) });
+export function makeOutbox(db: SqlDriver, clock: FakeClock, registry: EntityRegistry = probeRegistry()) {
+  return new Outbox(db, { clock: clock.read, newId: createIdSource(clock.read, testRandomBytes), registry });
 }
 
 /** Writes a probe row the way a feature's save path would (inside saveWithOp's transaction). */

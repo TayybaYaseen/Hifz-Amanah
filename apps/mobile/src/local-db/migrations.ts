@@ -111,6 +111,32 @@ export const WORKSPACE_MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 3,
+    name: 'sync re-review fixes: row sync marks, refetch request, conflict check time',
+    up: async (tx) => {
+      // Additive only (F12-AC16): no outbox row or column is touched.
+      // - row_sync_marks (N2): the highest outbox seq of this device's operations the server acknowledged per row,
+      //   so Retry can refuse to replay an older change after a newer one synced, even once the synced queue item
+      //   was pruned (24 h, Q16).
+      // - refetch_requested / refetch_done (N4): a discarded UPDATE left values the server never had in the local
+      //   row; the next pull starts again from a snapshot (cursor NULL) so the server's values are written back.
+      //   Counters, not a cursor reset, so a pull already running cannot overwrite the request.
+      // - conflicts.last_checked_at (N5): reconciliation checks each conflict at most once every 5 minutes, oldest
+      //   check first.
+      await tx.exec(`
+        CREATE TABLE row_sync_marks (
+          entity           TEXT NOT NULL,
+          entity_id        TEXT NOT NULL,
+          last_synced_seq  INTEGER NOT NULL,
+          PRIMARY KEY (entity, entity_id)
+        );
+        ALTER TABLE sync_meta ADD COLUMN refetch_requested INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE sync_meta ADD COLUMN refetch_done INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE conflicts ADD COLUMN last_checked_at TEXT;
+      `);
+    },
+  },
 ];
 
 /** The device index: which workspace databases exist on this phone, and the device ID. */

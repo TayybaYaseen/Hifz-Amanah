@@ -89,6 +89,7 @@ export async function purgeSynced(tx: SqlExecutor, registry: EntityRegistry, opt
   }
   // Server rows held back while local changes were unsynced are cached data too.
   await tx.run('DELETE FROM deferred_changes');
+  await pruneRowSyncMarks(tx);
   await tx.run('UPDATE sync_meta SET last_pull_cursor = NULL WHERE id = 1');
 }
 
@@ -99,7 +100,20 @@ export async function pruneSyncedQueue(tx: SqlExecutor, nowMs: number): Promise<
   const result = await tx.run("DELETE FROM outbox WHERE state = 'SYNCED' AND synced_at IS NOT NULL AND synced_at < ?", [
     new Date(nowMs - SYNCED_LISTED_MS).toISOString(),
   ]);
+  await pruneRowSyncMarks(tx);
   return result.changes;
+}
+
+/**
+ * A row's sync mark (review N2) only matters while an older operation on that row is still unsynced (Retry checks
+ * it); marks of rows with nothing unsynced are removed. Later operations always have a higher seq, so they never
+ * need the mark.
+ */
+export async function pruneRowSyncMarks(tx: SqlExecutor): Promise<void> {
+  await tx.run(
+    `DELETE FROM row_sync_marks WHERE NOT EXISTS (
+       SELECT 1 FROM outbox o WHERE o.entity = row_sync_marks.entity AND o.entity_id = row_sync_marks.entity_id AND o.state != 'SYNCED')`,
+  );
 }
 
 /** F12-AC19: removes synced rows past each entity's retention window. Returns how many rows were removed. */

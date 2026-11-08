@@ -102,6 +102,47 @@ describe('F12 · local database upgrades', () => {
     await db.close();
   });
 
+  it('F12-AC16 (US-051) the version 2 → 3 upgrade (row sync marks, refetch request, conflict check time) keeps every queued operation', async () => {
+    // A database written by the second build (versions 1–2), with operations in every state and an open conflict.
+    const v2 = WORKSPACE_MIGRATIONS.slice(0, 2);
+    const db = openNodeDriver();
+    await runMigrations(db, v2);
+    const clock = new FakeClock();
+    const outbox = makeOutbox(db, clock);
+    const states = ['PENDING', 'SYNCING', 'SYNCED', 'FAILED', 'ACTION_REQUIRED'];
+    for (const [i, state] of states.entries()) {
+      const { opId } = await db.transaction((tx) =>
+        outbox.enqueue(tx, {
+          entity: 'sync_probe',
+          entityId: outbox.newEntityId(),
+          opType: 'UPDATE',
+          baseVersion: 1,
+          fields: { label: `row ${i}`, note: 'نوٹ — Arabic/Urdu text stays intact' },
+          label: `row ${i}`,
+        }),
+      );
+      await db.run('UPDATE outbox SET state = ?, attempts = ?, sent_count = ? WHERE op_id = ?', [state, i, i, opId]);
+    }
+    await db.run("INSERT INTO conflicts (conflict_id, op_id, entity, entity_id, status, created_at) VALUES ('c1', 'o1', 'sync_probe', 'e1', 'OPEN', 'x')");
+    await db.run("UPDATE sync_meta SET last_pull_cursor = 'cursor-1' WHERE id = 1");
+    const before = await outboxSnapshot(db);
+
+    expect(await runMigrations(db, WORKSPACE_MIGRATIONS)).toEqual(WORKSPACE_MIGRATIONS.slice(2).map((m) => m.version));
+    // No outbox row or column changed (version 3 adds nothing to the outbox).
+    expect(await outboxSnapshot(db)).toEqual(before);
+    expect(await db.get('SELECT last_pull_cursor, refetch_requested, refetch_done FROM sync_meta')).toEqual({
+      last_pull_cursor: 'cursor-1',
+      refetch_requested: 0,
+      refetch_done: 0,
+    });
+    expect(await db.get("SELECT status, last_checked_at FROM conflicts WHERE conflict_id = 'c1'")).toEqual({ status: 'OPEN', last_checked_at: null });
+    expect(await db.get('SELECT COUNT(*) AS n FROM row_sync_marks')).toEqual({ n: 0 });
+    const items = await makeOutbox(db, clock).list();
+    expect(items.map((i) => i.status.state)).toEqual(states);
+    expect(items[0]!.fields.note).toBe('نوٹ — Arabic/Urdu text stays intact');
+    await db.close();
+  });
+
   it('F12-AC16 (US-051) a failing migration rolls back completely and leaves the outbox and version as they were', async () => {
     const base = [...WORKSPACE_MIGRATIONS, probeMigration(WORKSPACE_MIGRATIONS.length + 1)];
     const db = await populated(base);

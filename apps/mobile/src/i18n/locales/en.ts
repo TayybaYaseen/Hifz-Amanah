@@ -286,6 +286,7 @@ export const en = {
     next: {
       PENDING: "Will be sent when the phone is online.",
       waitingFor: "Waiting for record: {label} must sync first.",
+      waitingForEarlier: "Waiting: an earlier change to this record must sync first.",
       retryAt: "Trying again automatically: {time}",
       SYNCING: "Sending to the server…",
       SYNCED: "Received by the server: {time}",
@@ -307,6 +308,7 @@ export const en = {
     discarded: "Change discarded.",
     discardBlocked: "Other changes depend on this one: {count}. Discard those first.",
     discardMaybeSent: "This change may already have reached the server, so it cannot be discarded here. Sync it first, then correct the record if needed.",
+    retryNewerSynced: "A newer change to this record has already synced, so this older change cannot be sent again. Discard it, then correct the record if needed.",
     emptyTitle: "Nothing waiting to sync",
     emptyBody: "Changes you save appear here until the server receives them.",
     loadError: "Could not read the sync queue on this phone. Try again.",
