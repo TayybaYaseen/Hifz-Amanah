@@ -4,7 +4,7 @@
 import type { Role } from '@hifz/contracts';
 import type { DatabaseFiles, SqlDriver } from '../local-db/driver.ts';
 import { DEVICE_MIGRATIONS, WORKSPACE_MIGRATIONS, runMigrations, type Migration } from '../local-db/migrations.ts';
-import { heldExpired } from './retention.ts';
+import { effectiveNow, heldExpired } from './retention.ts';
 
 export const DEVICE_DB_NAME = 'hifz-device.db';
 
@@ -78,6 +78,20 @@ export class DeviceIndex {
     const row = await this.db.get<{ device_id: string }>('SELECT device_id FROM device WHERE id = 1');
     if (!row) throw new Error('device row missing');
     return row.device_id;
+  }
+
+  /** Keeps the latest server time any workspace's pull returned; it only moves forward (security review L6). */
+  async noteServerTime(serverTime: string): Promise<void> {
+    const ms = Date.parse(serverTime);
+    if (Number.isNaN(ms)) return;
+    const iso = new Date(ms).toISOString();
+    await this.db.run('UPDATE device SET last_server_time = ? WHERE id = 1 AND (last_server_time IS NULL OR last_server_time < ?)', [iso, iso]);
+  }
+
+  /** The clock for the 30-day purge and held/locked stamps: the device clock, never behind the last server time. */
+  async purgeNow(deviceNowMs: number): Promise<number> {
+    const row = await this.db.get<{ last_server_time: string | null }>('SELECT last_server_time FROM device WHERE id = 1');
+    return effectiveNow(deviceNowMs, row?.last_server_time ?? null);
   }
 
   async entries(): Promise<WorkspaceEntry[]> {

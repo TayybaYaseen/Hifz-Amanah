@@ -18,7 +18,7 @@ import { Outbox, type OutboxItem } from './outbox.ts';
 import { secureRandomBytes } from './platform.ts';
 import { appRegistry, type EntityRegistry } from './registry.ts';
 import { httpSyncApi, type ConflictApi } from './transport.ts';
-import { holdForSignOut, lockWorkspace, readMeta, resumeHeld, setOrgTimeZone, type WorkspaceMeta } from './workspace.ts';
+import { holdForSignOut, lockWorkspace, readMeta, resumeHeld, setOrgTimeZone, signOutAction, type WorkspaceMeta } from './workspace.ts';
 
 const TIMER_MS = 30_000;
 const EMPTY_COUNTS: Record<QueueState, number> = { PENDING: 0, SYNCING: 0, SYNCED: 0, FAILED: 0, ACTION_REQUIRED: 0 };
@@ -60,13 +60,21 @@ export interface SyncContextValue {
   retry(opId: string): Promise<void>;
   discard(opId: string): Promise<void>;
   conflictResolved(conflictId: string, rowVersion: number): Promise<void>;
+  /** Conflict Review learned the conflict is already resolved (CONFLICT_CLOSED or a RESOLVED detail; review H2). */
+  conflictClosed(conflictId: string): Promise<void>;
   reload(): void;
-  /** Every sign-out entry point calls this: it opens the warning when changes are unsynced (F12-AC10). */
-  requestSignOut(): void;
+  /**
+   * Every sign-out entry point calls this: it reads the live unsynced count and opens the warning when changes are
+   * unsynced (F12-AC10; review M3).
+   */
+  requestSignOut(): Promise<void>;
   signOutSheet: SignOutSheet;
   closeSignOutSheet(): void;
-  /** "Sign out anyway" (Q14) or, for a revoked workspace, delete and sign out (F12-AC20). */
-  signOutNow(mode: 'hold' | 'purge'): Promise<void>;
+  /**
+   * Signs out. "Sign out anyway" holds unsynced changes (Q14); a revoked workspace is deleted (F12-AC20). The rule
+   * is applied to the live count at that moment (workspace.signOutAction), never to what the sheet showed.
+   */
+  signOutNow(): Promise<void>;
 }
 
 const SyncContext = createContext<SyncContextValue | null>(null);
@@ -114,7 +122,10 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   // F12-AC20, Q14: on app start and each return to the foreground, held or locked workspaces whose 30 days have
   // passed are deleted, whoever is signed in (active workspaces are never touched).
   useEffect(() => {
-    const purge = () => void deviceIndex().then((index) => index.purgeExpired(Date.now(), workspaceRef.current?.entry.dbName ?? null)).catch(() => undefined);
+    const purge = () =>
+      void deviceIndex()
+        .then(async (index) => index.purgeExpired(await index.purgeNow(Date.now()), workspaceRef.current?.entry.dbName ?? null))
+        .catch(() => undefined);
     purge();
     const sub = AppState.addEventListener('change', (next) => {
       if (next === 'active') purge();
@@ -132,7 +143,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     void (async () => {
       try {
         const index = await deviceIndex();
-        const now = Date.now();
+        // Never behind the last server time, so a phone clock set back cannot postpone the purge (review L6).
+        const now = await index.purgeNow(Date.now());
         // F12-AC20, Q14: held or locked changes older than 30 days are deleted first, including this account's,
         // so signing in after 30 days never resumes them.
         await index.purgeExpired(now, null);
@@ -146,15 +158,22 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         const outbox = new Outbox(db, { clock, newId: createIdSource(clock, secureRandomBytes) });
         let engine: SyncEngine | null = null;
         if (target.live) {
+          const api = httpSyncApi(session);
           engine = new SyncEngine({
             db,
             outbox,
             registry: appRegistry,
-            transport: httpSyncApi(session),
+            transport: api,
+            conflicts: api,
             deviceId: await index.deviceId(),
             clock,
             random: Math.random,
-            onAccessRevoked: () => void index.setState(entry.dbName, 'LOCKED_REVOKED', Date.now()),
+            onAccessRevoked: () =>
+              void index
+                .purgeNow(Date.now())
+                .then((at) => index.setState(entry.dbName, 'LOCKED_REVOKED', at))
+                .catch(() => undefined),
+            onServerTime: (serverTime) => void index.noteServerTime(serverTime).catch(() => undefined),
           });
           await engine.start();
           const restored = await resumeHeld(db);
@@ -261,9 +280,10 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     if (state.kind !== 'revoked' || !workspace) return;
     if (meta?.workspaceState === 'LOCKED_REVOKED') return;
     void (async () => {
-      await lockWorkspace(workspace.db, appRegistry, Date.now());
       const index = await deviceIndex();
-      await index.setState(workspace.entry.dbName, 'LOCKED_REVOKED', Date.now());
+      const at = await index.purgeNow(Date.now());
+      await lockWorkspace(workspace.db, appRegistry, at);
+      await index.setState(workspace.entry.dbName, 'LOCKED_REVOKED', at);
       workspace.outbox.notify();
     })().catch(() => setLoadError(true));
   }, [state.kind, workspace, meta?.workspaceState]);
@@ -272,32 +292,31 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const locked = meta?.workspaceState === 'LOCKED_REVOKED' || state.kind === 'revoked';
   const upgradeRequired = Boolean(meta?.upgradeRequiredAt) || engineState.lastOutcome === 'UPGRADE_REQUIRED';
 
-  const signOutNow = useCallback(
-    async (mode: 'hold' | 'purge') => {
-      setSignOutSheet(null);
-      const ws = workspaceRef.current;
-      try {
-        if (ws) {
-          ws.engine?.stop();
-          const index = await deviceIndex();
-          const remaining = await ws.outbox.unsyncedCount();
-          const isLocked = (await readMeta(ws.db)).workspaceState === 'LOCKED_REVOKED';
-          if (mode === 'hold' && remaining > 0 && !isLocked) {
-            await holdForSignOut(ws.db, appRegistry, Date.now());
-            await index.setState(ws.entry.dbName, 'HELD', Date.now());
-            await ws.db.close();
-          } else {
-            // Nothing unsynced, or a revoked workspace: everything on the device for it is deleted (F12-AC20).
-            await ws.db.close();
-            await index.remove(ws.entry.dbName);
-          }
+  const signOutNow = useCallback(async () => {
+    setSignOutSheet(null);
+    const ws = workspaceRef.current;
+    try {
+      if (ws) {
+        // Stop first, so no save or sync result lands between the count below and the purge.
+        ws.engine?.stop();
+        const index = await deviceIndex();
+        const remaining = await ws.outbox.unsyncedCount();
+        const isLocked = (await readMeta(ws.db)).workspaceState === 'LOCKED_REVOKED' || state.kind === 'revoked';
+        // Review M3: unsynced changes are deleted only for a revoked workspace (F12-AC20); otherwise held (Q14).
+        if (signOutAction({ remaining, locked: isLocked }) === 'HOLD') {
+          const at = await index.purgeNow(Date.now());
+          await holdForSignOut(ws.db, appRegistry, at);
+          await index.setState(ws.entry.dbName, 'HELD', at);
+          await ws.db.close();
+        } else {
+          await ws.db.close();
+          await index.remove(ws.entry.dbName);
         }
-      } finally {
-        await session.signOut();
       }
-    },
-    [session],
-  );
+    } finally {
+      await session.signOut();
+    }
+  }, [session, state.kind]);
 
   const value: SyncContextValue = {
     enabled: workspace !== null,
@@ -332,10 +351,24 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     retry: async (opId) => workspace?.engine?.retry(opId),
     discard: async (opId) => workspace?.engine?.discard(opId),
     conflictResolved: async (conflictId, rowVersion) => workspace?.engine?.conflictResolved(conflictId, rowVersion),
+    conflictClosed: async (conflictId) => {
+      const engine = workspace?.engine;
+      if (!engine) return;
+      await engine.reconcileConflict(conflictId);
+      engine.requestSync('manual');
+    },
     reload: () => setReloadKey((k) => k + 1),
-    requestSignOut: () => {
-      if (!workspace || unsynced === 0) {
-        void signOutNow('purge');
+    requestSignOut: async () => {
+      // Review M3: the live count, not the last rendered one (a save may have landed since).
+      let remaining = 0;
+      try {
+        remaining = workspace ? await workspace.outbox.unsyncedCount() : 0;
+      } catch {
+        // The queue cannot be read: warn rather than risk losing changes.
+        remaining = workspace ? Math.max(unsynced, 1) : 0;
+      }
+      if (remaining === 0) {
+        await signOutNow();
         return;
       }
       setSignOutSheet({ variant: locked ? 'revoked' : state.kind === 'expired' ? 'expired' : 'normal' });

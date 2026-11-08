@@ -6,7 +6,7 @@
 // - Queue states follow the domain state machine (@hifz/domain/sync `transition`); SYNCED only from an APPLIED
 //   result or a resolved conflict (F12-AC9). Nothing is discarded automatically (NFR-OFF-007).
 import { RESERVED_FIELD_KEYS, type SyncEntity, type SyncOpType } from '@hifz/contracts';
-import { initialQueueStatus, isUuidV7, type QueueItemStatus, type QueueState } from '@hifz/domain/sync';
+import { initialQueueStatus, isHeldByOpenConflict, isUuidV7, type QueueItemStatus, type QueueState } from '@hifz/domain/sync';
 import type { SqlDriver, SqlExecutor } from '../local-db/driver.ts';
 
 export interface NewOp {
@@ -39,6 +39,11 @@ export interface OutboxItem {
   syncedAt: string | null;
   /** Last temporary error code (network, 5xx), shown while the item waits to retry. */
   lastError: string | null;
+  /**
+   * How many times the operation was put in a push request. 0 = never sent; null = queued before this was tracked
+   * (treated as possibly sent).
+   */
+  sentCount: number | null;
   status: QueueItemStatus;
 }
 
@@ -63,6 +68,7 @@ interface OutboxRow {
   label: string | null;
   created_at: string;
   synced_at: string | null;
+  sent_count: number | null;
 }
 
 export class OutboxValidationError extends Error {
@@ -96,6 +102,7 @@ function toItem(row: OutboxRow): OutboxItem {
     createdAt: row.created_at,
     syncedAt: row.synced_at,
     lastError: row.last_error,
+    sentCount: row.sent_count === null || row.sent_count === undefined ? null : Number(row.sent_count),
     status: {
       state: row.state as QueueState,
       attempts: Number(row.attempts),
@@ -122,6 +129,21 @@ function validate(op: NewOp): void {
     if (Object.hasOwn(op.fields, key)) throw new OutboxValidationError(`field "${key}" is not allowed`);
   }
   for (const dep of op.dependsOn ?? []) if (!isUuidV7(dep)) throw new OutboxValidationError('dependsOn must hold op IDs');
+}
+
+/**
+ * Discard is offered only where the server has certainly not applied the change (review M5, NFR-OFF-007):
+ * - never sent (PENDING, sent count 0);
+ * - FAILED: the server rejected it (stored as REJECTED, never applied), it failed on the device before sending,
+ *   or its conflict is no longer reachable;
+ * - held behind another operation's open conflict (RETRY CONFLICT_OPEN is never applied).
+ * A PENDING operation that was sent before (a timeout, a lost response, an app killed while sending) may already
+ * be applied on the server, so discarding it could leave the phone and the server disagreeing; it syncs first.
+ */
+export function discardable(item: Pick<OutboxItem, 'status' | 'sentCount'>): boolean {
+  if (item.status.state === 'FAILED') return true;
+  if (isHeldByOpenConflict(item.status)) return true;
+  return item.status.state === 'PENDING' && item.sentCount === 0;
 }
 
 export class Outbox {
@@ -168,8 +190,8 @@ export class Outbox {
     await tx.run('UPDATE sync_meta SET next_seq = ? WHERE id = 1', [seq + 1]);
     await tx.run(
       `INSERT INTO outbox (op_id, seq, entity, entity_id, op_type, command, payload, base_version, depends_on, state,
-                           attempts, label, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                           attempts, label, created_at, sent_count)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
       [
         opId,
         seq,
@@ -263,6 +285,17 @@ export class Outbox {
     }
     params.push(opId);
     await tx.run(`UPDATE outbox SET ${sets.join(', ')} WHERE op_id = ?`, params);
+  }
+
+  /** Counts one more send of the operation (it is in a push request). */
+  async markSent(tx: SqlExecutor, opId: string): Promise<void> {
+    await tx.run('UPDATE outbox SET sent_count = COALESCE(sent_count, 0) + 1 WHERE op_id = ?', [opId]);
+  }
+
+  /** Unsynced operations on one record, in outbox order. */
+  async unsyncedForRow(entity: string, entityId: string, executor: SqlExecutor = this.db): Promise<OutboxItem[]> {
+    const rows = await executor.all<OutboxRow>("SELECT * FROM outbox WHERE entity = ? AND entity_id = ? AND state != 'SYNCED' ORDER BY seq", [entity, entityId]);
+    return rows.map(toItem);
   }
 
   /** Unsynced operations that depend on `opId` (Discard is blocked while any exist). */

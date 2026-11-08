@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { ConflictSummary } from '@hifz/contracts';
-import { nextSendable, type QueueState } from '@hifz/domain/sync';
+import { isHeldByOpenConflict, nextSendable, type QueueState } from '@hifz/domain/sync';
 import { errorKeys } from '../../api/errors.ts';
 import { AppScreen, AppText, Button, Card, Notice } from '../../components/ui.tsx';
 import { ConfirmSheet, SyncBanner, useFormatDateTime, useItemLabel } from '../../components/sync.tsx';
@@ -74,7 +74,12 @@ export function SyncQueueScreen({ onReview }: { onReview: (conflictId: string) =
     } catch (err) {
       setNotice({
         tone: 'error',
-        text: err instanceof DiscardNotAllowedError && err.dependents > 0 ? t('syncQueue.discardBlocked', { count: err.dependents }) : t('errors.INTERNAL'),
+        text:
+          err instanceof DiscardNotAllowedError && err.reason === 'DEPENDENTS'
+            ? t('syncQueue.discardBlocked', { count: err.dependents })
+            : err instanceof DiscardNotAllowedError && err.reason === 'MAYBE_SENT'
+              ? t('syncQueue.discardMaybeSent')
+              : t('errors.INTERNAL'),
       });
     } finally {
       setDiscarding(null);
@@ -172,7 +177,12 @@ export function SyncQueueScreen({ onReview }: { onReview: (conflictId: string) =
                     hold={holds.get(item.opId)}
                     onRetry={() => void sync.retry(item.opId)}
                     onDiscard={() => setDiscarding(item)}
-                    onReview={item.status.conflictId ? () => onReview(item.status.conflictId!) : undefined}
+                    onReview={(() => {
+                      // Its own conflict, or (held, Q7) the conflict this phone caused on the same record. A held
+                      // item behind someone else's conflict has no Review here.
+                      const id = item.status.conflictId ?? (isHeldByOpenConflict(item.status) ? conflictOnRow(sync.items, item) : null);
+                      return id ? () => onReview(id) : undefined;
+                    })()}
                   />
                 ))}
               </View>
@@ -200,6 +210,14 @@ export function SyncQueueScreen({ onReview }: { onReview: (conflictId: string) =
       </ConfirmSheet>
     </AppScreen>
   );
+}
+
+/** The open conflict this phone's own change caused on the same record as the given item, if any. */
+function conflictOnRow(items: readonly OutboxItem[], item: OutboxItem): string | null {
+  const owner = items.find(
+    (i) => i.entity === item.entity && i.entityId === item.entityId && i.status.state === 'ACTION_REQUIRED' && i.status.conflictId !== null,
+  );
+  return owner?.status.conflictId ?? null;
 }
 
 function ConflictsTab({ onReview }: { onReview: (conflictId: string) => void }) {

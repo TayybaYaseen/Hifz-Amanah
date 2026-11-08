@@ -63,6 +63,15 @@ export function heldExpired(since: string | null, nowMs: number, days = HELD_UNS
   return !Number.isNaN(start) && nowMs - start >= days * DAY_MS;
 }
 
+/**
+ * The clock purges and retention use (security review L6): the device clock, but never earlier than the last
+ * server time a pull returned, so turning the phone's clock back cannot postpone a purge.
+ */
+export function effectiveNow(deviceNowMs: number, lastServerTime: string | null): number {
+  const server = lastServerTime ? Date.parse(lastServerTime) : Number.NaN;
+  return Number.isNaN(server) ? deviceNowMs : Math.max(deviceNowMs, server);
+}
+
 const UNSYNCED_IDS = "SELECT entity_id FROM outbox WHERE entity = ? AND state != 'SYNCED'";
 
 /**
@@ -78,6 +87,8 @@ export async function purgeSynced(tx: SqlExecutor, registry: EntityRegistry, opt
     await tx.run("DELETE FROM outbox WHERE state = 'SYNCED'");
     await tx.run('DELETE FROM conflicts');
   }
+  // Server rows held back while local changes were unsynced are cached data too.
+  await tx.run('DELETE FROM deferred_changes');
   await tx.run('UPDATE sync_meta SET last_pull_cursor = NULL WHERE id = 1');
 }
 

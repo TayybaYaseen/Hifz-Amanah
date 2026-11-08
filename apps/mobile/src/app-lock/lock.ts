@@ -98,11 +98,13 @@ export class AppLockManager {
       this.store.get(this.key('lockedOut')),
       this.store.get(this.key('offered')),
     ]);
+    const wrongAttempts = Number(wrong ?? 0) || 0;
     return {
       configured: hash !== null,
       biometric: hash !== null && biometric === '1',
-      wrongAttempts: Number(wrong ?? 0) || 0,
-      lockedOut: lockedOut === '1',
+      wrongAttempts,
+      // A 5th attempt counted but not yet marked (the app was killed mid-check) still locks out: never fail open.
+      lockedOut: lockedOut === '1' || wrongAttempts >= MAX_WRONG_PINS,
       offered: offered === '1',
     };
   }
@@ -118,18 +120,22 @@ export class AppLockManager {
     await this.store.set(this.key('offered'), '1');
   }
 
-  /** Checks a PIN. Wrong attempts persist across restarts; the 5th wrong PIN locks the user out. */
+  /**
+   * Checks a PIN. Every check counts as a wrong attempt BEFORE the comparison (security review L1), so killing the
+   * app during the check cannot give unlimited guesses; a correct PIN then clears the count. Wrong attempts
+   * persist across restarts; the 5th wrong PIN locks the user out.
+   */
   async verifyPin(pin: string): Promise<VerifyResult> {
     const status = await this.status();
     if (status.lockedOut || !status.configured) return { ok: false, remaining: 0, lockedOut: status.lockedOut };
+    const wrong = status.wrongAttempts + 1;
+    await this.store.set(this.key('wrong'), String(wrong));
     const [salt, stored] = await Promise.all([this.store.get(this.key('salt')), this.store.get(this.key('pinHash'))]);
     const ok = isValidPin(pin) && salt !== null && stored !== null && equalConstantTime(await hashPin(this.crypto, pin, salt, this.rounds), stored);
     if (ok) {
       await this.store.delete(this.key('wrong'));
       return { ok: true };
     }
-    const wrong = status.wrongAttempts + 1;
-    await this.store.set(this.key('wrong'), String(wrong));
     if (wrong >= MAX_WRONG_PINS) {
       await this.store.set(this.key('lockedOut'), '1');
       return { ok: false, remaining: 0, lockedOut: true };

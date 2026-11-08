@@ -58,6 +58,7 @@ export const urLatn: Messages = {
     ENTITY_NOT_SUPPORTED: 'Is qism ki tabdeeli abhi sync nahin ho sakti. App update karein.',
     CONFLICT_STALE: 'Yeh record dobara tabdeel ho gaya hai. Taza tareen version dekhein.',
     CONFLICT_CLOSED: 'Yeh tanaza pehle hi hal ho chuka hai.',
+    CONFLICT_OPEN: 'Is record par aik tanaza ke hal hone ka intezar hai.',
   },
   fields: {
     PASSWORD_TOO_SHORT: 'Kam az kam 8 huroof istemaal karein.',
@@ -292,6 +293,7 @@ export const urLatn: Messages = {
       SYNCED: "Server ko mausool: {time}",
       FAILED: "Dobara bhejein, ya agar zaroorat nahin to ise khatam kar dein.",
       ACTION_REQUIRED: "Server par bhi tabdeel hua. Dono version ka jaiza lein.",
+      heldByConflict: "Woh tanaza hal hote hi yeh khud ba khud dobara bheji jaye gi.",
     },
     reason: "Wajah: {reason}",
     reasonFields: "Qabool nahin hua: {fields}",
@@ -306,6 +308,7 @@ export const urLatn: Messages = {
     discardConfirm: "Tabdeeli khatam karein",
     discarded: "Tabdeeli khatam kar di gayi.",
     discardBlocked: "Is par munhasir doosri tabdeeliyan: {count}. Pehle unhein khatam karein.",
+    discardMaybeSent: "Ho sakta hai yeh tabdeeli server tak pohanch chuki ho, is liye ise yahan khatam nahin kiya ja sakta. Pehle sync karein, phir zaroorat ho to record durust karein.",
     emptyTitle: "Sync ke liye kuch baqi nahin",
     emptyBody: "Aap ki mehfooz ki hui tabdeeliyan server tak pohanchne tak yahan nazar aati hain.",
     loadError: "Is phone par sync ki qataar nahin parhi ja saki. Dobara koshish karein.",

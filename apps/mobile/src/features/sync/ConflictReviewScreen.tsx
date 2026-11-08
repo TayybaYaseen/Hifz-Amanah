@@ -44,10 +44,20 @@ export function ConflictReviewScreen({ conflictId, onDone }: { conflictId: strin
     setLoad({ kind: 'loading' });
     setResult(null);
     try {
-      setLoad({ kind: 'ready', detail: await sync.conflicts.getConflict(conflictId) });
+      const detail = await sync.conflicts.getConflict(conflictId);
+      setLoad({ kind: 'ready', detail });
+      if (detail.status === 'RESOLVED') {
+        // Resolved elsewhere (review H2): the phone's item is settled from the server's word, nothing is applied here.
+        setResult({ tone: 'info', code: 'errors.CONFLICT_CLOSED' });
+        void sync.conflictClosed(conflictId).catch(() => undefined);
+      }
     } catch (err) {
-      // F12-AC17: another Teacher (or a conflict that is gone) gets 404, and no data is shown.
-      if (err instanceof ApiFailure && err.status === 404) setLoad({ kind: 'notAvailable' });
+      // F12-AC17: another Teacher (or a conflict that is gone) gets 404, and no data is shown. The phone's own item
+      // for it, if any, becomes failed NOT_FOUND (Q8).
+      if (err instanceof ApiFailure && err.status === 404) {
+        setLoad({ kind: 'notAvailable' });
+        void sync.conflictClosed(conflictId).catch(() => undefined);
+      }
       else setLoad({ kind: 'error', code: err instanceof ApiFailure ? err.code : 'INTERNAL' });
     }
     // sync.conflicts wraps the stable session.
@@ -99,7 +109,11 @@ export function ConflictReviewScreen({ conflictId, onDone }: { conflictId: strin
     } catch (err) {
       const code = err instanceof ApiFailure ? err.code : 'INTERNAL';
       if (err instanceof ApiFailure && err.status === 404) setLoad({ kind: 'notAvailable' });
-      else if (code === 'CONFLICT_CLOSED') setResult({ tone: 'info', code: 'errors.CONFLICT_CLOSED' });
+      else if (code === 'CONFLICT_CLOSED') {
+        // Resolved by someone else meanwhile (review H2): settle the phone's item from the server's state.
+        setResult({ tone: 'info', code: 'errors.CONFLICT_CLOSED' });
+        void sync.conflictClosed(conflictId).catch(() => undefined);
+      }
       else setResult({ tone: 'error', code: `errors.${code}` });
     } finally {
       setBusy(false);
@@ -146,6 +160,7 @@ export function ConflictReviewScreen({ conflictId, onDone }: { conflictId: strin
   const detail = load.detail;
   const label = isolate(handler?.label(detail.device) ?? handler?.label(detail.server) ?? t(`sync.entity.${detail.entity}`, { defaultValue: t('sync.entity.unknown') }));
   const resolved = result?.tone === 'success';
+  const closed = result?.code === 'errors.CONFLICT_CLOSED';
 
   return (
     <AppScreen testID="conflict.screen">
@@ -166,7 +181,7 @@ export function ConflictReviewScreen({ conflictId, onDone }: { conflictId: strin
       ))}
       <AppText color={colors.textSecondary}>{t('conflict.otherFields')}</AppText>
 
-      {resolved ? null : (
+      {resolved || closed ? null : (
         <Card>
           <AppText role="cardTitle" accessibilityRole="header">
             {t('conflict.choiceTitle')}
@@ -216,7 +231,7 @@ export function ConflictReviewScreen({ conflictId, onDone }: { conflictId: strin
           }}
         />
       ) : null}
-      {resolved || result?.code === 'errors.CONFLICT_CLOSED' ? (
+      {resolved || closed ? (
         <Button variant="secondary" label={t('common.back')} onPress={onDone} />
       ) : (
         <Button

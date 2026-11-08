@@ -5,11 +5,11 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
-import { createDriver, type DatabaseFiles, type SqlDriver, type SqlValue } from '../driver.ts';
+import { CONNECTION_PRAGMAS, createDriver, type DatabaseFiles, type SqlDriver, type SqlValue } from '../driver.ts';
 
 export function openNodeDriver(path = ':memory:'): SqlDriver {
   const db = new DatabaseSync(path);
-  db.exec('PRAGMA foreign_keys = ON;');
+  db.exec(CONNECTION_PRAGMAS);
   const bind = (params: readonly SqlValue[]) => params as SQLInputValue[];
   return createDriver({
     exec: async (sql) => {

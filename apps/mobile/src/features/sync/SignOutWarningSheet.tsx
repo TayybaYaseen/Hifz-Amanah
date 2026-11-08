@@ -43,9 +43,10 @@ export function SignOutWarningSheet({ onOpenQueue, onSignInToSync }: { onOpenQue
   // After "Sync now", the live count decides what to show.
   const resolvedAfter = !afterSync ? null : sync.unsynced === 0 ? 'allSynced' : 'partial';
 
-  const signOut = async (mode: 'hold' | 'purge') => {
+  // What happens to the workspace is decided at sign-out from the live count (review M3, workspace.signOutAction).
+  const signOut = async () => {
     setBusy(true);
-    await sync.signOutNow(mode);
+    await sync.signOutNow();
   };
 
   return (
@@ -62,7 +63,7 @@ export function SignOutWarningSheet({ onOpenQueue, onSignInToSync }: { onOpenQue
             variant="destructive"
             label={t('signOutWarning.confirmRevoked')}
             busy={busy}
-            onPress={() => void signOut('purge')}
+            onPress={() => void signOut()}
           />
         </>
       ) : resolvedAfter === 'allSynced' ? (
@@ -70,7 +71,7 @@ export function SignOutWarningSheet({ onOpenQueue, onSignInToSync }: { onOpenQue
           <Notice tone="success" testID="signOutWarning.allSynced">
             {t('signOutWarning.allSynced')}
           </Notice>
-          <Button testID="signOutWarning.signOut" label={t('more.signOut')} busy={busy} onPress={() => void signOut('purge')} />
+          <Button testID="signOutWarning.signOut" label={t('more.signOut')} busy={busy} onPress={() => void signOut()} />
           <Button testID="signOutWarning.cancel" variant="secondary" label={t('common.cancel')} onPress={close} />
         </>
       ) : (
@@ -123,7 +124,7 @@ export function SignOutWarningSheet({ onOpenQueue, onSignInToSync }: { onOpenQue
             variant="destructive"
             label={t('signOutWarning.signOutAnyway')}
             busy={busy}
-            onPress={() => void signOut('hold')}
+            onPress={() => void signOut()}
           />
         </>
       )}

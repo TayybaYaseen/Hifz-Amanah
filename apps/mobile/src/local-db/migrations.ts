@@ -88,6 +88,29 @@ export const WORKSPACE_MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 2,
+    name: 'sync review fixes: sent count, last server time, deferred server changes, discard reason',
+    up: async (tx) => {
+      // Additive only (F12-AC16): existing outbox rows are not rewritten. `sent_count` is NULL for rows queued
+      // before this version ("unknown", treated as possibly sent); new rows start at 0 (review M5).
+      await tx.exec(`
+        ALTER TABLE outbox ADD COLUMN sent_count INTEGER;
+        ALTER TABLE sync_meta ADD COLUMN last_server_time TEXT;
+        ALTER TABLE discards ADD COLUMN reason TEXT NOT NULL DEFAULT 'DISCARDED';
+
+        CREATE TABLE deferred_changes (
+          entity       TEXT NOT NULL,
+          entity_id    TEXT NOT NULL,
+          row_version  INTEGER NOT NULL,
+          op           TEXT NOT NULL CHECK (op IN ('UPSERT', 'REMOVE_FROM_DEVICE')),
+          fields       TEXT,
+          PRIMARY KEY (entity, entity_id)
+        );
+        CREATE INDEX conflicts_row ON conflicts (entity, entity_id, status);
+      `);
+    },
+  },
 ];
 
 /** The device index: which workspace databases exist on this phone, and the device ID. */
@@ -113,6 +136,13 @@ export const DEVICE_MIGRATIONS: readonly Migration[] = [
           last_opened_at  TEXT NOT NULL
         );
       `);
+    },
+  },
+  {
+    version: 2,
+    name: 'device index: last server time (security review L6)',
+    up: async (tx) => {
+      await tx.exec('ALTER TABLE device ADD COLUMN last_server_time TEXT');
     },
   },
 ];

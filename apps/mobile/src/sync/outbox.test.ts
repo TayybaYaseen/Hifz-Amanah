@@ -314,11 +314,17 @@ describe('F12 · sync states', () => {
     expect(transport.pushes.length).toBe(pushes);
     await createProbe(outbox, 'c');
     expect(await outbox.unsyncedCount()).toBe(3);
-    // A new app start (after the update) tries again, and the queue syncs.
+    // Restarting the same build does not ask again on its own (review L3): it would only be refused again.
     transport.onPush = new FakeTransport().onPush;
     transport.onPull = new FakeTransport().onPull;
     await engine.start();
-    expect(await engine.syncNow()).toBe('OK');
+    expect(await engine.syncNow()).toBe('UPGRADE_REQUIRED');
+    expect(transport.pushes.length).toBe(pushes);
+    // A new build that speaks a newer protocol starts fresh, and the queue syncs.
+    const updated = makeEngine(db, outbox, probeRegistry(), transport, new FakeClock(), { protocolVersion: 2 });
+    await updated.start();
+    expect(await db.get('SELECT upgrade_required_at, protocol_version FROM sync_meta')).toEqual({ upgrade_required_at: null, protocol_version: 2 });
+    expect(await updated.syncNow()).toBe('OK');
     expect(await outbox.unsyncedCount()).toBe(0);
   });
 

@@ -10,7 +10,7 @@ import { isolate } from '../i18n/direction.ts';
 import type { Banner, BannerState } from '../sync/banner.ts';
 import type { OutboxItem } from '../sync/outbox.ts';
 import type { EntityRegistry } from '../sync/registry.ts';
-import { colors, radius, space, touch } from '../theme/tokens.ts';
+import { colors, radius, space, touch, type as typography } from '../theme/tokens.ts';
 import { AppText, Notice } from './ui.tsx';
 
 type IconKind = QueueState | 'OFFLINE' | 'SESSION_EXPIRED' | 'ACCESS_REVOKED' | 'UPGRADE_REQUIRED' | 'NOTHING' | 'LOCKED';
@@ -38,7 +38,7 @@ export function SyncStateIcon({ kind, spinning = false }: { kind: IconKind; spin
   const icon = ICONS[kind];
   return (
     <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.icon}>
-      {spinning ? <ActivityIndicator size="small" color={icon.color} /> : <Text style={{ color: icon.color, fontSize: 18 }}>{icon.glyph}</Text>}
+      {spinning ? <ActivityIndicator size="small" color={icon.color} /> : <Text style={{ color: icon.color, fontSize: typography.sectionTitle.fontSize, lineHeight: typography.sectionTitle.lineHeight }}>{icon.glyph}</Text>}
     </View>
   );
 }
@@ -119,7 +119,7 @@ export function SyncBanner({ banner, onPress, loadError = false }: { banner: Ban
         ) : null}
       </View>
       {onPress ? (
-        <AppText color={colors.textSecondary} style={{ fontSize: 20 }}>
+        <AppText role="sectionTitle" color={colors.textSecondary}>
           {direction === 'rtl' ? '‹' : '›'}
         </AppText>
       ) : null}

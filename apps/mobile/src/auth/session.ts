@@ -91,8 +91,19 @@ export class SessionManager {
 
   private async adopt(tokens: SessionTokens): Promise<void> {
     const epoch = this.epoch;
+    // A sign-in that replaces a stored session (the app-lock re-sign-in after 5 wrong PINs or "Forgot PIN")
+    // ends the old session on the server too (security review L3). Best effort: the old refresh token is
+    // forgotten locally either way.
+    const previous = await this.store.getRefreshToken();
     this.accessToken = tokens.accessToken;
     await this.store.setRefreshToken(tokens.refreshToken);
+    if (previous && previous !== tokens.refreshToken) {
+      try {
+        await this.call('/auth/sign-out', { body: { refreshToken: previous }, timeoutMs: 10_000 });
+      } catch {
+        // Offline or refused: the old session ends at its own expiry; no copy of its token remains on the device.
+      }
+    }
     const me = await this.authorized<MeResponse>('/me');
     if (epoch !== this.epoch) return;
     await this.store.setLastLoginId(me.loginId);

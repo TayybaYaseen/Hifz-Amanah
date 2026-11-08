@@ -36,6 +36,34 @@ export interface DatabaseFiles {
   delete(name: string): Promise<void>;
 }
 
+/**
+ * Set on every connection (security review L5): deleted rows are overwritten with zeros instead of lingering in
+ * free pages, so purged student data cannot be read back from the file.
+ */
+export const CONNECTION_PRAGMAS = 'PRAGMA secure_delete = ON; PRAGMA foreign_keys = ON;';
+
+/**
+ * After a purge (revocation, sign-out, retention, scope reset): copies the WAL back into the main file and
+ * truncates it, so removed rows do not remain in the -wal file. Best effort; never fails the purge. Must run
+ * outside a transaction.
+ */
+export async function checkpoint(db: SqlExecutor): Promise<void> {
+  try {
+    await db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
+  } catch {
+    // A busy checkpoint is retried by SQLite later; the data is already deleted from the main file.
+  }
+}
+
+/**
+ * Before a database file is deleted: empties the WAL and leaves WAL mode, so closing the connection removes the
+ * -wal and -shm files and only the main file is left to delete (expo-sqlite deletes only that file).
+ */
+export async function prepareForDelete(db: SqlExecutor): Promise<void> {
+  await db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
+  await db.exec('PRAGMA journal_mode = DELETE;');
+}
+
 export class TransactionClosedError extends Error {
   constructor() {
     super('This transaction has already finished');

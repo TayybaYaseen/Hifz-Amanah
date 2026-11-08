@@ -27,8 +27,9 @@ export interface AppLockValue {
   forgotPin(): Promise<void>;
   /** Called by the locked-out sign-in form just before it signs in. */
   expectReauth(): void;
-  /** Checks the current PIN without counting toward the lockout (settings), then turns the lock off (Teacher). */
+  /** Checks the current PIN (a wrong one counts toward the lockout like any other), then turns the lock off (Teacher). */
   disable(currentPin: string): Promise<VerifyResult>;
+  /** Checks the current PIN without unlocking (settings). A wrong PIN counts toward the 5-try lockout. */
   checkPin(pin: string): Promise<VerifyResult>;
   retry(): void;
 }
@@ -126,12 +127,16 @@ export function AppLockProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void (async () => {
       try {
-        const [hardware, enrolled, types] = await Promise.all([
+        const [hardware, enrolled, types, level] = await Promise.all([
           LocalAuthentication.hasHardwareAsync(),
           LocalAuthentication.isEnrolledAsync(),
           LocalAuthentication.supportedAuthenticationTypesAsync(),
+          LocalAuthentication.getEnrolledLevelAsync(),
         ]);
-        setFingerprintAvailable(hardware && enrolled && types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT));
+        // Offered only with a Class 3 (strong) biometric enrolled, matching the strong-only prompt below (security L4).
+        setFingerprintAvailable(
+          hardware && enrolled && types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT) && level === LocalAuthentication.SecurityLevel.BIOMETRIC_STRONG,
+        );
       } catch {
         setFingerprintAvailable(false);
       }
@@ -175,7 +180,13 @@ export function AppLockProvider({ children }: { children: ReactNode }) {
     unlockWithFingerprint: async ({ promptMessage, cancelLabel }) => {
       if (!manager || !status?.biometric) return false;
       try {
-        const result = await LocalAuthentication.authenticateAsync({ promptMessage, cancelLabel, disableDeviceFallback: true });
+        const result = await LocalAuthentication.authenticateAsync({
+          promptMessage,
+          cancelLabel,
+          disableDeviceFallback: true,
+          // Android: only Class 3 biometrics unlock (security review L4); weak face unlock is refused.
+          biometricsSecurityLevel: 'strong',
+        });
         if (!result.success) return false;
         await manager.biometricUnlocked();
         setLocked(false);

@@ -1,6 +1,6 @@
 // Workspace-level sync state on the device (F12-AC14, AC15, AC20; plan Q14). One SQLite file per account and
 // organization; `sync_meta` holds the pull cursor, last success, and whether the workspace is locked.
-import type { SqlDriver, SqlExecutor } from '../local-db/driver.ts';
+import { checkpoint, type SqlDriver, type SqlExecutor } from '../local-db/driver.ts';
 import { purgeSynced } from './retention.ts';
 import type { EntityRegistry } from './registry.ts';
 
@@ -17,6 +17,8 @@ export interface WorkspaceMeta {
   upgradeRequiredAt: string | null;
   lastCleanupAt: string | null;
   orgTimeZone: string;
+  /** The latest `serverTime` a pull returned (security review L6): purge clocks never run behind it. */
+  lastServerTime: string | null;
 }
 
 interface MetaRow {
@@ -30,6 +32,7 @@ interface MetaRow {
   upgrade_required_at: string | null;
   last_cleanup_at: string | null;
   org_time_zone: string;
+  last_server_time: string | null;
 }
 
 export async function readMeta(db: SqlExecutor): Promise<WorkspaceMeta> {
@@ -46,6 +49,7 @@ export async function readMeta(db: SqlExecutor): Promise<WorkspaceMeta> {
     upgradeRequiredAt: row.upgrade_required_at,
     lastCleanupAt: row.last_cleanup_at,
     orgTimeZone: row.org_time_zone,
+    lastServerTime: row.last_server_time ?? null,
   };
 }
 
@@ -61,6 +65,7 @@ export async function lockWorkspace(db: SqlDriver, registry: EntityRegistry, now
     );
     await purgeSynced(tx, registry);
   });
+  await checkpoint(db);
 }
 
 /**
@@ -72,6 +77,31 @@ export async function holdForSignOut(db: SqlDriver, registry: EntityRegistry, no
     await purgeSynced(tx, registry);
     await tx.run('UPDATE sync_meta SET signed_out_at = ? WHERE id = 1', [new Date(nowMs).toISOString()]);
   });
+  await checkpoint(db);
+}
+
+export type SignOutAction =
+  /** Purge the synced cache and keep the unsynced operations locked to this account for up to 30 days (Q14). */
+  | 'HOLD'
+  /** Delete the workspace database and everything in it. */
+  | 'DELETE';
+
+/**
+ * What signing out does to the workspace (F12-AC10, AC20; Q14; review M3), whichever button was pressed.
+ * Unsynced changes are never deleted by a sign-out unless the workspace is locked after revocation (F12-AC20): a
+ * sign-out that finds unsynced changes (one saved after the warning was checked, say) holds them instead.
+ */
+export function signOutAction(input: { remaining: number; locked: boolean }): SignOutAction {
+  if (input.locked) return 'DELETE';
+  return input.remaining > 0 ? 'HOLD' : 'DELETE';
+}
+
+/** Records a server time from a pull; it only ever moves forward. */
+export async function noteServerTime(db: SqlExecutor, serverTime: string): Promise<void> {
+  const ms = Date.parse(serverTime);
+  if (Number.isNaN(ms)) return;
+  const iso = new Date(ms).toISOString();
+  await db.run('UPDATE sync_meta SET last_server_time = ? WHERE id = 1 AND (last_server_time IS NULL OR last_server_time < ?)', [iso, iso]);
 }
 
 /**

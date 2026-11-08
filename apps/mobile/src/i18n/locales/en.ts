@@ -56,6 +56,7 @@ export const en = {
     ENTITY_NOT_SUPPORTED: 'This kind of change cannot sync yet. Update the app.',
     CONFLICT_STALE: 'This record changed again. Review the latest version.',
     CONFLICT_CLOSED: 'This conflict was already resolved.',
+    CONFLICT_OPEN: 'Waiting for a conflict on this record to be resolved.',
   },
   fields: {
     PASSWORD_TOO_SHORT: 'Use at least 8 characters.',
@@ -290,6 +291,7 @@ export const en = {
       SYNCED: "Received by the server: {time}",
       FAILED: "Retry, or discard it if it is no longer needed.",
       ACTION_REQUIRED: "Also changed on the server. Review both versions.",
+      heldByConflict: "It will be sent again automatically once that conflict is resolved.",
     },
     reason: "Reason: {reason}",
     reasonFields: "Not accepted: {fields}",
@@ -304,6 +306,7 @@ export const en = {
     discardConfirm: "Discard change",
     discarded: "Change discarded.",
     discardBlocked: "Other changes depend on this one: {count}. Discard those first.",
+    discardMaybeSent: "This change may already have reached the server, so it cannot be discarded here. Sync it first, then correct the record if needed.",
     emptyTitle: "Nothing waiting to sync",
     emptyBody: "Changes you save appear here until the server receives them.",
     loadError: "Could not read the sync queue on this phone. Try again.",

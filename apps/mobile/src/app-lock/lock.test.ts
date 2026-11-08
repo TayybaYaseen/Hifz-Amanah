@@ -117,4 +117,26 @@ describe('F12 · app lock', () => {
     await lock.biometricUnlocked();
     expect((await lock.status()).wrongAttempts).toBe(0);
   });
+
+  it('F12-AC18 (US-051) security L1: a PIN check is counted before comparing, so killing the app mid-check still counts', async () => {
+    const store = new MemoryStore();
+    const m = manager(store);
+    await m.setPin('123456');
+    // The hash step dies (the app is killed while checking): the attempt is already counted.
+    let fail = true;
+    const dying = new AppLockManager(store, { ...testPinCrypto, sha256Hex: async (t: string) => {
+      if (fail) throw new Error('killed');
+      return testPinCrypto.sha256Hex(t);
+    } }, 'b3f6c2a0-0000-4000-8000-00000000000a', 10);
+    await expect(dying.verifyPin('000000')).rejects.toThrow('killed');
+    expect((await m.status()).wrongAttempts).toBe(1);
+    // A correct PIN clears the count.
+    fail = false;
+    expect(await dying.verifyPin('123456')).toEqual({ ok: true });
+    expect((await m.status()).wrongAttempts).toBe(0);
+    // Five counted attempts lock out even if the lockout flag was never written.
+    await store.set('hifz.lock.b3f6c2a0-0000-4000-8000-00000000000a.wrong', String(MAX_WRONG_PINS));
+    expect((await m.status()).lockedOut).toBe(true);
+    expect(await m.verifyPin('123456')).toEqual({ ok: false, remaining: 0, lockedOut: true });
+  });
 });

@@ -2,10 +2,10 @@
 // when it changed on this phone, and what happens next. Retry/Discard/Review per state; none when read-only.
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import type { HoldReason } from '@hifz/domain/sync';
+import { isHeldByOpenConflict, type HoldReason } from '@hifz/domain/sync';
 import { AppText, Button } from '../../components/ui.tsx';
 import { SyncStateIcon, stateColor, useFormatDateTime } from '../../components/sync.tsx';
-import type { OutboxItem } from '../../sync/outbox.ts';
+import { discardable, type OutboxItem } from '../../sync/outbox.ts';
 import type { EntityRegistry } from '../../sync/registry.ts';
 import { colors, radius, space } from '../../theme/tokens.ts';
 
@@ -62,7 +62,8 @@ export function QueueItemCard({ item, label, registry, hold, lockedView = false,
       case 'FAILED':
         return t('syncQueue.next.FAILED');
       case 'ACTION_REQUIRED':
-        return t('syncQueue.next.ACTION_REQUIRED');
+        // Held behind another change's open conflict on the same record (Q7): sent again once it is resolved.
+        return isHeldByOpenConflict(item.status) ? t('syncQueue.next.heldByConflict') : t('syncQueue.next.ACTION_REQUIRED');
     }
   })();
 
@@ -104,7 +105,7 @@ export function QueueItemCard({ item, label, registry, hold, lockedView = false,
         <View style={styles.actions}>
           {state === 'FAILED' && onRetry ? <Button testID={`${id}.retry`} variant="secondary" label={t('syncQueue.retry')} accessibilityLabel={t('syncQueue.retryA11y', { label })} onPress={onRetry} /> : null}
           {state === 'ACTION_REQUIRED' && onReview ? <Button testID={`${id}.review`} variant="secondary" label={t('syncQueue.review')} accessibilityLabel={t('syncQueue.reviewA11y', { label })} onPress={onReview} /> : null}
-          {(state === 'FAILED' || state === 'PENDING') && onDiscard ? (
+          {discardable(item) && onDiscard ? (
             <Button testID={`${id}.discard`} variant="tertiary" label={t('syncQueue.discard')} accessibilityLabel={t('syncQueue.discardA11y', { label })} onPress={onDiscard} />
           ) : null}
         </View>
