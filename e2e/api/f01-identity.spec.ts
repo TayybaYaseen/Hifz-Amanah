@@ -249,8 +249,14 @@ test.describe('F01 · Identity and authentication', { tag: '@F01' }, () => {
     const res = await admin.post(`/accounts/${await control.userIdOf('teacher.a2')}/deactivate`);
     expect((await res.json()).status).toBe('DEACTIVATED');
 
-    expect((await teacher.api.get('/me')).status()).toBe(401);
-    expect((await anon.post('/auth/refresh', { data: { refreshToken: teacher.refreshToken } })).status()).toBe(401);
+    // Existing sessions are refused with 403 ACCESS_REVOKED, so the app can lock the workspace
+    // (F12-AC14, NFR-OFF-010; F12 plan §5 "Identity change for ACCESS_REVOKED").
+    const me = await teacher.api.get('/me');
+    expect(me.status()).toBe(403);
+    expect((await me.json()).error?.code).toBe('ACCESS_REVOKED');
+    const refresh = await anon.post('/auth/refresh', { data: { refreshToken: teacher.refreshToken } });
+    expect(refresh.status()).toBe(403);
+    expect((await refresh.json()).error?.code).toBe('ACCESS_REVOKED');
     expect((await signInRaw(anon, toLoginId('teacher.a2'), TEST_PASSWORD)).status()).toBe(401);
   });
 

@@ -244,3 +244,17 @@ Report test results honestly. If something was not run, say so.
 - After completing and testing a feature, merge its branch into `main` through a Pull Request.
 - Keep `main` stable and free from incomplete or untested changes.
 - Do not merge or push changes without the user's approval.
+
+## Activate HifzAmanah Master Agent & Specialist Team
+Activate my existing HifzAmanah agent team. Do not recreate existing agents or modify their responsibilities. Include the newly added `security-agent.md` in `.claude/agents/`.
+
+Configure Master Agent as the central orchestrator. Whenever I give an implementation command using `/dal`, Master Agent must analyze the task, automatically delegate work to relevant specialist agents using actual Claude Code subagents, coordinate their work, integrate results, perform code review and testing, and report the final outcome to me.
+
+Verify that all existing agents are properly configured and callable, and that `/dal` invokes Master Agent correctly. Fix any missing configuration without duplicating files.
+
+Working with the agent team:
+- The Master Agent and all registered specialist agents in `.claude/agents/` are available for development tasks.
+- The user starts every implementation task, through `/dal` or another direct instruction. Claude never starts application implementation on its own.
+- All implementation follows the approved SRS, ARCHITECTURE, specs, and acceptance criteria, in the source-of-truth order of §2 of this file.
+- Raise any unresolved or Deferred decision that affects a task (SRS §17.3, e.g. DEC-B45, DEC-B55) with the user before implementing the affected functionality.
+- Planning documents and recorded decisions are not proof that functionality is implemented.

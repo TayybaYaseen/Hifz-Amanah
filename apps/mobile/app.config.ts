@@ -23,6 +23,10 @@ const config: ExpoConfig = {
   splash: { image: './assets/splash-icon.png', resizeMode: 'contain', backgroundColor: '#FAF8F0' },
   android: {
     ...(applicationId ? { package: applicationId } : {}),
+    // NFR-OFF-010, F12-AC20 (security review H1): no Google auto-backup of app data, so the SQLite workspaces
+    // (student records, unsynced changes) and the device index are not copied to the cloud. Note: on Android 12+
+    // this flag does not stop device-to-device transfer; that needs `dataExtractionRules` (not configured yet).
+    allowBackup: false,
     adaptiveIcon: { foregroundImage: './assets/adaptive-icon.png', backgroundColor: '#FAF8F0' },
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,

@@ -135,6 +135,33 @@ describe('F01 · mobile session', () => {
     expect(session.current).toEqual({ kind: 'signedOut', lastLoginId: 'teacher-a1' });
   });
 
+  it('F12-AC18 (US-051) security L3: signing in again over a stored session ends the old session on the server', async () => {
+    const { session, store, calls } = setup({
+      'POST /auth/sign-in': () => ({ status: 200, json: { step: 'SIGNED_IN', ...tokens(2) } }),
+      'POST /auth/sign-out': () => ({ status: 204 }),
+      'GET /me': () => ({ status: 200, json: ME }),
+    });
+    store.refresh = 'refresh-1'; // the session the app lock locked out
+    await session.signIn('teacher-a1', 'E2e-Test-Pass-1');
+    expect(store.refresh).toBe('refresh-2');
+    const signOut = calls.find((c) => c.route === 'POST /auth/sign-out')!;
+    // Ended by its refresh token alone (no bearer: the access token belongs to the new session).
+    expect(signOut).toMatchObject({ body: { refreshToken: 'refresh-1' }, auth: undefined });
+    expect(session.current.kind).toBe('signedIn');
+  });
+
+  it('F12-AC18 (US-051) security L3: if the old session cannot be ended, the new sign-in still succeeds', async () => {
+    const { session, store } = setup({
+      'POST /auth/sign-in': () => ({ status: 200, json: { step: 'SIGNED_IN', ...tokens(2) } }),
+      'POST /auth/sign-out': () => ({ status: 503, json: { error: { code: 'INTERNAL', message: '' } } }),
+      'GET /me': () => ({ status: 200, json: ME }),
+    });
+    store.refresh = 'refresh-1';
+    await session.signIn('teacher-a1', 'E2e-Test-Pass-1');
+    expect(store.refresh).toBe('refresh-2');
+    expect(session.current.kind).toBe('signedIn');
+  });
+
   it('F01-AC5 (US-001) sign-out while offline still forgets the session on the device', async () => {
     const store = new MemoryStore();
     const session = new SessionManager('http://api', async () => { throw new TypeError('Network request failed'); }, store);
@@ -244,5 +271,32 @@ describe('F01 · mobile session', () => {
     await session.verifyTwoFactor({ recoveryCode: 'GOOD-CODE' });
     expect(session.current.kind).toBe('signedIn');
     expect(calls.filter((c) => c.route === 'POST /auth/two-factor/verify').every((c) => c.body.challengeToken === 'ch')).toBe(true);
+  });
+});
+
+describe('F12 · access revoked', () => {
+  const revoked = { status: 403, json: { error: { code: 'ACCESS_REVOKED', message: '' } } };
+
+  it('F12-AC14 (US-052) a 403 ACCESS_REVOKED on any call moves the session to "revoked" and keeps the User ID', async () => {
+    const { session } = setup({
+      'POST /auth/sign-in': () => ({ status: 200, json: { step: 'SIGNED_IN', ...tokens(1) } }),
+      'GET /me': () => ({ status: 200, json: ME }),
+      'POST /sync/push': () => revoked,
+    });
+    await session.signIn('teacher-a1', 'p');
+    await expect(session.authorized('/sync/push', { body: {} })).rejects.toMatchObject({ code: 'ACCESS_REVOKED', status: 403 });
+    expect(session.current).toEqual({ kind: 'revoked', loginId: 'teacher-a1' });
+  });
+
+  it('F12-AC14 (US-052) at launch, a refresh answered with ACCESS_REVOKED shows the revoked state, not "offline"', async () => {
+    const { session, store } = setup({ 'POST /auth/refresh': () => revoked });
+    store.refresh = 'refresh-0';
+    store.lastLoginId = 'teacher-a1';
+    await session.restore();
+    expect(session.current).toEqual({ kind: 'revoked', loginId: 'teacher-a1' });
+    // Sign-out still works from here and forgets the token.
+    await session.signOut();
+    expect(session.current).toEqual({ kind: 'signedOut', lastLoginId: 'teacher-a1' });
+    expect(store.refresh).toBeNull();
   });
 });

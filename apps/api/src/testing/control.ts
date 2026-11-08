@@ -14,6 +14,8 @@ import type { MemoryMailer } from '../platform/mailer.ts';
 import { auditFaults } from '../modules/audit/audit.ts';
 import { decryptSecret, encryptSecret } from '../modules/identity/secrets.ts';
 import type { OrganizationService } from '../modules/organization/organization-service.ts';
+import type { SyncControl } from '../modules/sync/control-state.ts';
+import type { SyncRegistry } from '../modules/sync/handler.ts';
 import { newTotpSecret, totpForStep, totpStep } from '../modules/identity/totp.ts';
 import { TEST_PASSWORD } from '../../../../e2e/fixtures/personas.ts';
 import { seedPersonas } from './seed.ts';
@@ -40,6 +42,7 @@ interface ControlDeps {
   logSink: LogSink | undefined;
   totpKey: Buffer;
   organization: OrganizationService;
+  sync: { control: SyncControl; registry: SyncRegistry };
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -61,6 +64,11 @@ const NewWorkspaceInput = z.strictObject({
 });
 
 const TABLES = [
+  // F12 sync tables (RLS applies to them; the embedded test database connects as a superuser, which bypasses it).
+  'sync_conflicts',
+  'change_log',
+  'scope_changes',
+  'sync_ops',
   'audit_logs',
   'recovery_codes',
   'user_totp',
@@ -75,6 +83,8 @@ const TABLES = [
 
 export function registerTestControl(app: FastifyInstance, deps: ControlDeps): void {
   const expected = Buffer.from(deps.secret);
+  // Tables of test-registered sync handlers (e.g. sync_probe) are reset and searched with the rest.
+  const tables = (): string[] => [...deps.sync.registry.tables(), ...TABLES];
 
   const userIdOf = async (loginId: string): Promise<string> => {
     const row = await deps.db
@@ -96,7 +106,8 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
       });
 
       scope.post('/reset', async () => {
-        await sql.raw(`TRUNCATE ${TABLES.join(', ')} RESTART IDENTITY`).execute(deps.db);
+        await sql.raw(`TRUNCATE ${tables().join(', ')} RESTART IDENTITY`).execute(deps.db);
+        deps.sync.control.reset();
         deps.clock.reset();
         deps.mailer.clear();
         deps.logSink?.clear();
@@ -172,11 +183,78 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
         }
       });
 
+      // ---------- F12 · Sync (plan §5 "Test control") ----------
+
+      // Raises (or lowers) the oldest accepted sync protocol version (F12-AC15). Cleared by /reset.
+      scope.post('/sync/min-protocol', async (request) => {
+        const { version } = parse(z.strictObject({ version: z.number().int().min(1).max(1000) }), request.body);
+        deps.sync.control.setMinProtocolVersion(version);
+        return { minProtocolVersion: deps.sync.control.minProtocolVersion() };
+      });
+
+      // The next `count` push/pull requests fail with a temporary 5xx (F12-AC6). Cleared by /reset.
+      scope.post('/sync/fail-next', async (request) => {
+        const { count, status } = parse(
+          z.strictObject({ count: z.number().int().min(0).max(100), status: z.number().int().min(500).max(599).default(503) }),
+          request.body,
+        );
+        deps.sync.control.failNext(count, status);
+        return { status: 'armed', count };
+      });
+
+      // The stored result of one operation, for E2E assertions (no fields: sync_ops never stores them).
+      scope.get('/sync/ops/:opId', async (request) => {
+        const { opId } = request.params as { opId: string };
+        if (!UUID.test(opId)) throw new AppError('NOT_FOUND');
+        const row = await deps.db
+          .selectFrom('sync_ops')
+          .select(['op_id', 'organization_id', 'user_id', 'device_id', 'entity', 'entity_id', 'status', 'result', 'received_at'])
+          .where('op_id', '=', opId)
+          .executeTakeFirst();
+        if (!row) throw new AppError('NOT_FOUND');
+        return {
+          opId: row.op_id,
+          organizationId: row.organization_id,
+          userId: row.user_id,
+          deviceId: row.device_id,
+          entity: row.entity,
+          entityId: row.entity_id,
+          status: row.status,
+          result: row.result,
+          receivedAt: row.received_at.toISOString(),
+        };
+      });
+
+      // Every conflict, oldest first, without the device/server field values.
+      scope.get('/sync/conflicts', async () => {
+        const rows = await deps.db
+          .selectFrom('sync_conflicts')
+          .select(['id', 'organization_id', 'entity', 'entity_id', 'status', 'conflict_fields', 'caused_by_user_id', 'op_id', 'resolved_by', 'base_version', 'server_version'])
+          .orderBy('created_at')
+          .orderBy('id')
+          .execute();
+        return {
+          items: rows.map((r) => ({
+            id: r.id,
+            organizationId: r.organization_id,
+            entity: r.entity,
+            entityId: r.entity_id,
+            status: r.status,
+            conflictFields: r.conflict_fields,
+            causedByUserId: r.caused_by_user_id,
+            opId: r.op_id,
+            resolvedBy: r.resolved_by,
+            baseVersion: r.base_version === null ? null : Number(r.base_version),
+            serverVersion: Number(r.server_version),
+          })),
+        };
+      });
+
       // Counts occurrences of a string in every table and in the captured logs (F01-AC15).
       scope.post('/search', async (request) => {
         const { text } = parse(z.object({ text: z.string().min(4) }), request.body);
         let database = 0;
-        for (const table of TABLES) {
+        for (const table of tables()) {
           const { rows } = await sql<{ n: string }>`SELECT count(*) AS n FROM ${sql.table(table)} t WHERE strpos(t::text, ${text}) > 0`.execute(deps.db);
           database += Number(rows[0]?.n ?? 0);
         }

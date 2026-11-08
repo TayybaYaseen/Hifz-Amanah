@@ -18,7 +18,20 @@ in `apps/api/.data/pglite` (git-ignored).
 An unset `NODE_ENV` means **production**, which requires `DATABASE_URL`, `JWT_SECRET`, `HASH_PEPPER`,
 `TOTP_ENCRYPTION_KEY` (32 bytes, base64) and `MAIL_TRANSPORT=ses`. `npm run api:dev` sets `development`.
 `TEST_CONTROL_SECRET` is accepted only with `NODE_ENV=test`. `TRUST_PROXY_HOPS` (default 0) sets how many
-proxies in front of the API are trusted for the client address.
+proxies in front of the API are trusted for the client address. `SYNC_MIN_PROTOCOL_VERSION` (integer ≥ 1,
+default 1) is the oldest sync protocol the server accepts; older apps get `426 UPGRADE_REQUIRED` (F12-AC15).
+
+### Database role and row-level security (F12, ADR-016)
+
+Sync tables use Postgres row-level security with the `hifz_tenant` role ([`src/platform/tenant.ts`](src/platform/tenant.ts)).
+In staging and production:
+
+- The API must connect as a **non-superuser without `BYPASSRLS`** that is a **member of `hifz_tenant`**. Migration
+  0004 grants the role to the migrating user (`GRANT hifz_tenant TO CURRENT_USER`); if the API connects as another
+  role, grant it to that role too.
+- Running migration 0004 needs **`CREATEROLE`**, or a DBA creates `hifz_tenant` (`NOLOGIN NOSUPERUSER NOBYPASSRLS`)
+  beforehand.
+- A superuser or `BYPASSRLS` login defeats RLS. Only the embedded development/test database connects as a superuser.
 
 ## Conventions
 
@@ -82,6 +95,46 @@ The role is checked first, so `403` comes before any ID lookup. An ID outside th
 ID that does not exist (F02-AC7). Accounts now include `allClasses`. Deactivation is refused with `409 LAST_ADMIN`
 if it would leave no Owner or Admin.
 
+## Sync routes (F12)
+
+Protocol v1, decisions in [ADR-015](../../docs/adr/ADR-015-sync-protocol-idempotency-conflicts.md); shapes in
+[`packages/contracts/src/sync.ts`](../../packages/contracts/src/sync.ts); pure rules in `packages/domain/sync`; code in
+[`src/modules/sync`](src/modules/sync). Teacher, Admin, and Owner only; Student and Parent get `403 FORBIDDEN`
+(online, read-only). Every route refuses a revoked membership or deactivated account with `403 ACCESS_REVOKED`
+(also `/auth/refresh` and every other authenticated route, when the session ended for that reason), and an expired
+session with `401 SESSION_EXPIRED`.
+
+| Route | Body / query | Result |
+|---|---|---|
+| `POST /sync/push` | `{ protocolVersion, deviceId, ops: SyncOp[] }`, 1–100 ops in outbox order | `200` `{ results[], serverTime }`, one result per op in order: `APPLIED { rowVersion, entityId }`, `CONFLICT { conflictId }`, `REJECTED { code, fields? }` (`VALIDATION`, `NOT_FOUND`, `ENTITY_NOT_SUPPORTED`, `ID_TAKEN`, `OP_ID_REUSED`), or `RETRY { code }` (`DEPENDENCY_PENDING`, `CONFLICT_OPEN`; not stored, send again later). `426 UPGRADE_REQUIRED` below the minimum protocol; nothing applied |
+| `GET /sync/pull` | `?protocolVersion=` (absent = 1) `&cursor=` (absent = bootstrap) `&limit=` (1–500, default 500) | `200` `{ changes[], cursor, hasMore, scopeReset, serverTime }`; a change is `UPSERT` with staff-projected `fields` or `REMOVE_FROM_DEVICE`. `400 fields.cursor: INVALID` for a bad cursor; `426` as for push |
+| `GET /sync/conflicts` | `?status=OPEN\|RESOLVED&page=` | `200` 50 per page: entity, safe label, created time, caused-by user. A Teacher sees only conflicts their own operations caused, for records still in scope; Owner/Admin see all |
+| `GET /sync/conflicts/:id` | — | `200` both versions, base and server versions, `fieldDiff[]`; `404` for anyone who may not resolve it |
+| `POST /sync/conflicts/:id/resolve` | `{ choice: KEEP_DEVICE \| KEEP_SERVER \| MERGE, picks? }` | `200` `{ rowVersion }`; one `SYNC_CONFLICT_RESOLVED` audit. `404` for another Teacher (F12-AC17), `409 CONFLICT_STALE` if the row changed since, `409 CONFLICT_CLOSED` if already resolved, `400` for picks that split a coupled group |
+
+- **Per op, one transaction:** organization advisory lock, idempotent replay check (`sync_ops.op_hash`), `op_id`
+  claim, dependencies, scope (out of scope = `NOT_FOUND`), the handler's strict schema, conflict detection against
+  `change_log`; then apply or store a conflict. One refused op never rolls back the others.
+- **Dependencies:** an op is `RETRY DEPENDENCY_PENDING` until each `dependsOn` op of the same user is `APPLIED`, or
+  its conflict is `RESOLVED`, **and** that op's record exists in the organization. F04/F05 must decide what happens
+  to the dependents of a natural-key create-create conflict resolved with `KEEP_SERVER` (decision Q11), whose record
+  is never created.
+- **Own edits and `seq` (migration `0006_sync_ops_seq.sql`):** `sync_ops.seq` stores the op's client outbox `seq`
+  (nullable, not unique, not part of `op_hash`). In the conflict check, a change since the base counts as a server
+  change if its `op_id` is NULL, it came from another user or device, its `seq` is NULL, or its `seq` is greater than
+  the incoming op's `seq`. So this device's own earlier edits are excluded, but an older edit arriving after a newer
+  one becomes a conflict instead of overwriting it (NFR-OFF-006).
+- **No entity is synced in production yet.** Each feature registers a `SyncHandler`
+  ([`src/modules/sync/handler.ts`](src/modules/sync/handler.ts)) for its entities: attendance (F04), daily records,
+  portions, attempts (F05), mistakes and notes (F07), homework (F08). Until then they are `ENTITY_NOT_SUPPORTED`.
+- **Test-only `sync_probe` entity:** its table is applied by the integration-test harness from
+  `test/support/migrations/9001_sync_probe.sql` and its handler is passed in as `testSync` (`NODE_ENV=test`). It is
+  not in `migrations/` and is not registered by `npm run api:e2e-server`.
+- **Scope:** until F03 adds the roster, a Teacher without "all classes" has an empty sync scope (fail closed). F03
+  supplies a `SyncScopeProvider` and must call `recordScopeChange` for every Teacher a roster change affects
+  ([`src/modules/sync/change-log.ts`](src/modules/sync/change-log.ts)).
+- Request bodies are never logged, so operation fields and note bodies never reach the logs.
+
 ## Test control (non-production only)
 
 Enabled when `TEST_CONTROL_SECRET` is set (the E2E server sets `local-e2e-control-secret` unless overridden; E2E
@@ -97,11 +150,19 @@ F02 adds:
 - `POST /__test/audit/fail-next`: the next audit write fails (F02-AC13). A reset clears it.
 - `GET /__test/audit-target/:id`: audit records about one organization or user, oldest first.
 
+F12 adds (all cleared by `/__test/reset`):
+- `POST /__test/sync/min-protocol { version }`: sets the oldest accepted protocol version (F12-AC15).
+- `POST /__test/sync/fail-next { count, status? }`: the next `count` push/pull requests fail with `status`
+  (500–599, default 503) (F12-AC6).
+- `GET /__test/sync/ops/:opId`: the stored result of one operation (no fields; `sync_ops` never stores them).
+- `GET /__test/sync/conflicts`: every conflict, oldest first, without the device/server values.
+
 ## Not yet built
 
 - The per-IP throttle (F17-AC13) and the F17 audit query API arrive with F17.
-- Row-level security (ADR-006) is not built yet. F02 added no new tenant-scoped tables; every query filters by the
-  membership's organization. When to add it is an open question for the user (see docs/handover/F02-plan.md).
+- Row-level security (ADR-006, ADR-016) covers the sync tables only. The F01/F02 tables (`users`, `memberships`,
+  `audit_logs`, …) get it with F03; until then every query on them filters by the membership's organization.
+- Rate limiting on `/sync/*` is not built (open item D4 in docs/handover/F12-plan.md §12).
 - F02: an operator CLI or console for creating workspaces (only test control does it today), and removing or demoting
   an Owner (who may do it is still open).
 - The platform operator's reset of an Owner's two-factor setup is operator tooling, not an API route.

@@ -6,7 +6,34 @@ import { ACCESS_TOKEN_TTL_MS, SESSION_TTL_MS } from './rules.ts';
 import { newRefreshToken, sha256 } from './secrets.ts';
 import type { TokenService } from './tokens.ts';
 
-export type RevokeReason = 'SIGN_OUT' | 'PASSWORD_RESET' | 'PASSWORD_CHANGED' | 'DEACTIVATED' | 'TWO_FACTOR_RESET' | 'REFRESH_REUSE' | 'ROLE_CHANGED';
+export type RevokeReason =
+  | 'SIGN_OUT'
+  | 'PASSWORD_RESET'
+  | 'PASSWORD_CHANGED'
+  | 'DEACTIVATED'
+  | 'MEMBERSHIP_REVOKED'
+  | 'TWO_FACTOR_RESET'
+  | 'REFRESH_REUSE'
+  | 'ROLE_CHANGED';
+
+/**
+ * Sessions ended because the person's access to the madrasa was removed. Requests on them answer
+ * 403 ACCESS_REVOKED so the app can lock the workspace (F12-AC14, NFR-OFF-010); every other ending
+ * (sign-out, password reset, expiry, refresh reuse) stays 401 SESSION_EXPIRED.
+ */
+const ACCESS_REVOKED_REASONS: ReadonlySet<string> = new Set<RevokeReason>(['DEACTIVATED', 'MEMBERSHIP_REVOKED']);
+
+/** Why a session can no longer be used, or null when it is live. */
+export function sessionRefusal(
+  session: { revoked_at: Date | null; revoked_reason: string | null; expires_at: Date },
+  access: { accountActive: boolean; membershipActive: boolean },
+  now: Date,
+): 'SESSION_EXPIRED' | 'ACCESS_REVOKED' | null {
+  if (session.revoked_at) return session.revoked_reason && ACCESS_REVOKED_REASONS.has(session.revoked_reason) ? 'ACCESS_REVOKED' : 'SESSION_EXPIRED';
+  if (session.expires_at <= now) return 'SESSION_EXPIRED';
+  if (!access.accountActive || !access.membershipActive) return 'ACCESS_REVOKED';
+  return null;
+}
 
 export async function createSession(
   db: Executor,

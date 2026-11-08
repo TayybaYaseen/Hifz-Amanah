@@ -1,5 +1,6 @@
 // Shared setup for API integration tests: embedded Postgres (DEC-B68), migrations, the app with test control,
 // and sign-in helpers for the seeded personas (e2e/fixtures/personas.ts). Synthetic data only.
+import { fileURLToPath } from 'node:url';
 import type { FastifyInstance, InjectOptions, LightMyRequestResponse } from 'fastify';
 import { TEST_PASSWORD, loginIdOf, type PersonaKey } from '../../../../e2e/fixtures/personas.ts';
 import { buildApp } from '../../src/app.ts';
@@ -9,6 +10,16 @@ import { createDb, type Db } from '../../src/platform/db.ts';
 import { startEmbeddedPostgres, type EmbeddedPostgres } from '../../src/platform/embedded-postgres.ts';
 import { MemoryMailer } from '../../src/platform/mailer.ts';
 import { migrate } from '../../src/platform/migrate.ts';
+import type { AppDeps } from '../../src/app.ts';
+import { LogSink } from '../../src/testing/control.ts';
+
+/** Test-only schema (the sync_probe table, F12 decision Q1); never part of apps/api/migrations. */
+export const TEST_MIGRATIONS_DIR = fileURLToPath(new URL('./migrations/', import.meta.url));
+
+export interface HarnessOptions {
+  /** Test sync handlers and scope (F12); also applies the test-only migrations. */
+  testSync?: AppDeps['testSync'];
+}
 
 export const CONTROL_SECRET = 'integration-control-secret';
 
@@ -16,6 +27,7 @@ export interface Harness {
   db: Db;
   app: FastifyInstance;
   clock: Clock;
+  logSink: LogSink;
   stop(): Promise<void>;
   reset(): Promise<void>;
   control(method: 'GET' | 'POST', url: string, payload?: object): Promise<LightMyRequestResponse>;
@@ -27,13 +39,23 @@ export interface Harness {
 
 const loginOf = (who: string) => (who.includes('.') ? loginIdOf(who as PersonaKey) : who);
 
-export async function startHarness(): Promise<Harness> {
+export async function startHarness(options: HarnessOptions = {}): Promise<Harness> {
   const pg: EmbeddedPostgres = await startEmbeddedPostgres();
   const db = createDb({ connectionString: pg.connectionString, maxConnections: 1 }).db;
   await migrate(db);
+  if (options.testSync) await migrate(db, TEST_MIGRATIONS_DIR);
   const clock = new Clock();
   const config = loadConfig({ NODE_ENV: 'test', TEST_CONTROL_SECRET: CONTROL_SECRET });
-  const app = await buildApp({ config, db, clock, mailer: new MemoryMailer(), sleep: async () => {} });
+  const logSink = new LogSink();
+  const app = await buildApp({
+    config,
+    db,
+    clock,
+    mailer: new MemoryMailer(),
+    sleep: async () => {},
+    logSink,
+    ...(options.testSync ? { testSync: options.testSync } : {}),
+  });
 
   const control: Harness['control'] = (method, url, payload) =>
     app.inject({ method, url: `/__test${url}`, headers: { 'x-test-control-secret': CONTROL_SECRET }, ...(payload ? { payload } : {}) });
@@ -56,6 +78,7 @@ export async function startHarness(): Promise<Harness> {
     db,
     app,
     clock,
+    logSink,
     control,
     call,
     signIn,

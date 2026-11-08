@@ -34,12 +34,19 @@ export type SessionState =
   | { kind: 'signedIn'; me: MeResponse }
   /** The stored session could not be checked (no connection or a server error). It is kept; retry resumes it. */
   | { kind: 'offline'; loginId: string | null }
-  | { kind: 'expired'; loginId: string | null };
+  | { kind: 'expired'; loginId: string | null }
+  /**
+   * The server answered 403 ACCESS_REVOKED: the account was deactivated or its membership revoked (F12-AC14).
+   * The app shows the workspace-locked screen; only sign-out is offered.
+   */
+  | { kind: 'revoked'; loginId: string | null };
 
 type Listener = (state: SessionState) => void;
 
 /** The server has refused the session itself, as opposed to being unreachable or failing. */
 const isSessionRefusal = (err: unknown) => err instanceof ApiFailure && err.status === 401;
+/** The server ended this account's access to the madrasa (F12; plan §5 "Identity change for ACCESS_REVOKED"). */
+const isAccessRevoked = (err: unknown) => err instanceof ApiFailure && err.code === 'ACCESS_REVOKED';
 
 export class SessionManager {
   private state: SessionState = { kind: 'starting' };
@@ -84,8 +91,19 @@ export class SessionManager {
 
   private async adopt(tokens: SessionTokens): Promise<void> {
     const epoch = this.epoch;
+    // A sign-in that replaces a stored session (the app-lock re-sign-in after 5 wrong PINs or "Forgot PIN")
+    // ends the old session on the server too (security review L3). Best effort: the old refresh token is
+    // forgotten locally either way.
+    const previous = await this.store.getRefreshToken();
     this.accessToken = tokens.accessToken;
     await this.store.setRefreshToken(tokens.refreshToken);
+    if (previous && previous !== tokens.refreshToken) {
+      try {
+        await this.call('/auth/sign-out', { body: { refreshToken: previous }, timeoutMs: 10_000 });
+      } catch {
+        // Offline or refused: the old session ends at its own expiry; no copy of its token remains on the device.
+      }
+    }
     const me = await this.authorized<MeResponse>('/me');
     if (epoch !== this.epoch) return;
     await this.store.setLastLoginId(me.loginId);
@@ -109,6 +127,10 @@ export class SessionManager {
       this.setIfCurrent(epoch, { kind: 'signedIn', me });
     } catch (err) {
       if (isSessionRefusal(err)) return; // authorized() already moved to `expired`.
+      if (isAccessRevoked(err)) {
+        await this.revoke(epoch);
+        return;
+      }
       // No connection or a server error: keep the stored session and let the user retry (code review M2).
       this.setIfCurrent(epoch, { kind: 'offline', loginId: lastLoginId });
     }
@@ -189,6 +211,15 @@ export class SessionManager {
   /** Calls the API with the session; refreshes once on 401; ends in the session-expired state if that fails. */
   async authorized<T>(path: string, opts: Omit<RequestOptions, 'token'> = {}): Promise<T> {
     const epoch = this.epoch;
+    try {
+      return await this.authorizedOnce<T>(epoch, path, opts);
+    } catch (err) {
+      if (isAccessRevoked(err)) await this.revoke(epoch);
+      throw err;
+    }
+  }
+
+  private async authorizedOnce<T>(epoch: number, path: string, opts: Omit<RequestOptions, 'token'>): Promise<T> {
     if (!this.accessToken && !(await this.refresh())) return this.expire(epoch);
     try {
       return await this.call<T>(path, { ...opts, token: this.accessToken });
@@ -202,6 +233,18 @@ export class SessionManager {
         throw retry;
       }
     }
+  }
+
+  /**
+   * F12-AC14: access was revoked. The access token is dropped; the refresh token is kept, so the next launch asks
+   * the server again (and gets the same answer) until the user signs out, which also clears the locked data.
+   */
+  private async revoke(epoch: number): Promise<void> {
+    if (epoch !== this.epoch || this.state.kind === 'revoked') return;
+    this.epoch++;
+    this.accessToken = null;
+    const loginId = this.state.kind === 'signedIn' ? this.state.me.loginId : await this.store.getLastLoginId();
+    this.set({ kind: 'revoked', loginId });
   }
 
   private async expire(epoch: number): Promise<never> {

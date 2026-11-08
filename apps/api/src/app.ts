@@ -14,6 +14,12 @@ import { MembershipService } from './modules/organization/membership-service.ts'
 import { OrganizationService } from './modules/organization/organization-service.ts';
 import { registerOrganizationRoutes } from './modules/organization/routes.ts';
 import { TokenService } from './modules/identity/tokens.ts';
+import { ConflictService } from './modules/sync/conflict-service.ts';
+import { SyncControl } from './modules/sync/control-state.ts';
+import { SyncRegistry, type SyncHandler } from './modules/sync/handler.ts';
+import { registerSyncRoutes } from './modules/sync/routes.ts';
+import { rosterlessScope, type SyncScopeProvider } from './modules/sync/scope.ts';
+import { SyncService } from './modules/sync/sync-service.ts';
 import { registerTestControl, type LogSink } from './testing/control.ts';
 
 export interface AppDeps {
@@ -24,6 +30,11 @@ export interface AppDeps {
   /** Captured log lines, for the test-control text search. */
   logSink?: LogSink;
   sleep?: (ms: number) => Promise<void>;
+  /**
+   * Test builds only (NODE_ENV=test): extra sync entity handlers, such as the integration tests' sync_probe
+   * (F12 decision Q1), and a scope provider standing in for F03's roster. No production handler exists in F12.
+   */
+  testSync?: { handlers?: SyncHandler[]; scopes?: SyncScopeProvider };
 }
 
 const realSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -65,6 +76,19 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     memberships: new MembershipService(deps.db, deps.clock, accounts),
   });
 
+  if (deps.testSync && deps.config.env !== 'test') throw new Error('Test sync handlers are allowed only when NODE_ENV=test');
+  // F12: no production entity handler yet; F04/F05/F07/F08 register theirs here.
+  const syncRegistry = new SyncRegistry(deps.testSync?.handlers ?? []);
+  const syncScopes = deps.testSync?.scopes ?? rosterlessScope;
+  const syncControl = new SyncControl(deps.config.syncMinProtocolVersion);
+  const syncDeps = { db: deps.db, clock: deps.clock, registry: syncRegistry, scopes: syncScopes };
+  registerSyncRoutes(app, {
+    authenticate: (request) => auth.authenticate(bearer(request)),
+    sync: new SyncService({ ...syncDeps, control: syncControl }),
+    conflicts: new ConflictService(syncDeps),
+    control: syncControl,
+  });
+
   if (deps.config.testControlSecret) {
     if (deps.config.env !== 'test') throw new Error('The test-control API is enabled only when NODE_ENV=test');
     registerTestControl(app, {
@@ -75,6 +99,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       logSink: deps.logSink,
       totpKey: deps.config.totpKey,
       organization,
+      sync: { control: syncControl, registry: syncRegistry },
     });
   }
   return app;

@@ -17,3 +17,6 @@ tags:
 # 3. stopApp; launchApp → the record and its pending items are still there.                            (F12-AC2)
 # 4. Go online → items move to Synced in order: record, then portions and attempts.                    (F12-AC4)
 # 5. API check: exactly one record, its portions, and attempts; the record ID equals the device ID.    (F12-AC3, F12-AC5)
+#
+# Implemented testIDs, for when this flow becomes runnable: sync.savedOnDevice, sync.banner.state.<STATE>,
+#   sync.banner.count, syncQueue.screen, syncQueue.section.<state>, syncQueue.item.<opId> (Daily Entry arrives with F05)

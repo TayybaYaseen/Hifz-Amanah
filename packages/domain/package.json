@@ -1,0 +1,9 @@
+{
+  "name": "@hifz/domain",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./sync": "./sync/index.ts"
+  }
+}

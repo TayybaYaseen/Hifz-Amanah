@@ -165,8 +165,10 @@ export function Card({ children }: { children: ReactNode }) {
 }
 
 /** Primary, secondary, tertiary, or destructive button (design.md §5.1). Disabled while busy. */
-export function Button({ label, busyLabel, onPress, variant = 'primary', busy = false, disabled = false, testID }: {
+export function Button({ label, busyLabel, onPress, variant = 'primary', busy = false, disabled = false, testID, accessibilityLabel }: {
   label: string;
+  /** A fuller spoken label when the visible one is short (e.g. "Retry {item}"). */
+  accessibilityLabel?: string;
   busyLabel?: string;
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'tertiary' | 'destructive';
@@ -182,6 +184,7 @@ export function Button({ label, busyLabel, onPress, variant = 'primary', busy = 
     <Pressable
       testID={testID}
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: inactive, busy }}
       disabled={inactive}
       onPress={onPress}

@@ -22,6 +22,8 @@ const Env = z.object({
   AWS_REGION: z.string().default('ap-south-1'),
   /** Enables the test-control API (NFR-MNT-005). Never set in production. */
   TEST_CONTROL_SECRET: z.string().min(16).optional(),
+  /** Oldest sync protocol version the server accepts; older apps get 426 UPGRADE_REQUIRED (F12-AC15). */
+  SYNC_MIN_PROTOCOL_VERSION: z.coerce.number().int().min(1).default(1),
 });
 
 export interface Config {
@@ -35,6 +37,7 @@ export interface Config {
   mail: { transport: 'memory' | 'ses'; from: string; awsRegion: string };
   testControlSecret: string | undefined;
   trustProxyHops: number;
+  syncMinProtocolVersion: number;
 }
 
 export function loadConfig(source: NodeJS.ProcessEnv = process.env): Config {
@@ -65,5 +68,6 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): Config {
     mail: { transport: env.MAIL_TRANSPORT, from: env.MAIL_FROM, awsRegion: env.AWS_REGION },
     testControlSecret: env.TEST_CONTROL_SECRET,
     trustProxyHops: env.TRUST_PROXY_HOPS,
+    syncMinProtocolVersion: env.SYNC_MIN_PROTOCOL_VERSION,
   };
 }
