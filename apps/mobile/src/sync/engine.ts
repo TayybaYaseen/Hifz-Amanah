@@ -13,7 +13,8 @@
 //   unsynced operation left. A change at the row's own version is applied again (review H1): after APPLIED the
 //   server may hold different values at that version (a safe merge kept its display order, or other users' fields
 //   were merged), and the server's version is the truth. scopeReset drops synced rows and re-bootstraps
-//   (NFR-OFF-010).
+//   (NFR-OFF-010). A refetch asked for by a discard first catches up from the stored cursor (so scope changes and
+//   REMOVE_FROM_DEVICE are honoured), then re-bootstraps the same way (review R1).
 // - After the pull, the device's own open conflicts are checked with the server (review H2): resolved elsewhere →
 //   SYNCED; gone (404: out of scope or not this user's) → FAILED NOT_FOUND (decision Q8).
 // - Whole-request refusals: 401 → the session refreshes once and resumes (SessionManager.authorized), else the
@@ -460,22 +461,48 @@ export class SyncEngine {
     return kind;
   }
 
+  /**
+   * Pulls until hasMore = false. A requested refetch (review N4: a discard asked for the server's values again) is
+   * done in two steps (review R1, NFR-OFF-010, FR-SYNC-009):
+   * 1. Catch up incrementally from the stored cursor, so a scope change (scopeReset) and REMOVE_FROM_DEVICE changes
+   *    are honoured. The server checks scope changes only against a cursor, and a snapshot carries visible rows only
+   *    and moves the watermark past the scope change, so starting the refetch from a snapshot would keep rows that
+   *    left the user's scope cached for ever.
+   * 2. Re-bootstrap: drop the synced rows (unsynced rows and the outbox stay) and pull a fresh snapshot, which
+   *    rewrites every synced row at its server version.
+   * If step 1 already re-bootstrapped (scopeReset), or there is no stored cursor, the snapshot it pulled is the
+   * refetch. The request counts as done only once a snapshot pull has finished; the counter value read here is
+   * recorded, so a discard during a running pull asks for one more refetch (a pull interrupted half-way starts over).
+   */
   private async pullAll(): Promise<SyncOutcome> {
-    // Review N4: a discard asked for the server's values again; this pull starts from a fresh snapshot, and the
-    // request counts as done only once that pull has finished (a pull interrupted half-way starts over).
     const start = await this.d.db.get<{ last_pull_cursor: string | null; refetch_requested: number; refetch_done: number }>(
       'SELECT last_pull_cursor, refetch_requested, refetch_done FROM sync_meta WHERE id = 1',
     );
     const refetch = Number(start?.refetch_requested ?? 0);
-    let cursor = refetch > Number(start?.refetch_done ?? 0) ? null : (start?.last_pull_cursor ?? null);
+    const refetchDue = refetch > Number(start?.refetch_done ?? 0);
+    const first = await this.pullPages(start?.last_pull_cursor ?? null, refetch);
+    if (first.outcome !== 'OK' || !first.finished || !refetchDue || first.snapshot) return first.outcome;
+    await this.d.db.transaction(async (tx) => {
+      await purgeSynced(tx, this.d.registry, { keepQueueHistory: true });
+    });
+    await checkpoint(this.d.db);
+    return (await this.pullPages(null, refetch)).outcome;
+  }
+
+  /**
+   * Pulls pages from `cursor` until hasMore = false. `snapshot` is true when the pages pulled ended in a complete
+   * snapshot (started without a cursor, or re-bootstrapped after scopeReset); only then is `refetch` recorded as done.
+   */
+  private async pullPages(from: string | null, refetch: number): Promise<{ outcome: SyncOutcome; finished: boolean; snapshot: boolean }> {
+    let cursor = from;
     let rebootstrapped = false;
     for (let page = 0; page < 10_000; page++) {
-      if (this.stopped) return 'OK';
+      if (this.stopped) return { outcome: 'OK', finished: false, snapshot: false };
       let response;
       try {
         response = await this.d.transport.pull({ cursor, limit: SYNC_LIMITS.maxPullLimit, protocolVersion: this.protocolVersion });
       } catch (err) {
-        return this.onBlocked(failureOf(err).kind);
+        return { outcome: await this.onBlocked(failureOf(err).kind), finished: false, snapshot: false };
       }
       if (response.scopeReset && cursor !== null && !rebootstrapped) {
         // NFR-OFF-010, plan Q8: the scope changed. Drop every synced row and start again from a snapshot of the
@@ -489,19 +516,20 @@ export class SyncEngine {
         rebootstrapped = true;
         continue;
       }
+      const snapshot = from === null || rebootstrapped;
       const changes = response.changes;
       const nextCursor = response.cursor;
       await this.d.db.transaction(async (tx) => {
         for (const change of changes) await this.applyChange(tx, change);
         await tx.run('UPDATE sync_meta SET last_pull_cursor = ? WHERE id = 1', [nextCursor]);
-        if (!response.hasMore) await tx.run('UPDATE sync_meta SET refetch_done = MAX(refetch_done, ?) WHERE id = 1', [refetch]);
+        if (!response.hasMore && snapshot) await tx.run('UPDATE sync_meta SET refetch_done = MAX(refetch_done, ?) WHERE id = 1', [refetch]);
         await noteServerTime(tx, response.serverTime);
       });
       this.d.onServerTime?.(response.serverTime);
       cursor = nextCursor;
-      if (!response.hasMore) return 'OK';
+      if (!response.hasMore) return { outcome: 'OK', finished: true, snapshot };
     }
-    return 'OK';
+    return { outcome: 'OK', finished: false, snapshot: false };
   }
 
   private async applyChange(tx: SqlExecutor, change: Change): Promise<void> {

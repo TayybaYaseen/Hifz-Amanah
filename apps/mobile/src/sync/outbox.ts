@@ -208,8 +208,18 @@ export class Outbox {
     return this.deps.newId();
   }
 
-  /** Queues an operation inside the caller's transaction. Returns the op ID and its outbox sequence. */
+  /**
+   * Queues an operation inside the caller's transaction. Returns the op ID and its outbox sequence.
+   * Refused with OutboxBlockedError while signing out (review N6, R3), also when a feature calls it inside its own
+   * transaction instead of through saveWithOp. (A save already running in saveWithOp when sign-out blocks the
+   * outbox is awaited by `block()` and completes; it queues through `queue`, which does not check.)
+   */
   async enqueue(tx: SqlExecutor, op: NewOp): Promise<{ opId: string; seq: number }> {
+    if (this.blocked) throw new OutboxBlockedError();
+    return this.queue(tx, op);
+  }
+
+  private async queue(tx: SqlExecutor, op: NewOp): Promise<{ opId: string; seq: number }> {
     validate(op);
     const meta = await tx.get<{ next_seq: number }>('SELECT next_seq FROM sync_meta WHERE id = 1');
     if (!meta) throw new Error('sync_meta is missing; run the migrations first');
@@ -274,9 +284,15 @@ export class Outbox {
    *   gets) and a dependency on that CREATE;
    * - in both cases a dependency on the row's latest unsynced operation, so this device's changes of one row go
    *   out strictly in order (belt-and-braces with the domain's per-row ordering).
-   * Throws OutboxValidationError if the entity is not registered or the row is not on the device.
+   * Throws OutboxValidationError if the entity is not registered or the row is not on the device, and
+   * OutboxBlockedError while signing out (review R3).
    */
   async enqueueUpdate(tx: SqlExecutor, update: NewUpdate): Promise<{ opId: string; seq: number }> {
+    if (this.blocked) throw new OutboxBlockedError();
+    return this.queueUpdate(tx, update);
+  }
+
+  private async queueUpdate(tx: SqlExecutor, update: NewUpdate): Promise<{ opId: string; seq: number }> {
     const handler = this.deps.registry?.get(update.entity);
     if (!handler) throw new OutboxValidationError(`entity "${update.entity}" is not registered`);
     const row = await tx.get<{ row_version: number | null }>(`SELECT row_version FROM ${handler.table} WHERE id = ?`, [update.entityId]);
@@ -294,7 +310,7 @@ export class Outbox {
     }
     const previous = unsynced.at(-1);
     if (previous) dependsOn.add(previous.opId);
-    return this.enqueue(tx, {
+    return this.queue(tx, {
       entity: update.entity,
       entityId: update.entityId,
       opType: 'UPDATE',
@@ -312,7 +328,7 @@ export class Outbox {
   ): Promise<{ result: T; opIds: string[] }> {
     return this.saving(async (tx) => {
       const result = await entityWrite(tx);
-      const { opId } = await this.enqueueUpdate(tx, typeof update === 'function' ? update(result) : update);
+      const { opId } = await this.queueUpdate(tx, typeof update === 'function' ? update(result) : update);
       return { result, opIds: [opId] };
     });
   }
@@ -357,7 +373,7 @@ export class Outbox {
       const resolved = typeof ops === 'function' ? ops(result) : ops;
       const list: readonly NewOp[] = Array.isArray(resolved) ? resolved : [resolved as NewOp];
       const opIds: string[] = [];
-      for (const op of list) opIds.push((await this.enqueue(tx, op)).opId);
+      for (const op of list) opIds.push((await this.queue(tx, op)).opId);
       return { result, opIds };
     });
   }

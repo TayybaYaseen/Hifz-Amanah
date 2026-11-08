@@ -1,13 +1,13 @@
 // F12 · Offline and synchronization — unit: re-review fixes N2–N6 (docs/specs/04-f12-offline-sync.md; NFR-OFF-006,
 // NFR-OFF-007, FR-SYNC-006). Real SQL under node:sqlite; the server is a fake transport.
 import { describe, expect, it } from 'vitest';
-import type { ConflictDetail, OpResult, PushRequest, PushResponse } from '@hifz/contracts';
+import type { ConflictDetail, OpResult, PullResponse, PushRequest, PushResponse } from '@hifz/contracts';
 import { nextSendable } from '@hifz/domain/sync';
 import { MAX_RECONCILE, RECONCILE_INTERVAL_MS, RetryNotAllowedError } from './engine.ts';
 import { Outbox, OutboxBlockedError, OutboxValidationError } from './outbox.ts';
 import { SYNCED_LISTED_MS } from './retention.ts';
 import { quiesceForSignOut } from './workspace.ts';
-import { FakeClock, FakeTransport, makeEngine, makeOutbox, probeDb, probeRegistry, writeProbe } from './testing/probe.ts';
+import { FakeClock, FakeTransport, failure, makeEngine, makeOutbox, probeDb, probeRegistry, writeProbe } from './testing/probe.ts';
 
 const ROW = '01934f5e-8a00-7000-8000-000000000201';
 const now = () => new Date().toISOString();
@@ -222,7 +222,8 @@ describe('F12 · Discard restores the server values (review N4)', () => {
     const pullsBefore = transport.pulls.length;
     await engine.discard(opId); // also triggers a run
     await engine.syncNow();
-    expect(transport.pulls[pullsBefore]).toMatchObject({ cursor: null });
+    // Review R1: first a catch-up from the stored cursor, then the snapshot.
+    expect(transport.pulls.slice(pullsBefore, pullsBefore + 2).map((p) => p.cursor)).toEqual(['c0', null]);
     expect(await db.get('SELECT label, row_version FROM sync_probe WHERE id = ?', [ROW])).toEqual({ label: 'Server', row_version: 2 });
     expect(await db.get('SELECT refetch_requested, refetch_done FROM sync_meta')).toEqual({ refetch_requested: 1, refetch_done: 1 });
     // The next pull continues from the stored cursor again.
@@ -243,11 +244,14 @@ describe('F12 · Discard restores the server values (review N4)', () => {
         discarded = true;
         await engine.discard(opId);
       }
-      return { changes: [], cursor: cursor === null ? 'boot' : 'c9', hasMore: false, scopeReset: false, serverTime: now() };
+      // The snapshot carries the row at its server version (the refetch drops synced rows first, review R1).
+      const snapshot = [{ entity: 'sync_probe' as const, entityId: ROW, rowVersion: 2, op: 'UPSERT' as const, fields: { label: 'Server', status: 'OPEN', position: 1 } }];
+      return { changes: cursor === null ? snapshot : [], cursor: cursor === null ? 'boot' : 'c9', hasMore: false, scopeReset: false, serverTime: now() };
     };
     await engine.syncNow();
-    // The pull that was running (from c0) did not count as the refetch; the run after it started from a snapshot.
-    expect(transport.pulls.map((p) => p.cursor)).toEqual([null, 'c0', null]);
+    // The pull that was running (from c0) did not count as the refetch; the run after it caught up from the stored
+    // cursor and then pulled a snapshot (review R1).
+    expect(transport.pulls.map((p) => p.cursor)).toEqual([null, 'c0', 'c9', null]);
     expect(await db.get('SELECT refetch_requested, refetch_done FROM sync_meta')).toEqual({ refetch_requested: 1, refetch_done: 1 });
 
     // A server change kept aside while the edit was unsynced restores the row by itself: no refetch.
@@ -264,6 +268,144 @@ describe('F12 · Discard restores the server values (review N4)', () => {
     await engine.discard(second);
     expect(await db.get('SELECT label, row_version FROM sync_probe WHERE id = ?', [ROW])).toEqual({ label: 'Theirs', row_version: 5 });
     expect(await db.get('SELECT refetch_requested FROM sync_meta')).toEqual({ refetch_requested: 1 });
+  });
+});
+
+describe('F12 · a refetch honours scope changes and removals (review R1; NFR-OFF-010, FR-SYNC-009)', () => {
+  const OUT = '01934f5e-8a00-7000-8000-000000000202';
+  const KEEP = '01934f5e-8a00-7000-8000-000000000203';
+  const probe = (id: string, rowVersion: number, label: string) =>
+    ({ entity: 'sync_probe' as const, entityId: id, rowVersion, op: 'UPSERT' as const, fields: { label, status: 'OPEN', position: 1 } });
+  const page = (changes: PullResponse['changes'], cursor: string, extra: Partial<PullResponse> = {}): PullResponse => ({
+    changes,
+    cursor,
+    hasMore: false,
+    scopeReset: false,
+    serverTime: now(),
+    ...extra,
+  });
+
+  /**
+   * Synced rows ROW, OUT and KEEP, a stored cursor c0, a FAILED edit of ROW to discard (it asks for a refetch), and a
+   * FAILED edit of KEEP that stays unsynced.
+   */
+  async function refetchSetup() {
+    const s = await setup();
+    await serverRow(s.db, ROW, 2, 'Server');
+    await serverRow(s.db, OUT, 1, 'Out of scope');
+    await serverRow(s.db, KEEP, 3, 'Keep');
+    await s.engine.syncNow(); // stored cursor c0
+    const discarded = await update(s.outbox, ROW, { label: 'Mine' });
+    const kept = await update(s.outbox, KEEP, { label: 'Mine keep' });
+    s.transport.onPush = respond((op) => ({ opId: op.opId, status: 'REJECTED', code: 'VALIDATION' }));
+    await s.engine.syncNow();
+    expect((await s.outbox.get(discarded))!.status.state).toBe('FAILED');
+    expect((await s.outbox.get(kept))!.status.state).toBe('FAILED');
+    return { ...s, discarded, kept };
+  }
+  type RefetchSetup = Awaited<ReturnType<typeof refetchSetup>>;
+
+  async function expectUnsyncedUntouched(s: RefetchSetup) {
+    // The unsynced row keeps its local values and its queue item; the discarded item is gone.
+    expect(await s.db.get('SELECT label, row_version FROM sync_probe WHERE id = ?', [KEEP])).toEqual({ label: 'Mine keep', row_version: 3 });
+    expect(await s.outbox.get(s.kept)).toMatchObject({ opType: 'UPDATE', baseVersion: 3, fields: { label: 'Mine keep' }, status: { state: 'FAILED' } });
+    expect(await s.outbox.get(s.discarded)).toBeNull();
+  }
+
+  it('F12-AC7 (US-052) NFR-OFF-010: a refetch after a scope change catches up from the cursor; out-of-scope synced rows are dropped', async () => {
+    const s = await refetchSetup();
+    s.transport.onPull = ({ cursor }) => {
+      // The server checks scope changes only against a cursor; a snapshot carries visible rows only.
+      if (cursor === 'c0') return page([], 'boot', { hasMore: true, scopeReset: true });
+      if (cursor === null) return page([probe(ROW, 2, 'Server'), probe(KEEP, 4, 'Theirs')], 'c1');
+      return page([], cursor);
+    };
+    const before = s.transport.pulls.length;
+    await s.engine.discard(s.discarded);
+    await s.engine.syncNow();
+    // One catch-up from c0 (scopeReset), then one snapshot; no second purge and snapshot.
+    expect(s.transport.pulls.slice(before).map((p) => p.cursor).filter((c) => c !== 'c1')).toEqual(['c0', null]);
+    expect(await s.db.get('SELECT id FROM sync_probe WHERE id = ?', [OUT])).toBeNull();
+    expect(await s.db.get('SELECT label, row_version FROM sync_probe WHERE id = ?', [ROW])).toEqual({ label: 'Server', row_version: 2 });
+    await expectUnsyncedUntouched(s);
+    // The server's version of the unsynced row is kept aside, never written over the local change.
+    expect(await s.db.get('SELECT row_version FROM deferred_changes WHERE entity_id = ?', [KEEP])).toEqual({ row_version: 4 });
+    expect(await s.db.get('SELECT refetch_requested, refetch_done, last_pull_cursor FROM sync_meta')).toEqual({
+      refetch_requested: 1,
+      refetch_done: 1,
+      last_pull_cursor: 'c1',
+    });
+  });
+
+  it('F12-AC7 (US-052) FR-SYNC-009: a REMOVE_FROM_DEVICE since the stored cursor is applied before the refetch snapshot, even if the snapshot fails', async () => {
+    const s = await refetchSetup();
+    let snapshotFails = true;
+    s.transport.onPull = ({ cursor }) => {
+      if (cursor === 'c0') return page([{ entity: 'sync_probe', entityId: OUT, rowVersion: 2, op: 'REMOVE_FROM_DEVICE' }], 'c5');
+      if (cursor === null) {
+        if (snapshotFails) throw failure(0, 'NETWORK');
+        return page([probe(ROW, 2, 'Server'), probe(KEEP, 3, 'Keep')], 'c6');
+      }
+      return page([], cursor);
+    };
+    const before = s.transport.pulls.length;
+    await s.engine.discard(s.discarded);
+    expect(await s.engine.syncNow()).toBe('OFFLINE');
+    expect(s.transport.pulls.slice(before).map((p) => p.cursor)).toEqual(['c0', null]);
+    // The removal was honoured by the catch-up; the refetch is still due.
+    expect(await s.db.get('SELECT id FROM sync_probe WHERE id = ?', [OUT])).toBeNull();
+    expect(await s.db.get('SELECT refetch_requested, refetch_done FROM sync_meta')).toEqual({ refetch_requested: 1, refetch_done: 0 });
+    await expectUnsyncedUntouched(s);
+
+    snapshotFails = false;
+    expect(await s.engine.syncNow()).toBe('OK');
+    expect(await s.db.get('SELECT label, row_version FROM sync_probe WHERE id = ?', [ROW])).toEqual({ label: 'Server', row_version: 2 });
+    expect(await s.db.get('SELECT id FROM sync_probe WHERE id = ?', [OUT])).toBeNull();
+    await expectUnsyncedUntouched(s);
+    expect(await s.db.get('SELECT refetch_requested, refetch_done, last_pull_cursor FROM sync_meta')).toEqual({
+      refetch_requested: 1,
+      refetch_done: 1,
+      last_pull_cursor: 'c6',
+    });
+  });
+
+  it('F12 unit (NFR-OFF-007): without a stored cursor a refetch is a single snapshot pull', async () => {
+    const s = await refetchSetup();
+    await s.db.run('UPDATE sync_meta SET last_pull_cursor = NULL WHERE id = 1');
+    s.transport.onPull = ({ cursor }) => (cursor === null ? page([probe(ROW, 2, 'Server'), probe(OUT, 1, 'Out of scope')], 'c7') : page([], cursor));
+    const before = s.transport.pulls.length;
+    await s.engine.discard(s.discarded);
+    await s.engine.syncNow();
+    expect(s.transport.pulls[before]).toMatchObject({ cursor: null });
+    expect(s.transport.pulls.slice(before).filter((p) => p.cursor === null)).toHaveLength(1);
+    expect(await s.db.get('SELECT label FROM sync_probe WHERE id = ?', [ROW])).toEqual({ label: 'Server' });
+    await expectUnsyncedUntouched(s);
+    expect(await s.db.get('SELECT refetch_requested, refetch_done FROM sync_meta')).toEqual({ refetch_requested: 1, refetch_done: 1 });
+  });
+});
+
+describe('F12 · a blocked outbox refuses direct enqueues too (review R3)', () => {
+  it("F12-AC10 (US-053) while signing out, enqueue and enqueueUpdate inside a feature's own transaction are refused", async () => {
+    const { db, outbox } = await setup();
+    await serverRow(db, ROW, 1);
+    await outbox.block();
+    const id = outbox.newEntityId();
+    await expect(
+      db.transaction(async (tx) => {
+        await writeProbe(id, { label: 'own tx' })(tx);
+        await outbox.enqueue(tx, { entity: 'sync_probe', entityId: id, opType: 'CREATE', baseVersion: null, fields: { label: 'own tx' } });
+      }),
+    ).rejects.toBeInstanceOf(OutboxBlockedError);
+    await expect(
+      db.transaction(async (tx) => {
+        await tx.run('UPDATE sync_probe SET label = ? WHERE id = ?', ['own tx', ROW]);
+        await outbox.enqueueUpdate(tx, { entity: 'sync_probe', entityId: ROW, fields: { label: 'own tx' } });
+      }),
+    ).rejects.toBeInstanceOf(OutboxBlockedError);
+    // Nothing was queued, and the transactions rolled back their entity writes.
+    expect(await db.get('SELECT COUNT(*) AS n FROM outbox')).toEqual({ n: 0 });
+    expect(await db.get('SELECT id FROM sync_probe WHERE id = ?', [id])).toBeNull();
+    expect(await db.get('SELECT label FROM sync_probe WHERE id = ?', [ROW])).toEqual({ label: 'Probe' });
   });
 });
 
