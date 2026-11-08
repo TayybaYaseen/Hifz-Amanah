@@ -15,3 +15,15 @@ tags:
 # 3. Test control restores the server; tap Retry → Syncing → Synced.                                   (F12-AC8)
 # 4. Go offline; save two entries; Sign out → warning shows 2 unsynced changes with
 #    "Sync now", "Cancel", "Sign out anyway"; tap Cancel → still signed in.                            (F12-AC10)
+#
+# Implemented testIDs (apps/mobile/src/features/sync, components/sync.tsx), for when this flow becomes runnable:
+#   banner: sync.banner, sync.banner.state.<STATE>, sync.banner.count | sync.banner.lastSynced; sync.savedOnDevice
+#   queue:  syncQueue.screen, syncQueue.summary, syncQueue.section.<state>, syncQueue.item.<opId>,
+#           syncQueue.item.<opId>.reason, syncQueue.item.<opId>.retry (FAILED only), syncQueue.syncNow
+#   test control: POST /__test/sync/fail-next {count, status} (step 1), POST /__test/reset (step 3)
+#   sign-out: signOutWarning.sheet, signOutWarning.count, signOutWarning.syncNow, signOutWarning.cancel,
+#             signOutWarning.signOutAnyway
+# OPEN QUESTION (not decided here): step 2 expects a temporary 503 to show "Failed with a reason and Retry".
+# The implementation keeps a temporarily refused item PENDING with its reason and "Trying again automatically"
+# (automatic backoff, F12-AC6 / NFR-OFF-007); the .retry button appears only for FAILED items. Either this
+# step or the app behaviour must change once the Master Agent / user decides.

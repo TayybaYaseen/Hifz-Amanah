@@ -13,3 +13,8 @@ tags:
 # 1. Given an Owner or Admin, when they first sign in on a device, then they must set a PIN or fingerprint app lock. A Teacher may skip it. The app locks after 5 minutes in the background. (F12-AC18)
 # 2. Given synced daily records older than 120 days on a device, when the app cleans its cache, then they are removed from the device and still load from the server when online. Unsynced records are never removed. (F12-AC19)
 # 3. Given a device that learns its access was revoked, when the workspace locks, then synced data is purged at once, and unsynced changes stay locked and visible until sign-out or 30 days, then are purged. (F12-AC20)
+#
+# Implemented testIDs, for when this flow becomes runnable (apps/mobile/src/features/app-lock):
+#   setup: appLock.setup.screen, appLock.setup.pin, appLock.setup.skip (Teacher only), appLock.biometric.enable,
+#          appLock.biometric.skip; unlock: appLock.unlock.screen, appLock.unlock.pin, appLock.unlock.fingerprint
+#   revoked (step 3): workspaceLocked.screen, workspaceLocked.count, workspaceLocked.signOut

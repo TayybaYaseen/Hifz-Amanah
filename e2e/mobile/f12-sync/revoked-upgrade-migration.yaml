@@ -16,3 +16,9 @@ tags:
 # 4. Test control raises the minimum protocol version; go online → "Upgrade required"; items kept.     (F12-AC15)
 # 5. Install the current build over it (local migration runs) → 2 pending items present; they sync.   (F12-AC16)
 # 6. teacher.a2 edits S3 (API); teacher.a1 pull → S3 never appears on this device.                    (F12-AC7)
+#
+# Implemented testIDs, for when this flow becomes runnable:
+#   revoked (step 2): workspaceLocked.screen, workspaceLocked.count, workspaceLocked.item.<opId>, workspaceLocked.signOut,
+#                     sync.banner.state.ACCESS_REVOKED; sign-out confirmation signOutWarning.confirmRevoked
+#   upgrade (step 4): sync.banner.state.UPGRADE_REQUIRED, syncQueue.screen, sync.upgrade.notice
+#   test control: POST /__test/sync/min-protocol {version} (step 4); POST /__test/reset clears it.
