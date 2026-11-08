@@ -212,7 +212,7 @@ export function Field({ label, value, onChangeText, error, helper, secure = fals
   helper?: string;
   secure?: boolean;
   testID: string;
-} & Pick<TextInputProps, 'keyboardType' | 'autoComplete' | 'textContentType' | 'maxLength' | 'editable' | 'inputMode'>) {
+} & Pick<TextInputProps, 'keyboardType' | 'autoComplete' | 'textContentType' | 'maxLength' | 'editable' | 'inputMode' | 'multiline' | 'autoCapitalize' | 'placeholder'>) {
   const { t } = useTranslation();
   const { direction } = useLocale();
   const [hidden, setHidden] = useState(true);
