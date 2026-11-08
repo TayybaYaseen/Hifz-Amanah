@@ -24,6 +24,19 @@ export interface SyncRow {
 
 export type FieldsSchema = z.ZodType<Record<string, unknown>>;
 
+/** Who writes and when (recorded-by and updated-at columns); never part of the synced fields. */
+export interface WriteMeta {
+  actorUserId: string;
+  at: Date;
+}
+
+/** A handler's business validation result: the fields to write, or the refused fields and their issue codes. */
+export type Prepared =
+  | { ok: true; fields: Record<string, unknown> }
+  | { ok: false; issues: Record<string, string> }
+  /** Out of the caller's scope: the same NOT_FOUND as a missing record (FR-SEC-008). */
+  | { ok: false; notFound: true };
+
 export interface AppliedChange {
   actor: Actor;
   // Conflict resolutions are audited by the conflict service (SYNC_CONFLICT_RESOLVED), not through this hook. F05
@@ -56,10 +69,29 @@ export interface SyncHandler {
   load(tx: Tx, organizationId: string, id: string, options: { forUpdate: boolean }): Promise<SyncRow | null>;
   loadMany(tx: Tx, organizationId: string, ids: readonly string[]): Promise<SyncRow[]>;
   /** Inserts at row_version 1 with the client's id. False when the id is already used, in any organization. */
-  insert(tx: Tx, organizationId: string, id: string, fields: Record<string, unknown>): Promise<boolean>;
-  update(tx: Tx, organizationId: string, id: string, changes: Record<string, unknown>, rowVersion: number): Promise<void>;
+  insert(tx: Tx, organizationId: string, id: string, fields: Record<string, unknown>, meta: WriteMeta): Promise<boolean>;
+  update(tx: Tx, organizationId: string, id: string, changes: Record<string, unknown>, rowVersion: number, meta: WriteMeta): Promise<void>;
   /** A safe, non-sensitive label for conflict lists (never a note body). */
   label(row: SyncRow): string;
+  /**
+   * Business validation of a CREATE in the op's transaction, with the caller (F04): scope beyond the keys, dates,
+   * required text. Returns the fields to insert, which may add server-derived ones (e.g. a Leave status); a refusal
+   * becomes a stored REJECTED VALIDATION result naming the fields.
+   */
+  prepareCreate?(tx: Tx, actor: Actor, fields: Record<string, unknown>): Promise<Prepared>;
+  /**
+   * Business validation of an UPDATE about to apply to `row` (after conflict detection), and of a conflict
+   * resolution. Returns the changes to write, which may add server-derived fields.
+   */
+  prepareUpdate?(tx: Tx, actor: Actor, row: SyncRow, changes: Record<string, unknown>): Promise<Prepared>;
+  /**
+   * The row already holding this CREATE's natural key (e.g. attendance for the same student and date), locked for
+   * the transaction, or null. A different row there is a create-create collision (F12 decision Q11): equal
+   * meaningful fields apply as a no-op; different ones become a conflict on the existing row.
+   */
+  findNaturalDuplicate?(tx: Tx, organizationId: string, fields: Record<string, unknown>): Promise<SyncRow | null>;
+  /** The fields compared on a natural-key collision (default: every field of the CREATE). */
+  readonly collisionFields?: readonly string[];
   /** Writes the owning module's audit entry for an applied change, in the same transaction (ARCHITECTURE §15). */
   audit?(tx: Tx, change: AppliedChange): Promise<void>;
 }

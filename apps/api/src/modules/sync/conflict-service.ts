@@ -216,14 +216,19 @@ export class ConflictService {
       // server version is kept, so every device re-reads the settled row (F12-AC12).
       const now = this.d.clock.now();
       const next = row.rowVersion + 1;
-      await handler.update(tx, org, conflict.entity_id, outcome.changes, next);
+      // The owning module re-validates the chosen values against today's state (e.g. a holiday declared since, F04)
+      // and adds its server-derived fields.
+      const prepared = handler.prepareUpdate ? await handler.prepareUpdate(tx, actor, row, outcome.changes) : { ok: true as const, fields: outcome.changes };
+      if (!prepared.ok) throw 'notFound' in prepared ? new AppError('NOT_FOUND') : new AppError('VALIDATION', prepared.issues);
+      const changes = prepared.fields;
+      await handler.update(tx, org, conflict.entity_id, changes, next, { actorUserId: actor.userId, at: now });
       await appendChange(tx, {
         organizationId: org,
         entity: conflict.entity,
         entityId: conflict.entity_id,
         rowVersion: next,
         op: 'UPSERT',
-        changedFields: Object.keys(outcome.changes),
+        changedFields: Object.keys(changes),
         keys: row.keys,
         actorUserId: actor.userId,
         opId: null,

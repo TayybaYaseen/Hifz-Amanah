@@ -222,7 +222,67 @@ export interface StudentEnrollmentsTable {
   ended_by: string | null;
 }
 
+// ---------- Calendar (F04, 0008_calendar.sql). Row-level security applies: query them only through withTenant(). ----------
+
+export interface ClassSchedulesTable {
+  id: string;
+  organization_id: string;
+  class_id: string;
+  /** ISO weekdays, 1 = Monday … 7 = Sunday. */
+  weekdays: number[];
+  /** 'HH:MM:SS' from pg, or null. */
+  start_time: string | null;
+  end_time: string | null;
+  effective_from: string;
+  effective_to: string | null;
+  created_at: Timestamp;
+  created_by: string | null;
+  superseded_at: Timestamp | null;
+  superseded_by: string | null;
+}
+
+export interface CalendarExceptionsTable {
+  id: string;
+  organization_id: string;
+  class_id: string | null;
+  date: string;
+  kind: 'HOLIDAY' | 'CLOSURE' | 'NO_CLASS';
+  label: string;
+  records_confirmed: Generated<number>;
+  created_at: Timestamp;
+  created_by: string | null;
+  cancelled_at: Timestamp | null;
+  cancelled_by: string | null;
+}
+
+export interface AttendanceRecordsTable {
+  id: string;
+  organization_id: string;
+  student_id: string;
+  class_id: string;
+  report_date: string;
+  session_label: string | null;
+  status: 'PRESENT' | 'LATE' | 'HALF_DAY' | 'LEAVE' | 'ABSENT';
+  leave_status: 'NONE' | 'REQUESTED' | 'APPROVED' | 'REJECTED';
+  /** Internal: never logged, audited by value, or sent to a Student or Parent (F04-AC23). */
+  leave_reason: string | null;
+  leave_requested_by: string | null;
+  leave_requested_at: Timestamp | null;
+  leave_decided_by: string | null;
+  leave_decided_at: Timestamp | null;
+  /** Internal (FR-DAY-010): same rules as leave_reason. */
+  absent_note: string | null;
+  recorded_by: string;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+  updated_by: string;
+  row_version: ColumnType<string, number | undefined, number>;
+}
+
 export interface Database {
+  class_schedules: ClassSchedulesTable;
+  calendar_exceptions: CalendarExceptionsTable;
+  attendance_records: AttendanceRecordsTable;
   classes: ClassesTable;
   class_teachers: ClassTeachersTable;
   students: StudentsTable;

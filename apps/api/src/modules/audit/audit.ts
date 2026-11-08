@@ -36,13 +36,21 @@ export type AuditAction =
   | 'STUDENT_DEACTIVATED'
   | 'STUDENT_REACTIVATED'
   | 'STUDENT_ENROLLED'
-  | 'STUDENT_MOVED';
+  | 'STUDENT_MOVED'
+  // F04 · Calendar and attendance
+  | 'SCHEDULE_SET'
+  | 'CALENDAR_EXCEPTION_CREATED'
+  | 'CALENDAR_EXCEPTION_CANCELLED'
+  | 'ATTENDANCE_RECORDED'
+  | 'ATTENDANCE_CHANGED'
+  | 'LEAVE_APPROVED'
+  | 'LEAVE_REJECTED';
 
 export interface AuditEvent {
   organizationId: string | null;
   actorUserId: string | null;
   action: AuditAction;
-  targetType: 'USER' | 'ORGANIZATION' | 'SYNC_CONFLICT' | 'CLASS' | 'STUDENT';
+  targetType: 'USER' | 'ORGANIZATION' | 'SYNC_CONFLICT' | 'CLASS' | 'STUDENT' | 'CALENDAR_EXCEPTION' | 'ATTENDANCE_RECORD';
   targetId: string | null;
   summary?: Record<string, unknown>;
   at: Date;

@@ -28,6 +28,9 @@ const STATUS: Record<ErrorCode, number> = {
   ENTITY_NOT_SUPPORTED: 400,
   CONFLICT_STALE: 409,
   CONFLICT_CLOSED: 409,
+  // Calendar (F04).
+  RECORDS_EXIST: 409,
+  LEAVE_NOT_AWAITING: 409,
 };
 
 const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
@@ -54,6 +57,8 @@ const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
   ENTITY_NOT_SUPPORTED: 'This kind of change cannot sync yet',
   CONFLICT_STALE: 'The record changed again. Review the latest version',
   CONFLICT_CLOSED: 'This conflict was already resolved',
+  RECORDS_EXIST: 'Records already exist for this date. Confirm to continue',
+  LEAVE_NOT_AWAITING: 'This leave is no longer waiting for a decision',
 };
 
 export class AppError extends Error {

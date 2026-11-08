@@ -13,6 +13,11 @@ import { bearer, registerIdentityRoutes } from './modules/identity/routes.ts';
 import { MembershipService } from './modules/organization/membership-service.ts';
 import { OrganizationService } from './modules/organization/organization-service.ts';
 import { registerOrganizationRoutes } from './modules/organization/routes.ts';
+import { attendanceSyncHandler } from './modules/calendar/attendance-sync.ts';
+import { AttendanceService } from './modules/calendar/attendance-service.ts';
+import { ExceptionService } from './modules/calendar/exception-service.ts';
+import { registerCalendarRoutes } from './modules/calendar/routes.ts';
+import { ScheduleService } from './modules/calendar/schedule-service.ts';
 import { ClassService } from './modules/roster/class-service.ts';
 import { registerRosterRoutes } from './modules/roster/routes.ts';
 import { rosterScope } from './modules/roster/scope.ts';
@@ -36,7 +41,7 @@ export interface AppDeps {
   sleep?: (ms: number) => Promise<void>;
   /**
    * Test builds only (NODE_ENV=test): extra sync entity handlers, such as the integration tests' sync_probe
-   * (F12 decision Q1), and a scope provider replacing the roster's (F03). No production handler exists in F12.
+   * (F12 decision Q1), and a scope provider replacing the roster's (F03).
    */
   testSync?: { handlers?: SyncHandler[]; scopes?: SyncScopeProvider };
 }
@@ -87,9 +92,17 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     students: new StudentService(deps.db, deps.clock),
   });
 
+  // ---------- Calendar and attendance (F04) ----------
+  registerCalendarRoutes(app, {
+    authenticate: (request) => auth.authenticate(bearer(request)),
+    schedules: new ScheduleService(deps.db, deps.clock),
+    exceptions: new ExceptionService(deps.db, deps.clock),
+    attendance: new AttendanceService(deps.db, deps.clock),
+  });
+
   if (deps.testSync && deps.config.env !== 'test') throw new Error('Test sync handlers are allowed only when NODE_ENV=test');
-  // F12: no production entity handler yet; F04/F05/F07/F08 register theirs here.
-  const syncRegistry = new SyncRegistry(deps.testSync?.handlers ?? []);
+  // Production entity handlers: attendance (F04). F05/F07/F08 register theirs here; tests may add sync_probe.
+  const syncRegistry = new SyncRegistry([attendanceSyncHandler({ clock: deps.clock }), ...(deps.testSync?.handlers ?? [])]);
   const syncScopes = deps.testSync?.scopes ?? rosterScope(deps.db, deps.clock);
   const syncControl = new SyncControl(deps.config.syncMinProtocolVersion);
   const syncDeps = { db: deps.db, clock: deps.clock, registry: syncRegistry, scopes: syncScopes };
