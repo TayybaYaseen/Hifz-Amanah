@@ -139,8 +139,9 @@ hifz-amanah/
         navigation/         # Teacher / Admin / Student / Guardian navigators
         features/           # auth, workspaces, classes, students, attendance, daily-entry,
                             # homework, reports, sync, import-export, analytics, settings, audit
-        local-db/           # SQLite schema, local migrations, repositories, outbox
-        sync/               # sync engine (push/pull, retry/backoff, conflict store)
+        local-db/           # SQLite driver, local migrations, repositories
+        sync/               # outbox, sync engine (push/pull, retry/backoff, conflict store), retention
+        app-lock/           # PIN / fingerprint app lock (NFR-OFF-011)
     api/
       src/
         modules/            # one folder per bounded module (§5)
@@ -314,10 +315,18 @@ reporting / platform
   report_published(organization_id, student_id, period_kind, period_start, published_by, published_at,
                    updated_after_publish_at NULL)                      -- FR-RPT-010
   report_cache(organization_id, student_id, period_kind, period_start, source_seq, payload jsonb)
-  change_log(organization_id, seq BIGSERIAL, entity, entity_id, op, at)
-  sync_ops(organization_id, op_id UUID PRIMARY KEY, device_id, user_id, received_at, result jsonb)
-  sync_conflicts(id, organization_id, entity, entity_id, local_payload, server_payload,
-                 base_version, status[OPEN|RESOLVED], resolved_by, resolution)
+  -- sync tables as built in F12 (migrations 0004/0005, ADR-015); RLS forced on all four (ADR-016)
+  change_log(seq BIGSERIAL, organization_id, entity, entity_id, row_version, op[UPSERT|REMOVE],
+             changed_fields text[], student_id NULL, class_id NULL,       -- scope keys at change time (F12-AC7)
+             actor_user_id, op_id NULL, at)                                -- append-only (trigger)
+  sync_ops(op_id UUID PRIMARY KEY, organization_id, user_id, device_id, entity, entity_id,
+           op_hash bytea, status[APPLIED|CONFLICT|REJECTED], result jsonb, received_at)  -- RETRY never stored
+  sync_conflicts(id, organization_id, entity, entity_id, base_version, server_version,
+                 device_fields jsonb, server_fields jsonb, conflict_fields text[],
+                 student_id NULL, class_id NULL, caused_by_user_id, op_id,
+                 status[OPEN|RESOLVED], resolved_by, resolved_at, resolution jsonb, created_at)
+                 -- one OPEN conflict per (organization_id, entity, entity_id)
+  scope_changes(organization_id, user_id, seq, at)   -- seq from change_log's sequence; drives pull scopeReset; written by roster (F03)
   import_jobs(id, organization_id, kind, file_object_key, status, row_count, summary jsonb, created_by)
   import_rows(job_id, row_no, status[NEW|EXACT_MATCH|SUSPECTED_DUP|INVALID|PROPOSED_UPDATE|COMMITTED|FAILED],
               errors jsonb, target_id NULL)
@@ -444,13 +453,19 @@ For `STUDENT` and `PARENT` audiences it removes `notes.visibility = INTERNAL`, i
 ### 8.1 Device storage
 
 ```text
-SQLite (per signed-in account + organization)
-  entity tables (mirror of permitted server data + local edits)
-  outbox(op_id, seq, entity, entity_id, op_type, payload, base_version,
+SQLite (per signed-in account + organization; local migrations in apps/mobile/src/local-db/migrations.ts)
+  entity tables (mirror of permitted server data + local edits; added by F04/F05/F08)
+  outbox(op_id, seq, entity, entity_id, op_type, command, payload, base_version,
          depends_on[], state[PENDING|SYNCING|SYNCED|FAILED|ACTION_REQUIRED],
-         attempts, last_error, created_at)
-  sync_meta(last_pull_cursor, last_success_at, protocol_version, schema_version)
+         attempts, last_error, next_attempt_at, failure_code, failure_fields,
+         row_version, conflict_id, label, sent_count, created_at, synced_at)
+  sync_meta(last_pull_cursor, last_success_at, last_server_time, protocol_version, schema_version,
+            workspace_state[ACTIVE|LOCKED_REVOKED], revoked_at, signed_out_at, upgrade_required_at,
+            last_cleanup_at, org_time_zone, next_seq)
   conflicts(local copy of server conflicts for review UI)
+  discards(local record of discarded or superseded operations, with reason)
+  deferred_changes(pulled server changes held back while the row has unsynced local edits)
+SQLite device index (one per install): device_id; workspaces(db_name, user, org, role, state[ACTIVE|HELD|LOCKED_REVOKED], since)
 ```
 
 **Save path (NFR-OFF-002):** the entity write and the outbox insert happen in **one SQLite transaction**. The UI shows "Saved on device" only after that commit. "Synced" appears only after the server acknowledges the operation (FR-SYNC-007, `design.md` §8).
@@ -468,7 +483,7 @@ sequenceDiagram
   alt no conflict
     API->>DB: apply, bump row_version, append change_log, audit, record sync_ops
   else meaningful conflict
-    API->>DB: insert sync_conflicts (both versions), record sync_ops = ACTION_REQUIRED
+    API->>DB: insert sync_conflicts (both versions), record sync_ops = CONFLICT (app shows action required)
   end
   API-->>App: per-op results [{op_id, status, row_version | conflict_id | error}]
   App->>API: GET /sync/pull?cursor=…
@@ -479,7 +494,7 @@ sequenceDiagram
 - **Ordering:** operations carry `depends_on`. The server rejects an operation whose dependency has not been applied, using the retryable error `DEPENDENCY_PENDING`. The client sends operations in outbox order.
 - **Retry:** exponential backoff with jitter. A `FAILED` operation stays visible with its reason (NFR-OFF-007).
 - **Versioning:** `protocolVersion` is checked on every request. The server answers `UPGRADE_REQUIRED` for unsupported clients, and pending operations are kept.
-- **Conflicts (FR-SYNC-008):** these fields are "meaningful": attempt status, quantities, quality, mistakes, attendance status, and homework status/portions. If one of them changed on both sides since `base_version`, a conflict is created. Last-write-wins is never used for them. Non-meaningful fields (e.g. display ordering) may use a documented safe merge. An authorized user resolves the conflict in the Conflict Review screen. The resolution is a new operation and is audited.
+- **Conflicts (FR-SYNC-008):** these fields are "meaningful": attempt status, quantities, quality, mistakes, attendance status, and homework status/portions. If one of them changed on both sides since `base_version`, a conflict is created. Last-write-wins is never used for them. Non-meaningful fields (e.g. display ordering) may use a documented safe merge. An authorized user resolves the conflict in the Conflict Review screen. The resolution is an online request (`POST /sync/conflicts/:id/resolve`, F12 decision Q6) applied as a new audited change (`SYNC_CONFLICT_RESOLVED`). Protocol details, the one-open-conflict-per-row rule, and the per-organization lock that keeps the pull cursor gap-free are in ADR-015.
 - **Revocation (NFR-OFF-010, FR-SYNC-009):** if push or pull returns `ACCESS_REVOKED`, the app stops syncing that workspace and locks its cached data. Unsynced operations stay visible but cannot be sent. Synced data is purged at once. Unsynced operations stay locked and visible, and are purged on sign-out or after 30 days (NFR-OFF-011). The app lock (PIN or fingerprint) is required for Owner/Admin and optional for Teachers; it locks after 5 minutes in the background. Synced daily records older than 120 days are removed from the device cache.
 - **Sign-out with pending operations** shows a warning (`design.md` §4.13).
 - **Local schema upgrades** run in a transaction and are tested with a populated outbox (NFR-OFF-009).
@@ -636,7 +651,7 @@ App (online, Teacher/Admin) → POST /analytics/{studentId}/ai-recommendation
 
 - Audit rows are written **in the same transaction** as the change they describe.
 - The writer role has INSERT-only access. No UPDATE/DELETE grants exist on `audit_logs`.
-- **Audited actions include:** account/role/membership changes, password reset, guardian link/verification/revocation, note visibility changes, daily record/attempt create/edit, Leave decisions, attendance changes, "all classes" flag changes, report publishing, 2FA setup/reset and recovery-code regeneration, account locks, homework confirm/revise/reject, Quran metadata edits, daily-report mode change, AI settings change, import/export jobs, conflict resolution, sensitive report access (NFR-PORT-006).
+- **Audited actions include:** account/role/membership changes, password reset, guardian link/verification/revocation, note visibility changes, daily record/attempt create/edit, Leave decisions, attendance changes, "all classes" flag changes, report publishing, 2FA setup/reset and recovery-code regeneration, account locks, homework confirm/revise/reject, Quran metadata edits, daily-report mode change, AI settings change, import/export jobs, conflict resolution (`SYNC_CONFLICT_RESOLVED`: entity, record ID, choice, field names and picks, old/new values only for fields the entity handler declares non-sensitive), sensitive report access (NFR-PORT-006).
 - `summary` holds field names plus old/new values **for non-sensitive fields only**. Note bodies, passwords, OTPs, and tokens are never stored.
 
 ---
@@ -711,6 +726,8 @@ App (online, Teacher/Admin) → POST /analytics/{studentId}/ai-recommendation
 | ADR-012 | Authentication built into the API; TOTP two-factor sign-in for Owner/Admin | Approved 2026-10-30 |
 | ADR-013 | AWS Mumbai hosting with S3 and SES; Expo Push Service for Android push | Approved 2026-10-30 |
 | ADR-014 | Quantity rules chosen by section: Sabaq = `LINES` over a single-Surah range with `total_lines`; Sabqi/Manzil unchanged (extends ADR-005; no conversion) | Approved 2026-11-01 (SRS DEC-B60…B64) |
+| ADR-015 | Sync protocol v1: `op_hash` idempotency, stored terminal results, `RETRY` not stored, one open conflict per row, per-organization advisory lock for a gap-free pull cursor ([docs/adr/ADR-015](adr/ADR-015-sync-protocol-idempotency-conflicts.md); refines ADR-003/004) | Accepted 2026-11-08 (F12 plan §10 answers) |
+| ADR-016 | Row-level security pattern: `hifz_tenant` role, `SET LOCAL ROLE` + `app.current_org_id` per transaction, `FORCE` RLS ([docs/adr/ADR-016](adr/ADR-016-postgres-row-level-security-pattern.md); implements ADR-006) | Accepted 2026-11-08 (F12 decision Q9) |
 
 ### 19.1 Implementation gates (closed 2026-10-30)
 
