@@ -18,8 +18,8 @@ export const SYNC_LIMITS = {
 } as const;
 
 /**
- * Entities the protocol carries. `sync_probe` is test-only (registered by the API only in test builds); the rest
- * are reserved for F04, F05, F07, F08 and answer ENTITY_NOT_SUPPORTED until their handler is registered.
+ * Entities the protocol carries. `sync_probe` is test-only (registered by the API only in test builds); F04 registers attendance_record; the rest
+ * are reserved for F05, F07, F08 and answer ENTITY_NOT_SUPPORTED until their handler is registered.
  */
 export const SYNC_ENTITIES = [
   'sync_probe',
