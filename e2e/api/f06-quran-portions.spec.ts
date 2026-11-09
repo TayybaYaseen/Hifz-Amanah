@@ -3,6 +3,9 @@
 // SYNTHETIC DATA ONLY: Quran values come from the synthetic fixture (control.seedSyntheticQuran) or are invented here;
 // none is real Quran metadata. Criteria that save portions (AC5, AC8…AC17) need F05's daily-entry endpoints and stay
 // test.fixme; AC18 waits for the approved seed (DEFERRED: DEC-B31); AC19's record part waits for F05 records.
+import { createHash } from 'node:crypto';
+// The device's own pure functions (packages/domain), so AC24 checks exactly what the app runs offline.
+import { evaluateRange, referenceIndex, type ReferenceSnapshotV1 } from '../../packages/domain/quran-ref/index.ts';
 import { expect, test, type QuranConversion, type QuranReview, type TestControl } from './support/fixtures';
 
 const SURAH = { nameAr: 'اختبار ١', nameTranslit: 'Synthetic 1', ayahCount: 7, rowVersion: null };
@@ -124,6 +127,7 @@ const REVIEW: QuranReview = {
   reviewer: 'Reviewer (synthetic)',
   qualification: 'Test only',
   mushafPrinting: 'Synthetic printing (test)',
+  signOffRef: 'Synthetic sign-off register entry (test)',
   decision: 'APPROVED',
   signedOn: '2026-11-09',
   findings: [],
@@ -148,14 +152,22 @@ async function catalogue(
   return ids;
 }
 
-/** Converts, catalogues (cleared), and signs a synthetic dataset; returns the signed seed and report hash. */
+/** Converts, catalogues (cleared), and signs a synthetic dataset; returns the signed seed, report, and report hash. */
 async function signedDataset(control: TestControl, options: { production?: boolean; datasetVersion?: string } = {}) {
   const conversion = await control.convertSyntheticQuran(options);
-  await catalogue(control, conversion.report.sources, { synthetic: !options.production });
+  const sourceIds = await catalogue(control, conversion.report.sources, { synthetic: !options.production });
   const signed = await control.signQuranDataset(conversion.seed, conversion.report, REVIEW);
   expect(signed.status).toBe(200);
-  return { conversion, seed: signed.body.seed as Record<string, unknown> & { layouts: { lines: Line[] }[] }, reportSha256: signed.body.reportSha256 as string };
+  return {
+    conversion,
+    sourceIds,
+    seed: signed.body.seed as Record<string, unknown> & { layouts: { lines: Line[] }[] },
+    report: signed.body.report,
+    reportSha256: signed.body.reportSha256 as string,
+  };
 }
+
+const sha256 = (text: string) => createHash('sha256').update(text, 'utf8').digest('hex');
 
 /** The oracle for Total Lines: the Ayat lines of the imported mapping that hold any Ayat of the range. */
 const expectedLines = (lines: Line[], surah: number, from: number, to: number) =>
@@ -177,7 +189,9 @@ test.describe('F06 · Quran reference data pipeline (ADR-017)', { tag: '@F06' },
 
     // A production-flagged dataset with cleared sources and a signed approval: verified for this madrasa only.
     const production = await signedDataset(control, { production: true, datasetVersion: '2' });
-    expect((await control.applyQuranSeed(production.seed)).status).toBe(200);
+    // Without the signed report and its evidence it is refused (DEC-B78); with it, applied.
+    expect(issueCodes((await control.applyQuranSeed(production.seed)).body)).toEqual(['validationReport.report:REQUIRED']);
+    expect((await control.applyQuranSeed(production.seed, 'ALIF', production.report)).status).toBe(200);
     expect(await edition(await as('teacher.a1'))).toMatchObject({ hasLayout: true, layoutVerified: true, verification: 'UNVERIFIED' });
     expect(await edition(await as('admin.b'))).toMatchObject({ hasLayout: false, layoutVerified: false });
 
@@ -266,11 +280,63 @@ test.describe('F06 · Quran reference data pipeline (ADR-017)', { tag: '@F06' },
     expect(res.totalLines).toBeLessThan(lines.filter((l) => l.surah === 1 && l.page === 1).length);
   });
 
-  test.fixme('F06-AC24 (US-025) offline lookups from the cached reference snapshot match the server', async () => {
-    // Waits for the reference snapshot and device cache (delivery decided by DEC-B75; plan:
-    // docs/handover/F06-snapshot-implementation-plan.md §6.4). Given a Teacher device that synced the snapshot and
-    // is offline, when a Surah/Ayat range is chosen, then the derived Para, the validation result, and the Total Lines
-    // pre-fill equal the server's answers for the same snapshot version.
+  test('F06-AC24 (US-025) offline lookups from the cached reference snapshot match the server', async ({ as, control }) => {
+    // The device side of this criterion runs the same packages/domain functions on its SQLite cache; the mobile flow
+    // is e2e/mobile/f06-quran-portions/offline-reference.yaml. Here: download exactly as the device does, verify, then
+    // compare every answer with the server's for the same snapshot version.
+    const { seed } = await signedDataset(control);
+    expect((await control.applyQuranSeed(seed)).status).toBe(200);
+    const teacher = await as('teacher.a1');
+    const check = await (await teacher.get('quran/reference/version?format=1')).json();
+    const res = await teacher.get('quran/reference/snapshot?format=1');
+    expect(res.status()).toBe(200);
+    const body = await res.text();
+    // Verification before activation: sha256(body) = ETag = the version check.
+    expect(sha256(body)).toBe(check.referenceVersion);
+    expect(res.headers().etag).toBe(`"${check.referenceVersion}"`);
+    const snapshot = JSON.parse(body) as ReferenceSnapshotV1;
+    expect(snapshot.snapshotFormatVersion).toBe(1);
+    const index = referenceIndex(snapshot);
+
+    const ranges: [number, number, number][] = [
+      [1, 1, 4], [1, 1, 20], [2, 3, 9], [3, 19, 20], [2, 7, 7], // valid: one line, several lines, a whole Surah
+      [1, 1, 21], [1, 9, 3], [4, 1, 2], [114, 1, 20], [3, 0, 2], // beyond the count, end before start, no layout, Ayat 0
+    ];
+    for (const [surah, ayahStart, ayahEnd] of ranges) {
+      const online = await teacher.get(`quran/line-count?surah=${surah}&ayahStart=${ayahStart}&ayahEnd=${ayahEnd}`);
+      const offline = evaluateRange({ surah, ayahStart, ayahEnd }, index);
+      if (online.status() === 400) {
+        // The query schema refuses an impossible value before any rule runs; the device refuses it too.
+        expect(offline.issues.length, `${surah}:${ayahStart}-${ayahEnd}`).toBeGreaterThan(0);
+        continue;
+      }
+      const { edition: _edition, ...server } = await online.json();
+      expect(offline, `${surah}:${ayahStart}-${ayahEnd}`).toEqual(server);
+    }
+    // Ayat lines only (DEC-B77): Total Lines equals the oracle from the imported mapping.
+    expect(evaluateRange({ surah: 1, ayahStart: 1, ayahEnd: 4 }, index).totalLines).toBe(expectedLines(seed.layouts[0]!.lines, 1, 1, 4));
+    // Unchanged data: the device's copy is CURRENT, and a conditional download answers 304.
+    expect((await (await teacher.get(`quran/reference/version?format=1&have=${check.referenceVersion}`)).json()).cached.status).toBe('CURRENT');
+    expect((await teacher.get('quran/reference/snapshot?format=1', { headers: { 'If-None-Match': `"${check.referenceVersion}"` } })).status()).toBe(304);
+    // Student and Parent never receive reference data (online-only, read-only experiences).
+    for (const who of ['student.s1', 'parent.p1'] as const) expect((await (await as(who)).get('quran/reference/snapshot?format=1')).status()).toBe(403);
+  });
+
+  test('DEC-B79 (US-025) a withdrawn layout licence revokes the cached version and stops distribution; nothing is deleted', async ({ as, control }) => {
+    const { seed, sourceIds } = await signedDataset(control);
+    expect((await control.applyQuranSeed(seed)).status).toBe(200);
+    const teacher = await as('teacher.a1');
+    const before = (await (await teacher.get('quran/reference/version?format=1')).json()).referenceVersion as string;
+    expect(await control.recordQuranLicence(sourceIds.layout!, { status: 'REFUSED', permissionRef: null, publisherClearanceRef: null })).toMatchObject({ revokedVersions: 1 });
+    const now = await (await teacher.get(`quran/reference/version?format=1&have=${before}`)).json();
+    expect(now.cached).toMatchObject({ status: 'REVOKED', reasonCode: 'LICENCE_WITHDRAWN' });
+    expect(now.layout).toEqual({ importId: null, verified: false, withdrawn: true });
+    const snapshot = JSON.parse(await (await teacher.get('quran/reference/snapshot?format=1')).text()) as ReferenceSnapshotV1;
+    expect(snapshot.lines).toEqual([]);
+    expect((await (await teacher.get('quran/line-count?surah=1&ayahStart=1&ayahEnd=4')).json()).totalLines).toBeNull();
+    // The import and its rows are kept for audit (plan P2); the layout is shown as withdrawn, not approved.
+    expect((await (await (await as('admin.a')).get('quran/imports')).json()).items).toHaveLength(2);
+    expect((await (await teacher.get('quran/editions')).json()).editions[0]).toMatchObject({ hasLayout: true, layoutWithdrawn: true, layoutVerified: false });
   });
 
   test('F06-AC25 (US-024) converting and importing the same dataset again changes nothing, and the stored hashes are the ones signed', async ({ as, control }) => {
@@ -358,12 +424,33 @@ test.describe('F06 · Quran reference data pipeline (ADR-017)', { tag: '@F06' },
     expect(issueCodes(v1.body)).toEqual(expect.arrayContaining(['formatVersion:V2_REQUIRED']));
     expect(await imported()).toEqual([]);
 
-    // Signed approval, cleared sources: applied, and the import records the reviewer, decision, and report hash.
-    expect((await control.applyQuranSeed(approved.body.seed)).status).toBe(200);
+    // DEC-B78: without the signed report itself, or with a report that is not the signed one, it is refused.
+    expect(issueCodes((await control.applyQuranSeed(approved.body.seed)).body)).toEqual(['validationReport.report:REQUIRED']);
+    const otherReport = structuredClone(approved.body.report) as { review: Record<string, unknown> };
+    otherReport.review.mushafPrinting = 'Another printing (test)';
+    expect(issueCodes((await control.applyQuranSeed(approved.body.seed, 'ALIF', otherReport)).body)).toEqual(['validationReport.report:HASH_MISMATCH']);
+    // An approval without a sign-off reference is refused by the sign step itself.
+    const noSignOff = await control.signQuranDataset(conversion.seed, conversion.report, { ...REVIEW, signOffRef: null });
+    expect(noSignOff.status).toBe(400);
+    expect(noSignOff.body.reasons).toEqual(expect.arrayContaining([expect.stringContaining('SIGN_OFF_REF_REQUIRED')]));
+    expect(await imported()).toEqual([]);
+
+    // Signed approval, cleared sources, the signed report: applied, and every import preserves the reviewer, the
+    // printing, the review date, the decision, the report hash, the stored report, and the sign-off reference.
+    expect((await control.applyQuranSeed(approved.body.seed, 'ALIF', approved.body.report)).status).toBe(200);
     const items = await imported();
     expect(items).toHaveLength(2);
     for (const item of items) {
-      expect(item).toMatchObject({ synthetic: false, reviewedBy: 'Reviewer (synthetic)', approvedOn: '2026-11-09', reviewDecision: 'APPROVED', validationReportSha256: approved.body.reportSha256 });
+      expect(item).toMatchObject({
+        synthetic: false,
+        reviewedBy: 'Reviewer (synthetic)',
+        approvedOn: '2026-11-09',
+        reviewDecision: 'APPROVED',
+        validationReportSha256: approved.body.reportSha256,
+        mushafPrinting: 'Synthetic printing (test)',
+        signOffRef: 'Synthetic sign-off register entry (test)',
+        validationReportStored: true,
+      });
     }
   });
 });
