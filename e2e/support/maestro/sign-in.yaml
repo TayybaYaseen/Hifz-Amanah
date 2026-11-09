@@ -6,7 +6,7 @@
 # For Owner/Admin personas use sign-in-staff.yaml, which completes two-factor sign-in.
 # Selectors use the testID contract in e2e/README.md. The User ID field may be prefilled with the last User ID,
 # so it is cleared first.
-appId: ${APP_ID}
+appId: com.hifzamanah.app
 ---
 - tapOn:
     id: "signin.userId"

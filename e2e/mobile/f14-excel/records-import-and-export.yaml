@@ -1,6 +1,6 @@
 # F14 · Excel import and export — mobile E2E (docs/specs/14-f14-excel-import-export.md; design.md §4.15)
 # Covers: F14-AC6, F14-AC7, F14-AC13, F14-AC14, F14-AC16, F14-AC17
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F14 records import, update mode, and export
 tags:
   - pending

@@ -21,6 +21,8 @@ import { SignInScreen } from '../features/auth/SignInScreen.tsx';
 import { TwoFactorScreen } from '../features/auth/TwoFactorScreen.tsx';
 import { RecoveryCodesScreen, TwoFactorSetupScreen } from '../features/auth/TwoFactorSetupScreen.tsx';
 import { HomeScreen } from '../features/home/HomeScreen.tsx';
+import { BulkEntryScreen } from '../features/attendance/BulkEntryScreen.tsx';
+import { HolidaysScreen, LeaveApprovalsScreen, TimetableScreen } from '../features/attendance/CalendarScreens.tsx';
 import { MoreScreen } from '../features/home/MoreScreen.tsx';
 import { ProfileScreen } from '../features/profile/ProfileScreen.tsx';
 import { WorkspaceScreen } from '../features/settings/WorkspaceScreen.tsx';
@@ -53,6 +55,11 @@ type AppStack = {
   Students: { classId: string | null };
   StudentForm: { student: StudentResponse | null; classId: string | null };
   StudentProfile: { studentId: string };
+  // F04 calendar and attendance
+  BulkEntry: undefined;
+  LeaveApprovals: undefined;
+  Holidays: undefined;
+  Timetable: { klass: ClassResponse };
 };
 
 /** Lets the sign-out sheet open the Sync Queue from outside the stack. */
@@ -195,7 +202,7 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
   return (
     <App.Navigator screenOptions={screenOptions}>
       <App.Screen name="Home" options={{ title: t('common.appName') }}>
-        {({ navigation }) => <HomeScreen me={me} onMore={() => navigation.navigate('More')} onSyncQueue={() => navigation.navigate('SyncQueue')} />}
+        {({ navigation }) => <HomeScreen me={me} onMore={() => navigation.navigate('More')} onSyncQueue={() => navigation.navigate('SyncQueue')} onAttendance={() => navigation.navigate('BulkEntry')} />}
       </App.Screen>
       <App.Screen name="More" options={{ title: t('more.title') }}>
         {({ navigation }) => (
@@ -207,6 +214,8 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
             onClasses={() => navigation.navigate('Classes')}
             onStudents={() => navigation.navigate('Students', { classId: null })}
             onSyncQueue={() => navigation.navigate('SyncQueue')}
+            onLeave={() => navigation.navigate('LeaveApprovals')}
+            onHolidays={() => navigation.navigate('Holidays')}
           />
         )}
       </App.Screen>
@@ -218,6 +227,9 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
       </App.Screen>
       {OFFLINE_ROLES.includes(me.role) ? (
         <>
+          <App.Screen name="BulkEntry" options={{ title: t('attendance.title') }}>
+            {() => <BulkEntryScreen me={me} />}
+          </App.Screen>
           <App.Screen name="SyncQueue" options={{ title: t('syncQueue.title') }}>
             {({ navigation }) => <SyncQueueScreen onReview={(conflictId) => navigation.navigate('ConflictReview', { conflictId })} />}
           </App.Screen>
@@ -243,6 +255,7 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
                 klass={route.params.klass}
                 onEdit={(klass) => navigation.navigate('ClassForm', { klass })}
                 onStudents={(klass) => navigation.navigate('Students', { classId: klass.id })}
+                onTimetable={(klass) => navigation.navigate('Timetable', { klass })}
               />
             )}
           </App.Screen>
@@ -264,6 +277,12 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
               />
             )}
           </App.Screen>
+          <App.Screen name="Timetable" options={{ title: t('timetable.title') }}>
+            {({ route }) => <TimetableScreen klass={route.params.klass} canManage={staff} />}
+          </App.Screen>
+          <App.Screen name="Holidays" options={{ title: t('holidays.title') }}>
+            {() => <HolidaysScreen canManage={staff} />}
+          </App.Screen>
           <App.Screen name="StudentProfile" options={{ title: t('students.profileTitle') }}>
             {({ navigation, route }) => (
               <StudentProfileScreen studentId={route.params.studentId} onEdit={(student) => navigation.navigate('StudentForm', { student, classId: null })} />
@@ -273,6 +292,9 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
       ) : null}
       {staff ? (
         <>
+          <App.Screen name="LeaveApprovals" options={{ title: t('leave.title') }}>
+            {() => <LeaveApprovalsScreen />}
+          </App.Screen>
           <App.Screen name="Accounts" options={{ title: t('accounts.title') }}>
             {({ navigation }) => (
               <AccountsScreen onAdd={() => navigation.navigate('AccountCreate')} onOpen={(account) => navigation.navigate('AccountDetail', { account })} />

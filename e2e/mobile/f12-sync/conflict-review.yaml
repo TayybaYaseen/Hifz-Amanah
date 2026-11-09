@@ -1,7 +1,7 @@
 # F12 · Offline and synchronization — mobile E2E (docs/specs/04-f12-offline-sync.md; design.md §4.13)
 # Covers: F12-AC11, F12-AC12, F12-AC13
 # Maestro drives one device; the second device's edit is made through the API from the same base version.
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F12 conflict — two edits from one base version, review, resolve
 tags:
   - pending

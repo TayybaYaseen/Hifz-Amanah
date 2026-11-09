@@ -12,7 +12,6 @@ Do not silently choose a value for anything listed as open. Ask the user, or kee
 
 | ID | Decision | Deferred until | What it blocks |
 |---|---|---|---|
-| DEC-B55 | Android application ID | The domain is registered | Device E2E runs (`APP_ID` parameter) and Play Console setup. Release (Phase 9). |
 | DEC-B45 | AI provider vendor (the budget is approved) | The FR-AI-012 provider comparison at the start of Phase 7 | The AI parts of F15 (US-063…065). Deterministic analytics (US-062) are not blocked. |
 
 ### Product-owner action items (not open decisions)

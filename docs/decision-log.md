@@ -2,7 +2,7 @@
 
 **Status:** Complete. The Q&A ran on 2026-10-30, and the product owner confirmed the final summary.
 - 69 decisions: 3 Category A, 8 Category C, 59 Category B (counted once each).
-- 2 Deferred: DEC-B55 and the provider part of DEC-B45.
+- 1 Deferred: the provider part of DEC-B45. (DEC-B55, Deferred on 2026-10-30, was decided by the product owner on 2026-11-08: `com.hifzamanah.app`.)
 - The central register is now **SRS §17**. This file keeps the inventory, the original references and the answers.
 **Purpose:** One inventory of every open decision in the repository. Each row has its sources, its classification and its live status. When the review ends, the outcomes go into `SRS.md` §16/§17, and this file keeps the history.
 
@@ -123,7 +123,7 @@ The "Stories" column lists the user stories affected. Affected documents are alw
 | DEC-B52 | Minimum Android version, device matrix and release channel | gate #7, `layouts.yaml` | F11, all | NFR-COMP-001 | Approved |
 | DEC-B53 | Hosting, region, expected volumes and performance targets | gate #9, ARCH §16 | all | NFR-PERF-005, NFR-REL-001 | Approved |
 | DEC-B54 | CI gates, UI automation and the test-control mechanism | gate #10, `fixtures.ts`, e2e README | all | NFR-MNT-004 | Approved |
-| DEC-B55 | Android application ID (`APP_ID`) | 47 mobile flows | all | — | Deferred |
+| DEC-B55 | Android application ID (`APP_ID`) | 47 mobile flows | all | — | Approved (decided 2026-11-08) |
 | DEC-B56 | Required student fields beyond the name | F03 Q1, design §4.5 roll number | F03 US-011 | FR-STU-001, NFR-PRV-001 | Approved |
 | DEC-B57 | Can a student be enrolled in two classes at once? | F03 Q2 | F03 US-012 | FR-STU-002 | Approved |
 | DEC-B58 | Duplicate class names: block or warn? | F03 Q4 | F03 US-010 | FR-CLS-001 | Approved |
@@ -189,7 +189,7 @@ All answers below come from the product owner's Q&A on 2026-10-30, and the produ
 | DEC-B52 | Android 8.0 (API 26) or the Expo SDK's minimum, whichever is higher. **Test devices:** a 5" 2 GB phone, a 6.5" mid-range phone, a 10" tablet and one real low-end device. **Release:** Play internal track, then closed testing, then production. |
 | DEC-B53 | **Hosting:** AWS Mumbai (managed PostgreSQL, S3, SES); this settles DEC-B06 as **Amazon SES**. **First-year sizing:** 20 madaris, 200 teachers, 5,000 students. **Targets:** p95 API under 500 ms, a report under 3 s, sync of 100 changes under 10 s, 99.5% uptime. |
 | DEC-B54 | **CI:** GitHub Actions on every PR runs typecheck, lint, unit tests, docs:check, e2e:trace and API E2E (Docker Compose). Maestro runs nightly and before each release. **Test control:** a test-only API, local/staging only and protected by a secret, providing seed reset, Mailpit, clock control, and AI and push stubs. |
-| DEC-B55 | **Deferred.** Reason: the domain is not registered yet. Device E2E runs and Play Console setup stay blocked until it is decided. |
+| DEC-B55 | **`com.hifzamanah.app`** (product owner, decided 2026-11-08). It was Deferred on 2026-10-30 because the domain was not registered yet. |
 | DEC-B56 | **Required:** name and class. **Optional:** roll number or External Student ID (unique per madrasa), admission date, private notes. No date of birth, address, phone or photo. |
 | DEC-B57 | One active class at a time. Moving a student ends the old enrollment and keeps its history. |
 | DEC-B58 | Active class names are unique within a madrasa (case-insensitive). |

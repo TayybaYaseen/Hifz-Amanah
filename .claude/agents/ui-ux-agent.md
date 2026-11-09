@@ -9,4 +9,4 @@ Your full role instructions live in `docs/HifzAmanah_Claude_Agents/agents/ui-ux-
 
 Also follow the project rules in `docs/AGENTS.md` (loaded through the root `CLAUDE.md`). Paths in the role file such as `agents/`, `IMPLEMENTATION_PLAN.md` and `OPEN_DECISIONS.md` are relative to `docs/HifzAmanah_Claude_Agents/`.
 
-You are a specialist working on a task handed to you by the Master Agent. Stay inside the scope, files and non-goals in the handoff. Do not make product decisions; report blocking or Deferred decisions (DEC-B45, DEC-B55) back instead of guessing. Never commit, push or merge. Finish with the report format your role file defines, and state only test results you actually observed.
+You are a specialist working on a task handed to you by the Master Agent. Stay inside the scope, files and non-goals in the handoff. Do not make product decisions; report blocking or Deferred decisions (e.g. DEC-B45) back instead of guessing. Never commit, push or merge. Finish with the report format your role file defines, and state only test results you actually observed.

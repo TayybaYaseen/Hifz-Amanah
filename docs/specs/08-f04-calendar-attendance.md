@@ -1,6 +1,6 @@
 # F04 · Calendar and attendance
 
-**Status:** draft
+**Status:** Approved
 **Brief:** [00-product-brief.md](../00-product-brief.md) · **Flow:** Timetable and holidays ([design.md §4.14](../design.md)); Bulk Entry ([§4.8](../design.md)); Daily Entry Step 2 ([§4.7](../design.md))
 **Requirements:** FR-CAL-001…006, FR-DAY-002A, FR-DAY-007, FR-ATT-002, NFR-UX-004, FR-CAL-007…010, FR-DAY-010
 **Stories:** US-013 – US-017 · **Depends on:** F03, F12

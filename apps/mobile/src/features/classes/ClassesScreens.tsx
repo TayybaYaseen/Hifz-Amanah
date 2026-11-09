@@ -129,7 +129,13 @@ export function ClassFormScreen({ klass, onSaved }: { klass: ClassResponse | nul
 }
 
 /** One class: details, its students, and Owner/Admin actions. Deactivation lists the active students first (F03 edge cases). */
-export function ClassDetailScreen({ klass: initial, onEdit, onStudents }: { klass: ClassResponse; onEdit: (klass: ClassResponse) => void; onStudents: (klass: ClassResponse) => void }) {
+export function ClassDetailScreen({ klass: initial, onEdit, onStudents, onTimetable }: {
+  klass: ClassResponse;
+  onEdit: (klass: ClassResponse) => void;
+  onStudents: (klass: ClassResponse) => void;
+  /** F04: the class timetable (US-013). */
+  onTimetable: (klass: ClassResponse) => void;
+}) {
   const { t } = useTranslation();
   const { session } = useSession();
   const [klass, setKlass] = useState(initial);
@@ -181,6 +187,7 @@ export function ClassDetailScreen({ klass: initial, onEdit, onStudents }: { klas
         <AppText color={colors.textSecondary}>{t('classes.studentCount', { count: klass.activeStudentCount })}</AppText>
       </Card>
       <Button testID="classDetail.students" variant="secondary" label={t('classes.viewStudents')} onPress={() => onStudents(klass)} />
+      <Button testID="classDetail.timetable" variant="secondary" label={t('timetable.title')} onPress={() => onTimetable(klass)} />
       {confirm ? (
         <Card>
           <AppText testID="classDetail.confirmMessage">

@@ -18,9 +18,10 @@ Instructions for AI coding agents (Claude Code, Codex, Cursor, Copilot, etc.) wo
 
 **If the documents conflict, or a needed decision is missing or marked Deferred (SRS §17.3), stop and ask the user.** Never quietly pick a value and treat it as approved. If you must leave a placeholder, make it configurable and mark it `// DEFERRED: <DEC-ID>` in code.
 
-Two decisions are Deferred:
-- **The Android application ID** (DEC-B55).
+One decision is Deferred:
 - **The AI provider vendor** (DEC-B45, Phase 7).
+
+The Android application ID is **`com.hifzamanah.app`** (DEC-B55, decided 2026-11-08).
 
 Always cite requirement IDs (e.g. `FR-HW-012`, `US-037`) in PR descriptions, ADRs, and test names.
 
@@ -56,7 +57,7 @@ Do not guess commands that don't exist. Mobile-only commands (`npm start`, `npm 
 | Feature gate (every story in a feature) | `npm run e2e:gate -- F05` |
 | Release gate (app-wide E2E) | `npm run e2e:gate -- APP` |
 | API E2E (Playwright Test; start `npm run api:e2e-server` first, or set `E2E_API_URL`) | `npm run e2e:api` |
-| Mobile E2E (Maestro; needs the Maestro CLI and an emulator) | `npm run e2e:mobile -- -e APP_ID=<android application id>` |
+| Mobile E2E (Maestro; needs the Maestro CLI and an emulator) | `npm run e2e:mobile` |
 | Docs traceability (one story per spec, verbatim criteria, requirement IDs, links) | `npm run docs:check` |
 
 **Specs are one per user story,** all directly in `docs/specs/` (no subfolders), indexed in `docs/specs/README.md`. Sorted by name, they list in implementation order:
@@ -256,5 +257,5 @@ Working with the agent team:
 - The Master Agent and all registered specialist agents in `.claude/agents/` are available for development tasks.
 - The user starts every implementation task, through `/dal` or another direct instruction. Claude never starts application implementation on its own.
 - All implementation follows the approved SRS, ARCHITECTURE, specs, and acceptance criteria, in the source-of-truth order of §2 of this file.
-- Raise any unresolved or Deferred decision that affects a task (SRS §17.3, e.g. DEC-B45, DEC-B55) with the user before implementing the affected functionality.
+- Raise any unresolved or Deferred decision that affects a task (SRS §17.3, e.g. DEC-B45) with the user before implementing the affected functionality.
 - Planning documents and recorded decisions are not proof that functionality is implemented.

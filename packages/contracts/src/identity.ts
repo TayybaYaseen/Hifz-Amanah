@@ -87,6 +87,11 @@ export const ERROR_CODES = [
   'CONFLICT_STALE',
   /** 409: the conflict was already resolved. */
   'CONFLICT_CLOSED',
+  // Calendar (F04; plan docs/handover/F04-plan.md).
+  /** 409: records already exist on the date of a new holiday; the Admin must confirm (FR-CAL-009, F04-AC20). */
+  'RECORDS_EXIST',
+  /** 409: the Leave is not awaiting a decision (already decided, changed, or not a Leave). */
+  'LEAVE_NOT_AWAITING',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

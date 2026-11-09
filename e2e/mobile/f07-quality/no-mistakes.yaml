@@ -1,6 +1,6 @@
 # F07 · Mistakes and quality — mobile E2E (docs/specs/10-f07-mistakes-quality.md; decision review 2026-10-30, SRS §17)
 # Covers: F07-AC14
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F07 explicit No mistakes
 tags:
   - pending

@@ -1,7 +1,7 @@
 # F01 · Identity and authentication — mobile E2E (docs/specs/01-f01-identity-authentication.md; decision review 2026-10-30, SRS §17)
 # Covers: F01-AC24, F01-AC26, F01-AC27, F01-AC28, F01-AC30
 # Android's Back first closes the keyboard, so `hideKeyboard` comes before every navigating `back`.
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F01 profile, User ID rules, Admin reset, and Owner/Admin two-factor sign-in
 tags:
   - F01

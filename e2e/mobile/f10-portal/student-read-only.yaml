@@ -1,6 +1,6 @@
 # F10 · Student and Parent access — mobile E2E (docs/specs/13-f10-student-parent-access.md; design.md §4.11)
 # Covers: F10-AC1, F10-AC2, F10-AC3, F10-AC4
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F10 student — own published reports, read-only, offline state
 tags:
   - pending

@@ -3,7 +3,7 @@
 # Students lists only Madrasa A students of Class A1 (former step 6): student records arrive with F03 and are
 # checked by e2e/mobile/f03-roster/teacher-students.yaml. Here F01-AC1 is checked through the home screen's
 # role and madrasa.
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F01 sign-in — role home, neutral errors, no forced password change
 tags:
   - F01

@@ -17,8 +17,12 @@ import { createIdSource, randomUuid } from './ids.ts';
 import { Outbox, type OutboxItem } from './outbox.ts';
 import { secureRandomBytes } from './platform.ts';
 import { appRegistry, type EntityRegistry } from './registry.ts';
+import { registerAttendance } from '../features/attendance/local.ts';
 import { httpSyncApi, type ConflictApi } from './transport.ts';
 import { holdForSignOut, lockWorkspace, quiesceForSignOut, readMeta, resumeHeld, setOrgTimeZone, signOutAction, type WorkspaceMeta } from './workspace.ts';
+
+// Offline-capable entities: F04 attendance (F05 daily records and F08 homework add theirs here).
+registerAttendance(appRegistry);
 
 const TIMER_MS = 30_000;
 const EMPTY_COUNTS: Record<QueueState, number> = { PENDING: 0, SYNCING: 0, SYNCED: 0, FAILED: 0, ACTION_REQUIRED: 0 };
@@ -57,6 +61,8 @@ export interface SyncContextValue {
    * existing row (it derives the base version and per-row dependencies, review N3). Null for Student/Parent.
    */
   outbox: Outbox | null;
+  /** The workspace database, for features to read their local rows (F04 Bulk Entry). Null for Student/Parent. */
+  db: SqlDriver | null;
   registry: EntityRegistry;
   conflicts: ConflictApi;
   syncNow(): Promise<SyncOutcome | null>;
@@ -349,6 +355,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     restoredCount,
     dismissRestored: () => setRestoredCount(null),
     outbox: workspace?.engine ? workspace.outbox : null,
+    db: workspace?.engine ? workspace.db : null,
     registry: appRegistry,
     conflicts: httpSyncApi(session),
     syncNow: async () => (workspace?.engine ? workspace.engine.syncNow({ ignoreBackoff: true }) : null),

@@ -1,6 +1,6 @@
 # F14 · Excel import and export — mobile E2E (docs/specs/14-f14-excel-import-export.md; decision review 2026-10-30, SRS §17)
 # Covers: F14-AC21
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F14 Teacher imports students into assigned classes
 tags:
   - pending

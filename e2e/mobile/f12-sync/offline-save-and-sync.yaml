@@ -1,6 +1,6 @@
 # F12 · Offline and synchronization — mobile E2E (docs/specs/04-f12-offline-sync.md; design.md §4.13)
 # Covers: F12-AC1, F12-AC2, F12-AC3, F12-AC4, F12-AC5, F12-AC9
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F12 offline — save, kill app, reopen, reconnect, synced once
 tags:
   - pending

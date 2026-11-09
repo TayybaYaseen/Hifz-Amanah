@@ -1,6 +1,7 @@
 // Seeds the synthetic E2E personas (e2e/fixtures/personas.ts). Test environments only; never real data.
 // Owner and Admin personas get an enabled authenticator secret so the fixtures can sign in (FR-AUTH-016).
 // F03: the fixture classes (with their Teachers) and students, each enrolled since SEED_ENROLLMENT_DAYS ago.
+// F04: each fixture class meets on its fixture schedule (MON-SAT) from that same date.
 import { v7 as uuidv7 } from 'uuid';
 import { addDays, calendarDateIn } from '@hifz/domain/roster';
 import { TEST_PASSWORD, classes, loginIdOf, madaris, personas, students } from '../../../../e2e/fixtures/personas.ts';
@@ -14,6 +15,9 @@ let passwordHash: Promise<string> | undefined;
 
 /** Seeded students are enrolled from this many days before today, so "earlier periods" exist. */
 export const SEED_ENROLLMENT_DAYS = 90;
+
+/** ISO weekdays of the fixture schedules (e2e/fixtures/personas.ts). */
+const SCHEDULE_DAYS: Record<(typeof classes)[keyof typeof classes]['schedule'], number[]> = { 'MON-SAT': [1, 2, 3, 4, 5, 6] };
 
 export async function seedPersonas(db: Db, clock: Clock, totpKey: Buffer): Promise<void> {
   passwordHash ??= hashPassword(TEST_PASSWORD);
@@ -92,6 +96,10 @@ export async function seedPersonas(db: Db, clock: Clock, totpKey: Buffer): Promi
         await tx
           .insertInto('classes')
           .values({ id: classIds[classKey], organization_id: organizationId, name: c.name, status: 'ACTIVE', created_at: now, updated_at: now, deactivated_at: null })
+          .execute();
+        await tx
+          .insertInto('class_schedules')
+          .values({ id: uuidv7(), organization_id: organizationId, class_id: classIds[classKey], weekdays: SCHEDULE_DAYS[c.schedule], start_time: null, end_time: null, effective_from: since, effective_to: null, created_at: now, created_by: null, superseded_at: null, superseded_by: null })
           .execute();
         for (const teacher of c.teachers) {
           await tx

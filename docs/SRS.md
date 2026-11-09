@@ -1462,7 +1462,6 @@ All thirteen gates were closed in the product-owner decision review of 2026-10-3
 | 13 | Teachers importing student lists | Approved | Yes, into assigned classes only (FR-XLS-001). DEC-B15 |
 
 **Still deferred:**
-- The Android application ID (DEC-B55), until the domain is registered.
 - The AI provider vendor (DEC-B45), until the FR-AI-012 comparison in Phase 7.
 
 **Action items owned by the product owner:**
@@ -1731,7 +1730,7 @@ This is the central register of every decision that was open anywhere in the rep
 | DEC-B52 | Android version and devices (gate #7) | Android 8.0+ (or the Expo minimum); device matrix; Play tracks | Approved | PO Q&A | Reach older phones | NFR-COMP-001 | all | layouts journey |
 | DEC-B53 | Hosting and targets (gate #9) | AWS Mumbai; 20 madaris / 200 teachers / 5,000 students; p95 < 500 ms, report < 3 s, sync < 10 s, 99.5% uptime | Approved | PO Q&A | Nearest region | NFR-PERF-006 | all | — (performance tests at Phase 8) |
 | DEC-B54 | CI and test control (gate #10) | GitHub Actions gates; nightly Maestro; test-only control API in local/staging | Approved | PO Q&A | — | NFR-MNT-005 | all | e2e support fixtures |
-| DEC-B55 | Android application ID | Not chosen | **Deferred** | PO Q&A | The domain is not registered yet. Blocks device E2E runs and Play Console setup only | — | all | every mobile flow (`APP_ID`) |
+| DEC-B55 | Android application ID | `com.hifzamanah.app` | Approved | PO decision 2026-11-08 (was Deferred on 2026-10-30) | Needed for device E2E runs and Play Console setup; it cannot change after the first release | — | all | every mobile flow (`appId`) |
 | DEC-B56 | Student fields | Name and class required; roll number/External ID, admission date, private notes optional | Approved | PO Q&A | Collect only what is needed | FR-STU-005 | US-011 | F03-AC17 |
 | DEC-B57 | Dual enrollment | One active class | Approved | PO Q&A | Clear scope and reports | FR-STU-006 | US-012 | F03-AC18 |
 | DEC-B58 | Duplicate class names | Blocked (case-insensitive, active classes) | Approved | PO Q&A | Unambiguous Excel mapping | FR-CLS-003 | US-010 | F03-AC14 |
@@ -1750,7 +1749,6 @@ This is the central register of every decision that was open anywhere in the rep
 ### 17.3 Open items after this review
 
 - **Deferred:**
-  - DEC-B55, the Android application ID: until the domain is registered.
   - DEC-B45, the AI provider vendor: until the FR-AI-012 comparison in Phase 7.
 - **Product-owner action items** (these are not open decisions):
   - Nominate the Quran metadata reviewer (DEC-B31).

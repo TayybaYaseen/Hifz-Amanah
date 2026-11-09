@@ -1,6 +1,6 @@
 # F04 · Calendar and attendance — mobile E2E (docs/specs/08-f04-calendar-attendance.md; decision review 2026-10-30, SRS §17)
 # Covers: F04-AC18, F04-AC19, F04-AC20, F04-AC21
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F04 Late, Half day, Leave in Bulk Entry; Absent after reciting; late holiday
 tags:
   - pending

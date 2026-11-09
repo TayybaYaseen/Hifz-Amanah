@@ -1,5 +1,5 @@
 # Subflow: reset the test environment to the seeded personas, then start the app fresh.
-appId: ${APP_ID}
+appId: com.hifzamanah.app
 ---
 - runScript:
     file: control.js

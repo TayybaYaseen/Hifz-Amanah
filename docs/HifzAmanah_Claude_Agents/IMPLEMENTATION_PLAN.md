@@ -44,7 +44,7 @@ Still open (SRS §17.3):
 
 | Item | Type | Effect on the plan |
 |---|---|---|
-| DEC-B55: Android application ID | Deferred | Keep it configurable and mark it `// DEFERRED: DEC-B55`. Mobile E2E runs take `APP_ID` as a parameter. Release (Phase 9) is blocked until it is decided. |
+| DEC-B55: Android application ID | Approved (decided 2026-11-08) | `com.hifzamanah.app`, set in `apps/mobile/app.config.ts` and every flow's `appId`. |
 | DEC-B45: AI provider vendor | Deferred | Blocks the AI parts of F15 (US-063…065) only. Decide it through the FR-AI-012 comparison at the start of Phase 7. |
 | DEC-B31: Quran metadata reviewer | Product-owner action | Needed before the F06 seed is approved for production. |
 | DEC-B39: glossary approval | Product-owner action | Needed before Urdu and Roman Urdu strings are final (F11). |
@@ -185,7 +185,7 @@ Tests: PDF in all three locales including RTL and Quranic Arabic; note-leak test
 
 - Release gate `npm run e2e:gate -- APP` passes, including the journeys (`e2e/api/journeys`, `e2e/mobile/journeys`).
 - Security and tenant-isolation review, localization/RTL, accessibility, performance targets (NFR-PERF-006), backups and restore, monitoring, staging acceptance, release and rollback plan.
-- Blocked until DEC-B55 is decided and DEC-B44 legal confirmation is received.
+- Blocked until DEC-B44 legal confirmation is received.
 - No deployment, spending, provisioning, or production launch without explicit user approval.
 
 ---

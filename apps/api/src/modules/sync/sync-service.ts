@@ -21,7 +21,7 @@ import type { Actor } from '../identity/auth-service.ts';
 import { appendChange, changedSince, lockOrganization } from './change-log.ts';
 import type { SyncControl } from './control-state.ts';
 import { decodeCursor, encodeCursor, maxSeq, type Cursor } from './cursor.ts';
-import type { SyncHandler, SyncRegistry } from './handler.ts';
+import type { SyncHandler, SyncRegistry, SyncRow } from './handler.ts';
 import { opHash } from './op-hash.ts';
 import { inScope, type SyncScope, type SyncScopeProvider } from './scope.ts';
 
@@ -109,9 +109,10 @@ export class SyncService {
         // anything else, so such an op is OP_ID_REUSED and never DEPENDENCY_PENDING or CONFLICT_OPEN. The probe is
         // rolled back (RETRY results are never stored); the real claim below re-checks it for concurrent pushes.
         if (await this.opIdTakenElsewhere(tx, claim('REJECTED', {}))) return rejected(op.opId, 'OP_ID_REUSED');
-        if (await this.dependencyPending(tx, actor, op)) return { opId: op.opId, status: 'RETRY', code: 'DEPENDENCY_PENDING' };
+        const dependencies = await this.dependencyState(tx, actor, op);
+        if (dependencies === 'PENDING') return { opId: op.opId, status: 'RETRY', code: 'DEPENDENCY_PENDING' };
 
-        const result = await this.decide(tx, actor, deviceId, op, scope);
+        const result = dependencies === 'GONE' ? rejected(op.opId, 'NOT_FOUND') : await this.decide(tx, actor, deviceId, op, scope);
         if (result.status === 'RETRY') return result;
         const claimed = await tx
           .insertInto('sync_ops')
@@ -142,16 +143,16 @@ export class SyncService {
    * conflict has since been RESOLVED; AND the dependency's record exists in this organization (review N8), loaded
    * through its handler in this tenant transaction. Not stored: RETRY DEPENDENCY_PENDING.
    *
-   * The existence check matters once a CREATE can conflict: F04/F05 natural-key create-create conflicts (decision
-   * Q11) resolved with KEEP_SERVER leave the device's record id never created, so its dependents stay
-   * DEPENDENCY_PENDING here (never applied against a missing record). F04/F05 MUST decide what happens to those
-   * dependents (e.g. re-point them to the server's record or fail them for the user) when they add that conflict.
+   * F04 decision (F12 plan Q11 follow-up): a dependency that was a natural-key create-create collision (its result
+   * or its conflict names a different, existing row) never creates the device's record id, so its dependents can
+   * never apply. They are refused NOT_FOUND (stored, shown as failed on the device with nothing lost) instead of
+   * waiting forever. Any other settled dependency without its record keeps the dependent waiting.
    */
-  private async dependencyPending(tx: Tx, actor: Actor, op: SyncOp): Promise<boolean> {
-    if (op.dependsOn.length === 0) return false;
+  private async dependencyState(tx: Tx, actor: Actor, op: SyncOp): Promise<'READY' | 'PENDING' | 'GONE'> {
+    if (op.dependsOn.length === 0) return 'READY';
     const settled = await tx
       .selectFrom('sync_ops')
-      .select(['sync_ops.op_id', 'sync_ops.entity', 'sync_ops.entity_id'])
+      .select(['sync_ops.op_id', 'sync_ops.entity', 'sync_ops.entity_id', 'sync_ops.status', 'sync_ops.result'])
       .where('sync_ops.op_id', 'in', op.dependsOn)
       .where('sync_ops.user_id', '=', actor.userId)
       .where((eb) =>
@@ -171,12 +172,31 @@ export class SyncService {
         ]),
       )
       .execute();
-    if (settled.length < op.dependsOn.length) return true;
+    if (settled.length < op.dependsOn.length) return 'PENDING';
+    let state: 'READY' | 'PENDING' | 'GONE' = 'READY';
     for (const dep of settled) {
       const handler = this.d.registry.get(dep.entity);
-      if (!handler || !(await handler.load(tx, actor.organizationId, dep.entity_id, { forUpdate: false }))) return true;
+      if (!handler) return 'PENDING';
+      if (await handler.load(tx, actor.organizationId, dep.entity_id, { forUpdate: false })) continue;
+      if (!(await this.wasCollision(tx, actor.organizationId, dep))) return 'PENDING';
+      state = 'GONE';
     }
-    return false;
+    return state;
+  }
+
+  /** True when a settled CREATE landed on another existing row (natural-key collision, see collide()). */
+  private async wasCollision(tx: Tx, organizationId: string, dep: { op_id: string; entity_id: string; status: string; result: unknown }): Promise<boolean> {
+    if (dep.status === 'APPLIED') {
+      const result = dep.result as { entityId?: unknown } | null;
+      return typeof result?.entityId === 'string' && result.entityId !== dep.entity_id;
+    }
+    const conflict = await tx
+      .selectFrom('sync_conflicts')
+      .select('entity_id')
+      .where('organization_id', '=', organizationId)
+      .where('op_id', '=', dep.op_id)
+      .executeTakeFirst();
+    return conflict !== undefined && conflict.entity_id !== dep.entity_id;
   }
 
   private async decide(tx: Tx, actor: Actor, deviceId: string, op: SyncOp, scope: SyncScope): Promise<OpResult> {
@@ -189,13 +209,19 @@ export class SyncService {
   private async create(tx: Tx, actor: Actor, op: SyncOp, handler: SyncHandler, scope: SyncScope): Promise<OpResult> {
     const parsed = handler.createSchema.safeParse(op.fields);
     if (!parsed.success) return rejected(op.opId, 'VALIDATION', issueFields(parsed.error));
-    const fields = parsed.data;
-    const keys = handler.keysForCreate(fields);
+    const keys = handler.keysForCreate(parsed.data);
     if (!inScope(scope, keys)) return rejected(op.opId, 'NOT_FOUND');
+    const prepared = handler.prepareCreate ? await handler.prepareCreate(tx, actor, parsed.data) : { ok: true as const, fields: parsed.data };
+    if (!prepared.ok) return 'notFound' in prepared ? rejected(op.opId, 'NOT_FOUND') : rejected(op.opId, 'VALIDATION', prepared.issues);
+    const fields = prepared.fields;
+    const at = this.d.clock.now();
+    // A replayed CREATE of the device's own row is an idempotent replay above; a different row already holding the
+    // natural key is a create-create collision (F12 decision Q11), never last-write-wins.
+    const duplicate = handler.findNaturalDuplicate ? await handler.findNaturalDuplicate(tx, actor.organizationId, fields) : null;
+    if (duplicate && duplicate.id !== op.entityId) return this.collide(tx, actor, op, handler, duplicate, fields, scope, at);
     // The client's UUIDv7 stays the primary key (F12-AC3). An id used anywhere, in any madrasa, is refused
     // without detail.
-    if (!(await handler.insert(tx, actor.organizationId, op.entityId, fields))) return rejected(op.opId, 'ID_TAKEN');
-    const at = this.d.clock.now();
+    if (!(await handler.insert(tx, actor.organizationId, op.entityId, fields, { actorUserId: actor.userId, at }))) return rejected(op.opId, 'ID_TAKEN');
     await appendChange(tx, {
       organizationId: actor.organizationId,
       entity: op.entity,
@@ -210,6 +236,68 @@ export class SyncService {
     });
     await handler.audit?.(tx, { actor, opType: 'CREATE', entityId: op.entityId, rowVersion: 1, changes: fields, at });
     return { opId: op.opId, status: 'APPLIED', rowVersion: 1, entityId: op.entityId };
+  }
+
+  /**
+   * Create-create on a natural key (F12 decision Q11; F04 attendance for one student and date). The device's row id is
+   * never created. When the handler's collision fields equal the existing row's, the op is APPLIED as a no-op on that
+   * row (its id is in the result). Otherwise a conflict on the existing row holds both versions; it is resolved in
+   * Conflict Review like any other (KEEP_DEVICE writes the device's fields onto the existing row). Never
+   * last-write-wins.
+   */
+  private async collide(
+    tx: Tx,
+    actor: Actor,
+    op: SyncOp,
+    handler: SyncHandler,
+    existing: SyncRow,
+    fields: Record<string, unknown>,
+    scope: SyncScope,
+    at: Date,
+  ): Promise<OpResult> {
+    if (!inScope(scope, existing.keys)) return rejected(op.opId, 'NOT_FOUND');
+    if (await this.openConflict(tx, actor.organizationId, op.entity, existing.id)) return { opId: op.opId, status: 'RETRY', code: 'CONFLICT_OPEN' };
+    const compared = handler.collisionFields ?? Object.keys(fields);
+    const device = Object.fromEntries(compared.filter((f) => Object.hasOwn(fields, f)).map((f) => [f, fields[f]]));
+    const outcome = detect({ local: device, server: existing.fields, serverChanged: compared }, handler.fieldSpec);
+    if (outcome.kind !== 'CONFLICT') return { opId: op.opId, status: 'APPLIED', rowVersion: existing.rowVersion, entityId: existing.id };
+    const conflictId = uuidv7();
+    await tx
+      .insertInto('sync_conflicts')
+      .values({
+        id: conflictId,
+        organization_id: actor.organizationId,
+        entity: op.entity,
+        entity_id: existing.id,
+        base_version: null,
+        server_version: existing.rowVersion,
+        device_fields: JSON.stringify(outcome.device),
+        server_fields: JSON.stringify(existing.fields),
+        conflict_fields: outcome.conflictFields,
+        student_id: existing.keys.studentId,
+        class_id: existing.keys.classId,
+        caused_by_user_id: actor.userId,
+        op_id: op.opId,
+        status: 'OPEN',
+        resolved_by: null,
+        resolved_at: null,
+        resolution: null,
+        created_at: at,
+      })
+      .execute();
+    return { opId: op.opId, status: 'CONFLICT', conflictId };
+  }
+
+  private async openConflict(tx: Tx, organizationId: string, entity: string, entityId: string): Promise<boolean> {
+    const open = await tx
+      .selectFrom('sync_conflicts')
+      .select('id')
+      .where('organization_id', '=', organizationId)
+      .where('entity', '=', entity)
+      .where('entity_id', '=', entityId)
+      .where('status', '=', 'OPEN')
+      .executeTakeFirst();
+    return open !== undefined;
   }
 
   private async update(tx: Tx, actor: Actor, deviceId: string, op: SyncOp, handler: SyncHandler, scope: SyncScope): Promise<OpResult> {
@@ -228,15 +316,7 @@ export class SyncService {
     // until that conflict is resolved. RETRY is not stored, so the edit keeps its own fields on the device and is
     // sent again afterwards (it may then apply, or become its own explicit conflict). Never folded into the open
     // conflict, never dropped.
-    const open = await tx
-      .selectFrom('sync_conflicts')
-      .select('id')
-      .where('organization_id', '=', org)
-      .where('entity', '=', op.entity)
-      .where('entity_id', '=', op.entityId)
-      .where('status', '=', 'OPEN')
-      .executeTakeFirst();
-    if (open) return { opId: op.opId, status: 'RETRY', code: 'CONFLICT_OPEN' };
+    if (await this.openConflict(tx, org, op.entity, op.entityId)) return { opId: op.opId, status: 'RETRY', code: 'CONFLICT_OPEN' };
 
     // Changes made since the base by OTHER users or devices; this device's own earlier edits are not a conflict.
     // An own edit from a LATER outbox seq that is already applied counts as a server change (review N1).
@@ -275,10 +355,12 @@ export class SyncService {
     }
 
     // Disjoint or safe-merge changes apply on top of the server row (F12-AC13); nothing new → no write.
-    const changes = outcome.apply;
-    if (Object.keys(changes).length === 0) return { opId: op.opId, status: 'APPLIED', rowVersion: row.rowVersion, entityId: op.entityId };
+    if (Object.keys(outcome.apply).length === 0) return { opId: op.opId, status: 'APPLIED', rowVersion: row.rowVersion, entityId: op.entityId };
+    const prepared = handler.prepareUpdate ? await handler.prepareUpdate(tx, actor, row, outcome.apply) : { ok: true as const, fields: outcome.apply };
+    if (!prepared.ok) return 'notFound' in prepared ? rejected(op.opId, 'NOT_FOUND') : rejected(op.opId, 'VALIDATION', prepared.issues);
+    const changes = prepared.fields;
     const next = row.rowVersion + 1;
-    await handler.update(tx, org, op.entityId, changes, next);
+    await handler.update(tx, org, op.entityId, changes, next, { actorUserId: actor.userId, at });
     await appendChange(tx, {
       organizationId: org,
       entity: op.entity,

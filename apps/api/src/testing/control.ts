@@ -64,6 +64,9 @@ const NewWorkspaceInput = z.strictObject({
 });
 
 const TABLES = [
+  // F04 calendar tables (attendance_records is reset through its sync handler's tables).
+  'calendar_exceptions',
+  'class_schedules',
   // F03 roster tables (row-level security as for the sync tables below).
   'student_enrollments',
   'students',

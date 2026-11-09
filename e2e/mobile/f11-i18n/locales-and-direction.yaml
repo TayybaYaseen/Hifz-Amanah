@@ -1,6 +1,6 @@
 # F11 · Localization and accessibility — mobile E2E (docs/specs/02-f11-localization-accessibility.md; design.md §6)
 # Covers: F11-AC1, F11-AC2, F11-AC3, F11-AC7
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F11 locales — English LTR, Urdu RTL, Roman Urdu LTR, glossary terms
 tags:
   - pending

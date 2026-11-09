@@ -1,6 +1,6 @@
 # F03 · Classes and students — mobile E2E (docs/specs/06-f03-classes-students.md; decision review 2026-10-30, SRS §17)
 # Covers: F03-AC15, F03-AC17
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F03 Teacher adds students in assigned classes; minimal student form
 tags:
   - F03

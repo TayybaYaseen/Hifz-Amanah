@@ -1,5 +1,5 @@
 # Subflow: turn off airplane mode and wait for the sync banner to settle.
-appId: ${APP_ID}
+appId: com.hifzamanah.app
 ---
 - setAirplaneMode: disabled
 - extendedWaitUntil:

@@ -2,7 +2,7 @@
 # Covers: F16-AC1, F16-AC2, F16-AC4, F16-AC7, F16-AC8, F16-AC9
 # Events are triggered through the API; pushes go through the test push provider.
 # "Report published" is the only MVP push event (FR-NOT-004).
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F16 push — register, preferences, deep link, sign-out removes token
 tags:
   - pending
