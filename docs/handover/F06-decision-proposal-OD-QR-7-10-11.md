@@ -1,7 +1,7 @@
 # F06 · Decision proposal: OD-QR-7, OD-QR-10, OD-QR-11
 
-**Status:** **Proposal awaiting the product owner. None of these is approved.** Nothing is built on the proposed
-answers. Code that depends on them is marked `DEFERRED: OD-QR-n`.
+**Status:** **Decided 2026-11-09:** OD-QR-7 → A (DEC-B75), OD-QR-10 → confirmed, quantities only (DEC-B76), OD-QR-11 → A, Ayat lines only, with teacher consultation recommended before production rollout (DEC-B77). Kept for history; the record is `decision-log.md` and SRS §17. Original status: proposal; nothing was built on the proposed
+answers.
 **Date:** 2026-11-09. **Context:** SRS §17.3; ADR-017 (accepted); proposed design
 [ADR-018](../adr/ADR-018-quran-reference-snapshot-offline-cache.md) (for OD-QR-7).
 

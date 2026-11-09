@@ -194,7 +194,7 @@ export function paraFor(ref: AyahRef, paras: readonly ParaBoundary[]): number | 
  * for the Teacher to enter and nothing is guessed (F05 edge case "no line data").
  *
  * Only Ayat lines count; Surah-heading and Bismillah lines never do (FR-SAB-012). This keeps the behaviour built
- * before line types existed. Whether headings should count is still open: DEFERRED: OD-QR-11.
+ * before line types existed, and is the decided rule (DEC-B77, 2026-11-09).
  */
 export function countLines(range: AyahRange, layout: readonly LayoutRow[]): number | null {
   const lines = ayahLines(layout).filter((l) => l.surah === range.surah && l.ayahEnd >= range.ayahStart && l.ayahStart <= range.ayahEnd);

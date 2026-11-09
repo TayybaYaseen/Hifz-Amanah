@@ -1,6 +1,6 @@
 # ADR-017 · Quran reference data: model, 16-line layout, offline distribution, import and validation
 
-**Status:** **Accepted 2026-11-09 (SRS §17 DEC-B72).** §8 (offline delivery) waits on OD-QR-7; §3.5 (divisions) is a later
+**Status:** **Accepted 2026-11-09 (SRS §17 DEC-B72).** §8 (offline delivery) is decided as the API snapshot (DEC-B75, ADR-018); §3.5 (divisions) is a later
 phase (DEC-B71); FR-SAB-015 is not in the MVP (DEC-B74). Acceptance approves **no dataset, licence, or physical
 verification**. Implementation starts with the backend (migration 0010, seed format v2, licence gate, sign-off check),
 tested with synthetic data only.
@@ -188,7 +188,7 @@ Index `(organization_id, import_id, surah, ayah_start)` (exists) plus `(organiza
 
 **Line counting is unchanged:** `countLines(surah, a, b, edition)` counts the `AYAH` lines of the active layout where
 `surah` matches and `ayah_start ≤ b AND ayah_end ≥ a`. `SURAH_NAME` and `BASMALLAH` lines are **not** counted, as 0009
-does today. OD-QR-11 asks teachers to confirm this.
+does today. Decided by DEC-B77 (2026-11-09); teacher consultation is recommended before production rollout.
 
 ### 3.9 Considered and not stored
 
@@ -267,7 +267,7 @@ Each portion keeps its Para and its quantity (`PARA` presets, `LINES`, `AYAT`, o
 Rubu = 1/4, Half = 1/2, Salasah = 3/4, Complete = 1 Para remain **amounts** stored as `(unit, numerator, denominator)`.
 They are never mapped to QUL's "Rub" (Rub al-Hizb, ⅛ Juz) or to any position. There is no conversion between lines,
 pages, Ayat, and Para fractions (ADR-005). Whether "first quarter of Para 5" should be a **selectable position** needs
-verified Para-quarter marks of the printed Indo-Pak Mushaf, and is open as OD-QR-10.
+verified Para-quarter marks of the printed Indo-Pak Mushaf, and is not in the MVP (DEC-B76, 2026-11-09).
 
 ## 6. Import pipeline
 
@@ -354,7 +354,7 @@ The values above are placeholders, not data. The human checklist is in the resea
   outbox (AGENTS §7). On access revocation, the cache is locked with the workspace.
 - **Size:** about 114 + 30 rows, plus one row per printed line (roughly 548 × 16 if 548 pages is confirmed), plus divisions. That is expected to be
   small, but it must be **measured** on the real file before release.
-- **Not bundled in the APK (recommended, OD-QR-7):** bundling would couple data fixes to app releases, ignore per-madrasa
+- **Not bundled in the APK (decided, DEC-B75):** bundling would couple data fixes to app releases, ignore per-madrasa
   Admin edits, and widen redistribution, which needs licence permission anyway. Teachers sign in online at least once,
   so the snapshot is in place before offline use.
 
@@ -433,16 +433,16 @@ documentation sample, which is not proven to be resource 11. Word IDs and positi
 | OD-QR-4 | Nominate the qualified Quran reviewer (DEC-B31, existing) | A qualified Hafiz/teacher with the confirmed Taj printing |
 | OD-QR-5 | *Closed by DEC-B71:* Ruku, Hizb, quarter-Hizb, and seven-Manzil are later-phase candidates | — |
 | OD-QR-6 | Approve the model in §3 (line types, word positions, `quran_sources`, optional `quran_divisions`) | Approve |
-| OD-QR-7 | Device distribution: API snapshot after sign-in, or bundled in the APK | API snapshot |
+| OD-QR-7 | Device distribution: API snapshot after sign-in, or bundled in the APK | API snapshot. **Decided 2026-11-09, DEC-B75** |
 | OD-QR-8 | Add page → start line → end line selection (resolved to Surah/Ayat), and store page/line as an extra reference? | Yes for Sabaq as an input aid; references optional for Sabqi/Manzil. This needs new FR text and a design.md update |
 | OD-QR-9 | Attribution requirements: the wording each licence or permission requires, and where it is shown | About screen, all three locales |
-| OD-QR-10 | Should Para quarters be selectable *positions*? (They stay amounts as they are today) | Not in MVP |
-| OD-QR-11 | Do Surah-heading and Bismillah lines count in Total Lines? | No (as built); confirm with teachers |
+| OD-QR-10 | Should Para quarters be selectable *positions*? (They stay amounts as they are today) | Not in MVP. **Decided 2026-11-09, DEC-B76** |
+| OD-QR-11 | Do Surah-heading and Bismillah lines count in Total Lines? | No (as built). **Decided 2026-11-09, DEC-B77**; teacher consultation recommended |
 | OD-QR-12 | *(Added 2026-11-09, readiness review R1.)* Must a Sabqi/Manzil Surah/Ayat range lie within the portion's Para? | Product owner to decide; until then it is not enforced |
 
 ## 13. Acceptance criteria F06-AC20…AC27 (activated 2026-11-09)
 
-Activated with their API E2E tests; the authoritative wording is in the story specs. AC24 is pending until the snapshot exists (OD-QR-7). The original planning table follows.
+Activated with their API E2E tests; the authoritative wording is in the story specs. AC24 is pending until the snapshot is built (DEC-B75). The original planning table follows.
 
 Added 2026-11-09 at the product owner's request (DEC-B71). The IDs are **reserved**. Each becomes an active
 `F06-ACnn` criterion in its story spec once ADR-017 is approved **and** its E2E test stubs exist. Until then,

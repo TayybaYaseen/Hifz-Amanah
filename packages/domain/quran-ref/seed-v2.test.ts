@@ -207,7 +207,7 @@ describe('F06 · licence gate (FR-SAB-011; DEC-B71)', () => {
 });
 
 describe('F06 · line counting with typed lines (FR-SAB-008, FR-SAB-012)', () => {
-  it('only Ayat lines count; heading and Bismillah lines never do (DEFERRED: OD-QR-11 keeps the built behaviour)', () => {
+  it('only Ayat lines count; heading and Bismillah lines never do (DEC-B77)', () => {
     const seed = syntheticSeedV2();
     const rows = normalizedLines(seed, 0);
     expect(rows.some((r) => r.lineType !== 'AYAH')).toBe(true);

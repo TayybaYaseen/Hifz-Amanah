@@ -119,7 +119,7 @@ export class QuranMetadataService {
   async countLinesFor(db: Executor, organizationId: string, range: AyahRange): Promise<{ edition: string; totalLines: number | null; importId: string | null }> {
     const { edition, importId } = await this.activeLayout(db, organizationId);
     if (!importId) return { edition, totalLines: null, importId: null };
-    // Ayat lines only: Surah-heading and Bismillah lines never count (FR-SAB-012; DEFERRED: OD-QR-11).
+    // Ayat lines only: Surah-heading and Bismillah lines never count (FR-SAB-012; DEC-B77).
     const rows = await db
       .selectFrom('mushaf_layout_lines')
       .select(['page', 'line', 'surah', 'line_type', 'ayah_start', 'ayah_end'])

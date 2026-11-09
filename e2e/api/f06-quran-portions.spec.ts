@@ -267,10 +267,10 @@ test.describe('F06 · Quran reference data pipeline (ADR-017)', { tag: '@F06' },
   });
 
   test.fixme('F06-AC24 (US-025) offline lookups from the cached reference snapshot match the server', async () => {
-    // Waits for the reference snapshot and device cache, whose delivery mechanism is still open (DEFERRED: OD-QR-7;
-    // design proposal ADR-018). Given a Teacher device that synced the snapshot and is offline, when a Surah/Ayat range
-    // is chosen, then the derived Para, the validation result, and the Total Lines pre-fill equal the server's answers
-    // for the same snapshot version.
+    // Waits for the reference snapshot and device cache (delivery decided by DEC-B75; plan:
+    // docs/handover/F06-snapshot-implementation-plan.md §6.4). Given a Teacher device that synced the snapshot and
+    // is offline, when a Surah/Ayat range is chosen, then the derived Para, the validation result, and the Total Lines
+    // pre-fill equal the server's answers for the same snapshot version.
   });
 
   test('F06-AC25 (US-024) converting and importing the same dataset again changes nothing, and the stored hashes are the ones signed', async ({ as, control }) => {

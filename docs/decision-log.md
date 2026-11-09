@@ -381,3 +381,28 @@ At the product owner's request:
   - the snapshot and cache design in ADR-018, which needs no F12 change.
 
   None of these is approved.
+
+### 2026-11-09 — OD-QR-7, OD-QR-10, OD-QR-11 decided; verification boundary; licence withdrawal (DEC-B75…B79)
+
+The product owner reviewed the F06 implementation and test report and decided:
+
+| ID | Question | Answer |
+|---|---|---|
+| DEC-B75 (OD-QR-7) | How do Teacher and Admin devices get Quran reference data for offline use? | **Option A:** a versioned Quran reference snapshot from the HifzAmanah API after the first online sign-in (ADR-018). Not bundled in the APK |
+| DEC-B76 (OD-QR-10) | Can a Teacher pick a Para quarter as a position? | **No.** Para quantities only in the MVP. Rubu, Half, Salasah, and Complete stay amounts `(PARA, n, d)` and are never converted into Ayat or line positions |
+| DEC-B77 (OD-QR-11) | Do Surah-heading and Bismillah lines count in Total Lines? | **No.** Total Lines counts Ayat lines only; Surah-heading and Bismillah lines stay separate line types (as built). **Teacher consultation is still recommended before the final production rollout** |
+| DEC-B78 | What may the acceptance criteria and the app claim about the physical Mushaf? | Automated validation covers the digital structure, metadata, mappings, checksums, source registration, and licence gates. **Comparison with the physical Taj Mushaf is a human review responsibility.** The system preserves the reviewer's identity, the exact printing details, the review date, the decision, and the signed approval evidence. `layoutVerified = true` only after an approved, signed **production** import for that specific madrasa. Signed test data never counts as production verification. Nothing may describe the system as automatically proving that a digital layout matches the physical Mushaf |
+| DEC-B79 (ADR-018) | What happens when a source licence is withdrawn? | Withdrawn or no-longer-authorized data is excluded from every future snapshot. The server marks the affected snapshot versions as **revoked**. A device removes revoked cached data on its **next successful online connection**. No claim is made that an offline device can be wiped remotely. The legal and retention implications of already-downloaded data are documented (ADR-018 §6) |
+| Scope | What next? | Record the decisions, then prepare (not start) the implementation plan for the snapshot API, the Android cache with checksum validation, background initial sync and refresh, revocation handling, the AC24 E2E test, and the offline mobile flow. Synthetic data only; no real Quran data; no licence gate bypassed. F05 daily Hifz entry continues as a parallel milestone. F12 and migrations outside the approved scope are not changed. **The plan is reviewed by the product owner before implementation** |
+
+**Applied:**
+- `SRS.md` v1.18: register rows DEC-B75…B79; FR-SAB-012, FR-SAB-013, FR-SAB-014, FR-QTY-002 annotated; §17.3 closes
+  OD-QR-7, OD-QR-10, OD-QR-11 and lists the new questions raised by the plan.
+- ADR-018 revised (revocation, contract, legal and retention section); status "Accepted in direction, revised text
+  awaiting product-owner review".
+- F06-AC20, AC21, AC23, AC24 wording in the story specs states the verification boundary and the decisions.
+- `DEFERRED: OD-QR-11` markers removed from code and tests (no behaviour change).
+- Implementation plan: `docs/handover/F06-snapshot-implementation-plan.md` (awaiting review; nothing built).
+
+**Still open:** the Taj printing, the licences (Tarteel, Taj Company, Tanzil verification), the reviewer, OD-QR-9
+(attribution), and the plan questions P1–P4 (`F06-snapshot-implementation-plan.md` §8).
