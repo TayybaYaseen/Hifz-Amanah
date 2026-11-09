@@ -44,13 +44,23 @@ export type AuditAction =
   | 'ATTENDANCE_RECORDED'
   | 'ATTENDANCE_CHANGED'
   | 'LEAVE_APPROVED'
-  | 'LEAVE_REJECTED';
+  | 'LEAVE_REJECTED'
+  // F06 · Quran reference
+  | 'QURAN_SURAH_CREATED'
+  | 'QURAN_SURAH_UPDATED'
+  | 'QURAN_PARA_CREATED'
+  | 'QURAN_PARA_UPDATED'
+  | 'QURAN_SEED_APPLIED'
+  | 'QURAN_LAYOUT_APPLIED';
 
 export interface AuditEvent {
   organizationId: string | null;
   actorUserId: string | null;
   action: AuditAction;
-  targetType: 'USER' | 'ORGANIZATION' | 'SYNC_CONFLICT' | 'CLASS' | 'STUDENT' | 'CALENDAR_EXCEPTION' | 'ATTENDANCE_RECORD';
+  targetType: 'USER' | 'ORGANIZATION' | 'SYNC_CONFLICT' | 'CLASS' | 'STUDENT' | 'CALENDAR_EXCEPTION' | 'ATTENDANCE_RECORD'
+    | 'QURAN_SURAH'
+    | 'QURAN_PARA'
+    | 'QURAN_IMPORT';
   targetId: string | null;
   summary?: Record<string, unknown>;
   at: Date;

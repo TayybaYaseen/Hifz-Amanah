@@ -19,6 +19,9 @@ import type { SyncRegistry } from '../modules/sync/handler.ts';
 import { newTotpSecret, totpForStep, totpStep } from '../modules/identity/totp.ts';
 import { TEST_PASSWORD, classes as fixtureClasses, madaris, students as fixtureStudents } from '../../../../e2e/fixtures/personas.ts';
 import { seedPersonas } from './seed.ts';
+import { parseSeed, SeedRejectedError, type QuranSeedLoader } from '../modules/quran-ref/seed.ts';
+// Synthetic, test-only Quran fixture (never real metadata); this module is registered only when NODE_ENV=test.
+import { syntheticSeed } from '@hifz/domain/quran-ref/synthetic-fixture';
 
 /** Keeps every log line in memory so tests can prove secrets never reach the logs (F01-AC15). */
 export class LogSink extends Writable {
@@ -42,6 +45,8 @@ interface ControlDeps {
   logSink: LogSink | undefined;
   totpKey: Buffer;
   organization: OrganizationService;
+  /** F06: applies synthetic Quran seeds to a test madrasa (never real Quran data). */
+  quranSeeds: QuranSeedLoader;
   sync: { control: SyncControl; registry: SyncRegistry };
 }
 
@@ -64,6 +69,12 @@ const NewWorkspaceInput = z.strictObject({
 });
 
 const TABLES = [
+  // F06 Quran reference tables (mushaf_editions is a global catalogue and is not reset).
+  'mushaf_layout_lines',
+  'mushaf_layouts',
+  'quran_paras',
+  'quran_surahs',
+  'quran_imports',
   // F04 calendar tables (attendance_records is reset through its sync handler's tables).
   'calendar_exceptions',
   'class_schedules',
@@ -194,6 +205,21 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
       // ---------- F03 · Roster ----------
 
       // The ids of the seeded fixture classes and students, keyed as in e2e/fixtures/personas.ts (A1, S1, …).
+      // F06: applies a SYNTHETIC Quran seed (default: the synthetic fixture; or a seed in the body) to the madrasa
+      // with this code. The loader refuses anything not marked synthetic-or-approved, and synthetic only in tests.
+      scope.post('/quran/seed', async (request, reply) => {
+        const input = z.strictObject({ organizationCode: z.string(), seed: z.unknown().optional() }).parse(request.body ?? {});
+        const org = await deps.db.selectFrom('organizations').select('id').where('code', '=', input.organizationCode).executeTakeFirst();
+        if (!org) throw new AppError('NOT_FOUND');
+        try {
+          const seed = input.seed === undefined ? syntheticSeed() : parseSeed(input.seed);
+          return await deps.quranSeeds.apply(org.id, seed);
+        } catch (error) {
+          if (error instanceof SeedRejectedError) return reply.status(400).send({ issues: error.issues });
+          throw error;
+        }
+      });
+
       scope.get('/roster/ids', async () => {
         const orgs = await deps.db.selectFrom('organizations').select(['id', 'code']).execute();
         const orgOf = (madrasa: keyof typeof madaris) => orgs.find((o) => o.code === madaris[madrasa].code)?.id ?? '';

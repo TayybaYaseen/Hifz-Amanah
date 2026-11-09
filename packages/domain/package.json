@@ -6,6 +6,9 @@
   "exports": {
     "./calendar": "./calendar/index.ts",
     "./roster": "./roster/index.ts",
-    "./sync": "./sync/index.ts"
+    "./sync": "./sync/index.ts",
+    "./quantity": "./quantity/index.ts",
+    "./quran-ref": "./quran-ref/index.ts",
+    "./quran-ref/synthetic-fixture": "./quran-ref/synthetic-fixture.ts"
   }
 }

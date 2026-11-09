@@ -1,34 +1,72 @@
 // F06 · Quran portions and metadata — API E2E (docs/specs/07-f06-quran-portions-metadata.md)
 // Screen journeys: e2e/mobile/f06-quran-portions/.
-import { test } from './support/fixtures';
+// SYNTHETIC DATA ONLY: Quran values come from the synthetic fixture (control.seedSyntheticQuran) or are invented here;
+// none is real Quran metadata. Criteria that save portions (AC5, AC8…AC17) need F05's daily-entry endpoints and stay
+// test.fixme; AC18 waits for the approved seed (DEFERRED: DEC-B31); AC19's record part waits for F05 records.
+import { expect, test } from './support/fixtures';
+
+const SURAH = { nameAr: 'اختبار ١', nameTranslit: 'Synthetic 1', ayahCount: 7, rowVersion: null };
 
 test.describe('F06 · Quran portions and metadata', { tag: '@F06' }, () => {
-  test.fixme('F06-AC1 (US-024) Admin Surah and Para boundary edits are saved per madrasa and audited', async () => {
-    // As admin.a add a Surah and edit a Para boundary; visible in Madrasa A, not in Madrasa B; both audited.
+  test('F06-AC1 (US-024) Admin Surah and Para boundary edits are saved per madrasa and audited', async ({ as, control }) => {
+    const adminA = await as('admin.a');
+    const surah = await adminA.put('quran/surahs/1', { data: SURAH });
+    expect(surah.status()).toBe(200);
+    await adminA.put('quran/surahs/2', { data: { ...SURAH, nameAr: 'اختبار ٢', nameTranslit: 'Synthetic 2', ayahCount: 20 } });
+    const para = await adminA.put('quran/paras/1', { data: { start: { surah: 1, ayah: 1 }, end: { surah: 2, ayah: 10 }, rowVersion: null } });
+    expect(para.status()).toBe(200);
+    const paraId = (await para.json()).para.id;
+    const edited = await adminA.put('quran/paras/1', { data: { start: { surah: 1, ayah: 1 }, end: { surah: 2, ayah: 12 }, rowVersion: 1 } });
+    expect((await edited.json()).para.end).toEqual({ surah: 2, ayah: 12 });
+
+    expect((await (await adminA.get('quran/surahs')).json()).items).toHaveLength(2);
+    expect((await (await (await as('admin.b')).get('quran/surahs')).json()).items).toEqual([]);
+    const surahAudit = await control.auditForTarget((await surah.json()).surah.id);
+    expect(surahAudit.map((r) => r.action)).toEqual(['QURAN_SURAH_CREATED']);
+    expect((await control.auditForTarget(paraId)).map((r) => r.action)).toEqual(['QURAN_PARA_CREATED', 'QURAN_PARA_UPDATED']);
   });
 
-  test.fixme('F06-AC2 (US-024) a Teacher cannot edit Quran metadata', async () => {
-    // As teacher.a1 call the metadata write endpoints → forbidden.
+  test('F06-AC2 (US-024) a Teacher cannot edit Quran metadata', async ({ as }) => {
+    const teacher = await as('teacher.a1');
+    expect((await teacher.put('quran/surahs/1', { data: SURAH })).status()).toBe(403);
+    expect((await teacher.put('quran/paras/1', { data: { start: { surah: 1, ayah: 1 }, end: { surah: 1, ayah: 2 }, rowVersion: null } })).status()).toBe(403);
+    expect((await teacher.get('quran/surahs')).status()).toBe(200);
   });
 
-  test.fixme('F06-AC3 (US-024) an Arabic Surah name is returned byte-identical in every locale', async () => {
-    // Save "الفاتحة"; read with Accept-Language en, ur, ur-Latn; each value equals the input byte for byte.
+  test('F06-AC3 (US-024) an Arabic Surah name is returned byte-identical in every locale', async ({ as }) => {
+    const admin = await as('admin.a');
+    // Not a real Surah name: synthetic Arabic text with diacritics and a decomposed madda, which must not be normalized.
+    const nameAr = 'آختِبار';
+    expect((await admin.put('quran/surahs/1', { data: { ...SURAH, nameAr } })).status()).toBe(200);
+    for (const locale of ['en', 'ur', 'ur-Latn']) {
+      const items = (await (await admin.get('quran/surahs', { headers: { 'accept-language': locale } })).json()).items;
+      expect(Buffer.from(items[0].nameAr, 'utf8').equals(Buffer.from(nameAr, 'utf8'))).toBe(true);
+    }
   });
 
-  test.fixme('F06-AC4 (US-024) a Para boundary ending before it starts is rejected', async () => {
-    // As admin.a save a boundary with end < start → field error.
+  test('F06-AC4 (US-024) a Para boundary ending before it starts is rejected', async ({ as }) => {
+    const admin = await as('admin.a');
+    await admin.put('quran/surahs/1', { data: SURAH });
+    const res = await admin.put('quran/paras/1', { data: { start: { surah: 1, ayah: 5 }, end: { surah: 1, ayah: 2 }, rowVersion: null } });
+    expect(res.status()).toBe(400);
+    expect((await res.json()).error.fields).toEqual({ end: 'END_BEFORE_START' });
   });
 
   test.fixme('F06-AC5 (US-025) Para 1–30 is accepted; 0 and 31 are rejected', async () => {
     // Save portions with Para 1, 30 → ok; 0, 31 → field errors.
   });
 
-  test.fixme('F06-AC6 (US-025) an Ayat past the Surah end is rejected naming the maximum', async () => {
-    // Surah with 7 Ayat; range 3–9 → error naming 7.
+  test('F06-AC6 (US-025) an Ayat past the Surah end is rejected naming the maximum', async ({ as }) => {
+    // Server-side range check through the Sabaq range lookup; F05 adds the same check on the portion save.
+    await (await as('admin.a')).put('quran/surahs/1', { data: SURAH });
+    const res = await (await as('teacher.a1')).get('quran/line-count?surah=1&ayahStart=3&ayahEnd=9');
+    expect((await res.json()).issues).toEqual([{ field: 'ayahEnd', code: 'OUT_OF_RANGE', max: 7 }]);
   });
 
-  test.fixme('F06-AC7 (US-025) an end Ayat before the start Ayat is rejected', async () => {
-    // Range 5–2 in one Surah → field error.
+  test('F06-AC7 (US-025) an end Ayat before the start Ayat is rejected', async ({ as }) => {
+    await (await as('admin.a')).put('quran/surahs/1', { data: SURAH });
+    const res = await (await as('teacher.a1')).get('quran/line-count?surah=1&ayahStart=5&ayahEnd=2');
+    expect((await res.json()).issues).toEqual([{ field: 'range', code: 'END_BEFORE_START' }]);
   });
 
   test.fixme('F06-AC8 (US-026) line quantities are whole LINES', async () => {

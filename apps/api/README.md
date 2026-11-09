@@ -131,6 +131,40 @@ Sync scope: the roster supplies the sync module's scope provider ([`src/modules/
 and writes `scope_changes` (next pull answers `scopeReset`) for each Teacher whose classes change: assignment added or
 removed, a student moved into or out of their class, "all classes" set or cleared, and Admin ↔ Teacher role changes.
 
+## Quran reference routes (F06)
+
+Surahs, Para boundaries, Mushaf editions, the Total Lines lookup, the review list, and import provenance (US-024…026).
+Shapes in [`packages/contracts/src/quran.ts`](../../packages/contracts/src/quran.ts); pure rules in
+`packages/domain/quran-ref` and `packages/domain/quantity`; code in [`src/modules/quran-ref`](src/modules/quran-ref);
+migration `0009_quran_ref.sql`. **There is no DELETE route and no line-layout editor.** Page/line data comes only from an
+approved import.
+
+**No Quran data ships yet** (SRS §17.3, DEFERRED: DEC-B31). Every madrasa starts empty until a dataset's accuracy and
+licence are approved. The default edition is `INDOPAK_16_LINE` (16 lines per page, DEC-B70); its publisher is unset.
+
+| Route | Who | Body / query | Result |
+|---|---|---|---|
+| `GET /quran/editions` | Owner, Admin, Teacher | — | `200 { active, editions: [{code, name, linesPerPage, publisher, pageCount, verification, hasLayout}] }` |
+| `GET /quran/surahs` · `GET /quran/paras` | Owner, Admin, Teacher | — | `200 { items, empty }`. `empty` drives "No Quran reference data yet — ask your Admin" |
+| `GET /quran/line-count` | Owner, Admin, Teacher | `?surah=&ayahStart=&ayahEnd=` | `200 { edition, totalLines, source: LAYOUT|UNAVAILABLE, layoutImportId, para, issues }`. `totalLines` is null when no verified layout covers the range, so the Teacher enters it (FR-SAB-008). `issues` carries range errors, e.g. `{field: ayahEnd, code: OUT_OF_RANGE, max: 7}` (F06-AC6) |
+| `PUT /quran/surahs/:number` | Owner, Admin | `{ nameAr, nameTranslit, ayahCount, rowVersion }` (`rowVersion` null to create) | `200 { surah, recordsNeedingReview }`; `QURAN_SURAH_CREATED|UPDATED` audit with before/after values. `nameAr` is stored byte-for-byte (F06-AC3). `400 fields.<field>: REQUIRED|TOO_LONG|OUT_OF_RANGE`; `409 CONFLICT_STALE` when `rowVersion` is not current |
+| `PUT /quran/paras/:number` | Owner, Admin | `{ start: {surah, ayah}, end: {surah, ayah}, rowVersion }` | `200 { para, recordsNeedingReview }`; `QURAN_PARA_CREATED|UPDATED` audit. `400 fields.end: END_BEFORE_START` (F06-AC4), `fields.<start|end>: UNKNOWN_SURAH|OUT_OF_RANGE` with `fields.<start|end>.max` |
+| `GET /quran/review` | Owner, Admin | — | `200 { findings, records }`. Findings: `MISSING_SURAHS|MISSING_PARAS` (numbers), `PARA_INVALID`, `PARA_OVERLAP|PARA_GAP`, `LAYOUT_MISSING`. `records` lists stored ranges that no longer fit (none until F05 registers its records); they are never changed (F06-AC19) |
+| `GET /quran/imports` | Owner, Admin | — | `200 { items }`: each dataset applied, with source, licence, reviewer, approval date, `synthetic`, checksum, counts, and whether a layout import is the active one |
+
+**Seed loader** ([`src/modules/quran-ref/seed.ts`](src/modules/quran-ref/seed.ts)). The input is a JSON file
+(`format: hifz-quran-seed`, `formatVersion: 1`) with `datasetKey`, `datasetVersion`, `provenance` (source, licence,
+reviewer, approval date, `synthetic`), optional `metadata` (Surahs and Paras), and `layouts` (per edition: lines per page
+and `{page, line, surah, ayahStart, ayahEnd}` rows).
+- A seed with any issue is refused whole.
+- A production seed must name its reviewer and approval date, and must be complete: 114 Surahs and 30 contiguous Paras.
+- Synthetic seeds are refused unless `NODE_ENV=test`.
+- Each (madrasa, kind, dataset, version, edition) is applied once. Re-applying is a no-op, and the same version with
+  changed content is refused.
+- A newer metadata version updates rows still marked `SEED` but keeps Admin edits.
+- A newer layout is a new import; the old lines stay and `mushaf_layouts` points at the new one.
+- `QURAN_SEED_FILE` (unset until approved) is applied to each new madrasa inside the workspace-creation transaction.
+
 ## Sync routes (F12)
 
 Protocol v1, decisions in [ADR-015](../../docs/adr/ADR-015-sync-protocol-idempotency-conflicts.md); shapes in
@@ -197,7 +231,16 @@ F03 seeds the fixture classes, Teachers, and students of `e2e/fixtures/personas.
 from 90 days before today) and adds:
 - `GET /__test/roster/ids`: `{ classes: { A1, A2, B1 }, students: { S1, S2, S3, SB1 } }` ids of the seeded fixtures.
 
+F06 adds:
+- `POST /__test/quran/seed { organizationCode, seed? }`: applies a **synthetic** Quran seed (default: the fixture in
+  `packages/domain/quran-ref/synthetic-fixture.ts`, which matches no real Mushaf) to that madrasa. `400 { issues }` if
+  refused. Real Quran data is never loaded through test control.
+
 ## Not yet built
+
+- F06: the production Quran seed and 16-line layout (blocked on the dataset, licence, edition, and reviewer; SRS §17.3);
+  syncing Quran metadata to devices for offline Daily Entry (arrives with F05); the review list's record source (F05/F08);
+  an operator CLI that applies an approved seed to existing madaris.
 
 - The per-IP throttle (F17-AC13) and the F17 audit query API arrive with F17.
 - Row-level security (ADR-006, ADR-016) covers the sync and roster tables. The F01/F02 tables (`users`, `memberships`,

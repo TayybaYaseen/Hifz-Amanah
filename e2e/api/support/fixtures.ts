@@ -43,6 +43,11 @@ export interface TestControl {
   search(text: string): Promise<{ database: number; logs: number | null }>;
   /** Ids of the seeded fixture classes and students, keyed as in fixtures/personas.ts (A1, S1, …) (F03). */
   rosterIds(): Promise<{ classes: Record<ClassKey, string>; students: Record<StudentKey, string> }>;
+  /**
+   * Applies the SYNTHETIC Quran fixture (never real metadata: 20 Ayat per Surah, 16-line test layout for Surahs 1–3)
+   * to a madrasa by code (F06). No real Quran seed exists until a dataset is approved (DEC-B31).
+   */
+  seedSyntheticQuran(organizationCode?: string): Promise<Record<string, unknown>>;
 }
 
 export interface Session {
@@ -103,6 +108,7 @@ export const test = base.extend<Fixtures>({
       userIdOf: async (who) => (await json(await ctx.get(`users/${id(who)}`))).id,
       search: async (text) => json(await ctx.post('search', { data: { text } })),
       rosterIds: async () => json(await ctx.get('roster/ids')),
+      seedSyntheticQuran: async (organizationCode = 'ALIF') => json(await ctx.post('quran/seed', { data: { organizationCode } })),
       setAiProvider: async () => notYet('AI provider stub (F15)'),
       aiProviderCalls: async () => notYet('AI provider stub (F15)'),
       setPushProviderFailing: async () => notYet('push stub (F16)'),

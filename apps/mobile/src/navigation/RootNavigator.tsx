@@ -9,7 +9,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useLocale } from '../i18n/LocaleContext.tsx';
 import { OfflineScreen } from '../features/auth/OfflineScreen.tsx';
 import { useTranslation } from 'react-i18next';
-import type { AccountResponse, ClassResponse, MeResponse, StudentResponse } from '@hifz/contracts';
+import type { AccountResponse, ClassResponse, MeResponse, ParaView, StudentResponse, SurahView } from '@hifz/contracts';
 import { useSession } from '../auth/SessionContext.tsx';
 import { AppScreen, AppText, Button, Notice } from '../components/ui.tsx';
 import { AccountCreateScreen, AccountDetailScreen, AccountsScreen } from '../features/accounts/AccountsScreens.tsx';
@@ -23,6 +23,7 @@ import { RecoveryCodesScreen, TwoFactorSetupScreen } from '../features/auth/TwoF
 import { HomeScreen } from '../features/home/HomeScreen.tsx';
 import { BulkEntryScreen } from '../features/attendance/BulkEntryScreen.tsx';
 import { HolidaysScreen, LeaveApprovalsScreen, TimetableScreen } from '../features/attendance/CalendarScreens.tsx';
+import { ParaFormScreen, QuranMetadataScreen, QuranReviewScreen, SurahFormScreen } from '../features/quran/QuranScreens.tsx';
 import { MoreScreen } from '../features/home/MoreScreen.tsx';
 import { ProfileScreen } from '../features/profile/ProfileScreen.tsx';
 import { WorkspaceScreen } from '../features/settings/WorkspaceScreen.tsx';
@@ -60,6 +61,11 @@ type AppStack = {
   LeaveApprovals: undefined;
   Holidays: undefined;
   Timetable: { klass: ClassResponse };
+  // F06 Quran metadata (Owner/Admin edit; Teacher reads)
+  QuranMetadata: undefined;
+  SurahForm: { surah: SurahView | null };
+  ParaForm: { para: ParaView | null; surahs: SurahView[] };
+  QuranReview: undefined;
 };
 
 /** Lets the sign-out sheet open the Sync Queue from outside the stack. */
@@ -216,6 +222,7 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
             onSyncQueue={() => navigation.navigate('SyncQueue')}
             onLeave={() => navigation.navigate('LeaveApprovals')}
             onHolidays={() => navigation.navigate('Holidays')}
+            onQuran={() => navigation.navigate('QuranMetadata')}
           />
         )}
       </App.Screen>
@@ -283,6 +290,32 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
           <App.Screen name="Holidays" options={{ title: t('holidays.title') }}>
             {() => <HolidaysScreen canManage={staff} />}
           </App.Screen>
+          {/* F06: Quran metadata. Owner/Admin edit; a Teacher reads it with no edit controls (F06-AC2). */}
+          <App.Screen name="QuranMetadata" options={{ title: t('quran.title') }}>
+            {({ navigation }) => (
+              <QuranMetadataScreen
+                canEdit={staff}
+                onAddSurah={() => navigation.navigate('SurahForm', { surah: null })}
+                onEditSurah={(surah) => navigation.navigate('SurahForm', { surah })}
+                onAddPara={(surahs) => navigation.navigate('ParaForm', { para: null, surahs })}
+                onEditPara={(para, surahs) => navigation.navigate('ParaForm', { para, surahs })}
+                onReview={() => navigation.navigate('QuranReview')}
+              />
+            )}
+          </App.Screen>
+          {staff ? (
+            <>
+              <App.Screen name="SurahForm" options={{ title: t('quran.title') }}>
+                {({ navigation, route }) => <SurahFormScreen surah={route.params.surah} onSaved={() => navigation.goBack()} />}
+              </App.Screen>
+              <App.Screen name="ParaForm" options={{ title: t('quran.title') }}>
+                {({ navigation, route }) => <ParaFormScreen para={route.params.para} surahs={route.params.surahs} onSaved={() => navigation.goBack()} />}
+              </App.Screen>
+              <App.Screen name="QuranReview" options={{ title: t('quran.review.title') }}>
+                {() => <QuranReviewScreen />}
+              </App.Screen>
+            </>
+          ) : null}
           <App.Screen name="StudentProfile" options={{ title: t('students.profileTitle') }}>
             {({ navigation, route }) => (
               <StudentProfileScreen studentId={route.params.studentId} onEdit={(student) => navigation.navigate('StudentForm', { student, classId: null })} />

@@ -24,6 +24,11 @@ const Env = z.object({
   TEST_CONTROL_SECRET: z.string().min(16).optional(),
   /** Oldest sync protocol version the server accepts; older apps get 426 UPGRADE_REQUIRED (F12-AC15). */
   SYNC_MIN_PROTOCOL_VERSION: z.coerce.number().int().min(1).default(1),
+  /**
+   * Path to the approved Quran seed file applied to every new madrasa (FR-SAB-007). DEFERRED: DEC-B31 — leave unset
+   * until a dataset's accuracy and licence are approved and a reviewer is named; unset means new madrasas start empty.
+   */
+  QURAN_SEED_FILE: z.string().min(1).optional(),
 });
 
 export interface Config {
@@ -38,6 +43,8 @@ export interface Config {
   testControlSecret: string | undefined;
   trustProxyHops: number;
   syncMinProtocolVersion: number;
+  /** The approved Quran seed file, or undefined (no production seed yet; DEFERRED: DEC-B31). */
+  quranSeedFile: string | undefined;
 }
 
 export function loadConfig(source: NodeJS.ProcessEnv = process.env): Config {
@@ -69,5 +76,6 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): Config {
     testControlSecret: env.TEST_CONTROL_SECRET,
     trustProxyHops: env.TRUST_PROXY_HOPS,
     syncMinProtocolVersion: env.SYNC_MIN_PROTOCOL_VERSION,
+    quranSeedFile: env.QURAN_SEED_FILE,
   };
 }

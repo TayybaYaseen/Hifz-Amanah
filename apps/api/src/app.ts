@@ -17,6 +17,9 @@ import { attendanceSyncHandler } from './modules/calendar/attendance-sync.ts';
 import { AttendanceService } from './modules/calendar/attendance-service.ts';
 import { ExceptionService } from './modules/calendar/exception-service.ts';
 import { registerCalendarRoutes } from './modules/calendar/routes.ts';
+import { QuranMetadataService } from './modules/quran-ref/metadata-service.ts';
+import { registerQuranRoutes } from './modules/quran-ref/routes.ts';
+import { QuranSeedLoader, readSeedFile } from './modules/quran-ref/seed.ts';
 import { ScheduleService } from './modules/calendar/schedule-service.ts';
 import { ClassService } from './modules/roster/class-service.ts';
 import { registerRosterRoutes } from './modules/roster/routes.ts';
@@ -78,7 +81,16 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   app.get('/', async () => ({ status: 'ok' }));
   registerIdentityRoutes(app, { auth, accounts, profile });
-  const organization = new OrganizationService(deps.db, deps.clock);
+  // ---------- Quran reference (F06) ----------
+  // Synthetic seeds are accepted only in test builds. The production seed file is unset until a dataset is approved
+  // (DEFERRED: DEC-B31); with no file, new madrasas start with empty Quran metadata.
+  const quranSeeds = new QuranSeedLoader(deps.db, deps.clock, { allowSynthetic: deps.config.env === 'test' });
+  const approvedSeed = deps.config.quranSeedFile ? await readSeedFile(deps.config.quranSeedFile) : null;
+  const organization = new OrganizationService(
+    deps.db,
+    deps.clock,
+    approvedSeed ? async (tx, organizationId) => void (await quranSeeds.applyInTx(tx, organizationId, approvedSeed, null)) : null,
+  );
   registerOrganizationRoutes(app, {
     authenticate: (request) => auth.authenticate(bearer(request)),
     organization,
@@ -98,6 +110,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     schedules: new ScheduleService(deps.db, deps.clock),
     exceptions: new ExceptionService(deps.db, deps.clock),
     attendance: new AttendanceService(deps.db, deps.clock),
+  });
+
+  registerQuranRoutes(app, {
+    authenticate: (request) => auth.authenticate(bearer(request)),
+    quran: new QuranMetadataService(deps.db, deps.clock),
   });
 
   if (deps.testSync && deps.config.env !== 'test') throw new Error('Test sync handlers are allowed only when NODE_ENV=test');
@@ -123,6 +140,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       logSink: deps.logSink,
       totpKey: deps.config.totpKey,
       organization,
+      quranSeeds,
       sync: { control: syncControl, registry: syncRegistry },
     });
   }

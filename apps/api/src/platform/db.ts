@@ -13,6 +13,8 @@ export interface OrganizationsTable {
   timezone: Generated<string>;
   week_start: Generated<'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY'>;
   daily_report_mode: Generated<'SINGLE' | 'MULTI_SESSION'>;
+  /** The Mushaf edition lines are counted on (0009; default INDOPAK_16_LINE, DEC-B70). */
+  mushaf_edition: Generated<string>;
   created_at: Timestamp;
 }
 
@@ -279,7 +281,91 @@ export interface AttendanceRecordsTable {
   row_version: ColumnType<string, number | undefined, number>;
 }
 
+// ---------- F06 · Quran reference (0009_quran_ref.sql) ----------
+
+export interface MushafEditionsTable {
+  code: string;
+  name: string;
+  lines_per_page: number;
+  publisher: string | null;
+  page_count: number | null;
+  verification: Generated<'UNVERIFIED' | 'VERIFIED'>;
+  created_at: Generated<Timestamp>;
+}
+
+export interface QuranImportsTable {
+  id: string;
+  organization_id: string;
+  kind: 'METADATA' | 'LAYOUT';
+  edition: string | null;
+  dataset_key: string;
+  dataset_version: string;
+  source_name: string;
+  source_url: string | null;
+  licence: string;
+  reviewed_by: string | null;
+  approved_on: string | null;
+  synthetic: boolean;
+  checksum: string;
+  counts: ColumnType<Record<string, number>, string, string>;
+  applied_at: Timestamp;
+  applied_by: string | null;
+}
+
+export interface QuranSurahsTable {
+  id: string;
+  organization_id: string;
+  number: number;
+  /** Stored exactly as supplied: never trimmed, normalized, translated, or transliterated (BR-15, F06-AC3). */
+  name_ar: string;
+  name_translit: string;
+  ayah_count: number;
+  source: 'SEED' | 'ADMIN';
+  import_id: string | null;
+  updated_at: Timestamp;
+  updated_by: string | null;
+  row_version: ColumnType<string, number | undefined, number>;
+}
+
+export interface QuranParasTable {
+  id: string;
+  organization_id: string;
+  number: number;
+  start_surah: number;
+  start_ayah: number;
+  end_surah: number;
+  end_ayah: number;
+  source: 'SEED' | 'ADMIN';
+  import_id: string | null;
+  updated_at: Timestamp;
+  updated_by: string | null;
+  row_version: ColumnType<string, number | undefined, number>;
+}
+
+export interface MushafLayoutsTable {
+  organization_id: string;
+  edition: string;
+  import_id: string;
+  activated_at: Timestamp;
+}
+
+export interface MushafLayoutLinesTable {
+  organization_id: string;
+  import_id: string;
+  page: number;
+  line: number;
+  surah: number;
+  ayah_start: number;
+  ayah_end: number;
+}
+
 export interface Database {
+  mushaf_editions: MushafEditionsTable;
+  quran_imports: QuranImportsTable;
+  quran_surahs: QuranSurahsTable;
+  quran_paras: QuranParasTable;
+  mushaf_layouts: MushafLayoutsTable;
+  mushaf_layout_lines: MushafLayoutLinesTable;
   class_schedules: ClassSchedulesTable;
   calendar_exceptions: CalendarExceptionsTable;
   attendance_records: AttendanceRecordsTable;

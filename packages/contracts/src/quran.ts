@@ -1,0 +1,156 @@
+// Quran reference contracts shared by the API and the app (F06; FR-SAB-005…008, FR-I18N-006, BR-15; DEC-B31, B32,
+// B70). Organization and role always come from the signed-in membership: every request schema is strict.
+//
+// Owner/Admin edit Surahs and Para boundaries (audited); Teachers read them (F06-AC2). There is no line-layout editor:
+// page/line data comes only from an approved import. No route deletes anything.
+import { z } from 'zod';
+
+export const METADATA_SOURCES = ['SEED', 'ADMIN'] as const;
+export type MetadataSource = (typeof METADATA_SOURCES)[number];
+
+/** LAYOUT: counted from the edition's verified layout. UNAVAILABLE: no layout data covers the range (enter by hand). */
+export const LINE_COUNT_SOURCES = ['LAYOUT', 'UNAVAILABLE'] as const;
+export type LineCountLookupSource = (typeof LINE_COUNT_SOURCES)[number];
+
+const surahNumber = z.coerce.number().int().min(1).max(114);
+const paraNumber = z.coerce.number().int().min(1).max(30);
+const ayah = z.number().int().min(1).max(999);
+const ref = z.strictObject({ surah: z.number().int().min(1).max(114), ayah });
+/** null on create; the row's current version on edit (409 CONFLICT_STALE when another edit came first). */
+const rowVersion = z.number().int().min(1).nullable();
+
+export const SurahParam = z.strictObject({ number: surahNumber });
+export const ParaParam = z.strictObject({ number: paraNumber });
+
+/** The Arabic name is stored byte-for-byte as sent: no trim, no normalization (F06-AC3). */
+export const SaveSurahRequest = z.strictObject({
+  nameAr: z.string().max(400),
+  nameTranslit: z.string().max(400),
+  ayahCount: z.number().int(),
+  rowVersion,
+});
+export type SaveSurahRequest = z.infer<typeof SaveSurahRequest>;
+
+export const SaveParaRequest = z.strictObject({ start: ref, end: ref, rowVersion });
+export type SaveParaRequest = z.infer<typeof SaveParaRequest>;
+
+export const LineCountQuery = z.strictObject({
+  surah: surahNumber,
+  ayahStart: z.coerce.number().int().min(1).max(999),
+  ayahEnd: z.coerce.number().int().min(1).max(999),
+});
+export type LineCountQuery = z.infer<typeof LineCountQuery>;
+
+export interface MushafEditionView {
+  code: string;
+  name: string;
+  linesPerPage: number;
+  /** Null until the exact publisher is approved (DEFERRED: DEC-B70). */
+  publisher: string | null;
+  pageCount: number | null;
+  verification: 'UNVERIFIED' | 'VERIFIED';
+  /** A verified page/line layout has been imported for this madrasa. */
+  hasLayout: boolean;
+}
+
+export interface EditionsResponse {
+  /** The edition this madrasa counts lines on. */
+  active: string;
+  editions: MushafEditionView[];
+}
+
+export interface SurahView {
+  id: string;
+  number: number;
+  nameAr: string;
+  nameTranslit: string;
+  ayahCount: number;
+  source: MetadataSource;
+  rowVersion: number;
+  updatedAt: string;
+}
+
+export interface ParaView {
+  id: string;
+  number: number;
+  start: { surah: number; ayah: number };
+  end: { surah: number; ayah: number };
+  source: MetadataSource;
+  rowVersion: number;
+  updatedAt: string;
+}
+
+/** `empty` drives "No Quran reference data yet — ask your Admin" (F06 edge case). */
+export interface SurahListResponse {
+  items: SurahView[];
+  empty: boolean;
+}
+
+export interface ParaListResponse {
+  items: ParaView[];
+  empty: boolean;
+}
+
+/** After an edit: how many stored records now need review (F06-AC19). The records themselves are unchanged. */
+export interface SaveSurahResponse {
+  surah: SurahView;
+  recordsNeedingReview: number;
+}
+
+export interface SaveParaResponse {
+  para: ParaView;
+  recordsNeedingReview: number;
+}
+
+export type MetadataFindingView =
+  | { code: 'MISSING_SURAHS' | 'MISSING_PARAS'; numbers: number[] }
+  | { code: 'PARA_INVALID'; para: number; issues: { field: string; code: string; max?: number }[] }
+  | { code: 'PARA_OVERLAP' | 'PARA_GAP'; para: number; next: number }
+  | { code: 'LAYOUT_MISSING'; edition: string };
+
+/** A stored record whose Quran range no longer fits the metadata. Listed for review; never changed. */
+export interface ReviewRecordView {
+  kind: string;
+  id: string;
+  range: { surah: number; ayahStart: number; ayahEnd: number };
+  issues: { field: string; code: string; max?: number }[];
+}
+
+export interface ReviewResponse {
+  findings: MetadataFindingView[];
+  records: ReviewRecordView[];
+}
+
+export interface LineCountResponse {
+  edition: string;
+  /** Pre-fill for Total Lines, or null: the Teacher enters it (FR-SAB-008). Never a guess. */
+  totalLines: number | null;
+  source: LineCountLookupSource;
+  layoutImportId: string | null;
+  /** Derived from the range start and the Para boundaries, or null when no boundary covers it (FR-SAB-001). */
+  para: number | null;
+  /** Range field errors (e.g. ayahEnd OUT_OF_RANGE with max), so the app can show them before saving. */
+  issues: { field: string; code: string; max?: number }[];
+}
+
+export interface QuranImportView {
+  id: string;
+  kind: 'METADATA' | 'LAYOUT';
+  edition: string | null;
+  datasetKey: string;
+  datasetVersion: string;
+  sourceName: string;
+  sourceUrl: string | null;
+  licence: string;
+  reviewedBy: string | null;
+  approvedOn: string | null;
+  synthetic: boolean;
+  checksum: string;
+  counts: Record<string, number>;
+  appliedAt: string;
+  active: boolean;
+}
+
+export interface ImportListResponse {
+  items: QuranImportView[];
+}
