@@ -1,8 +1,10 @@
 # ADR-018 · Quran reference snapshot and offline SQLite cache
 
-**Status:** **Accepted in direction, 2026-11-09** (DEC-B75 approves option A; DEC-B79 approves the licence-withdrawal
-rule with clarifications). **This revised text awaits product-owner review before implementation. Nothing here is
-built.** Implementation plan: [F06-snapshot-implementation-plan.md](../handover/F06-snapshot-implementation-plan.md).
+**Status:** **Accepted and implemented, 2026-11-09** (DEC-B75 option A; DEC-B79 licence withdrawal; plan questions
+P1–P5 decided as DEC-B80…B84). Implemented on `feature/f06-quran-portions-metadata` with synthetic data only; no real
+Quran dataset, licence, reviewer, or physical verification exists. Plan and test results:
+[F06-snapshot-implementation-plan.md](../handover/F06-snapshot-implementation-plan.md). Where the build differs from
+the first draft, the text below says so ("As built").
 **Feature:** F06 (US-025; F06-AC24, whose E2E test is pending). **Requirements:** FR-SAB-014 (DEC-B72, delivery
 DEC-B75), FR-SAB-001, FR-SAB-008, FR-SAB-009, FR-SAB-011, FR-SAB-013, NFR-OFF. **Builds on:** ADR-017 (accepted),
 ADR-015 (sync v1, **unchanged**), ADR-016 (RLS), AGENTS §7.
@@ -34,6 +36,11 @@ Reference data differs from F12 sync data:
 6. **Verification boundary** (DEC-B78): the snapshot carries `layoutVerified`, which is true only when the madrasa's
    active layout is a production (non-synthetic) import with an approved, signed review. It reports the human
    reviewer's sign-off; it is not an automated proof that the layout matches the physical Mushaf.
+   **As built (P5, DEC-B84):** migration 0011 stores, with every production import, the exact printing compared
+   (`mushaf_printing`), the paper sign-off reference (`signoff_ref`), and the signed validation report itself
+   (`validation_report`, its hash checked against `validation_report_sha256`), beside the reviewer, approval date, and
+   decision already kept. A production import without them is refused, and `layoutVerified` also requires them and
+   every source still licensed.
 
 ## 3. Server
 
@@ -60,10 +67,13 @@ The exact request/response schemas are in the implementation plan §2 and will l
 - The `snapshotFormatVersion` is inside the body, so the same data in two formats has two versions.
 - The device verifies `sha256(received body) == ETag == /version.referenceVersion` before applying anything.
 
-To avoid rebuilding on every check, the server caches the built body keyed by a **stamp** computed in one query inside
-the tenant transaction: the format, the max `updated_at` and row count of `quran_surahs` and `quran_paras`, the active
-layout import id per edition, the import's review fields, and the latest licence-record id of every source behind the
-active imports. A miss rebuilds the body (milliseconds at this size).
+**As built:** the body is rebuilt on every request (a few small queries plus the layout's Ayat lines). The stamp cache
+of the first draft was dropped: an in-process cache can go stale across server instances, and a check runs only a few
+times a day per device. It can be added later behind the same contract if measurements call for it.
+
+**Format negotiation (as built):** the app sends the highest format it reads; the server serves
+`min(requested, newest)`. A request below the oldest served format gets `426 UPGRADE_REQUIRED`; a malformed `format`
+gets `400`.
 
 ### 3.3 Payload (format 1)
 
@@ -98,7 +108,7 @@ behind the active imports on every build:
   Devices fall back to manual Total Lines (FR-SAB-008).
 - **Metadata source no longer cleared:** `surahs` and `paras` exclude every row whose `import_id` belongs to an import
   using that source, and `metadataWithdrawn` is true. Whether an Admin-edited row (`source = ADMIN`) that still carries
-  such an `import_id` is excluded is plan question **P1**; the proposal is to exclude it.
+  such an `import_id` is excluded too: **yes** (DEC-B80, P1). Admin edits do not make derived data redistributable.
 
 **Revoked versions.** Every snapshot the server serves is recorded in a manifest table (`quran_reference_snapshots`,
 new migration 0011, plan §3) with the import ids and source ids it contains. When a licence record withdraws a source:
@@ -120,12 +130,14 @@ Student, Parent, and staff records are never changed by a revocation.
 
 ## 4. Device (SQLite, Teacher/Admin only)
 
-### 4.1 Local schema (workspace migration 4; the outbox is never touched)
+### 4.1 Local schema (workspace migration 5; the outbox is never touched)
+
+**As built:** version 5, because workspace migration 4 is F04's attendance tables.
 
 ```text
-ref_meta(singleton=1, reference_version, snapshot_format_version, edition_code, layout_import_id, layout_verified,
-         layout_withdrawn, metadata_withdrawn, fetched_at, checked_at, last_error_code NULL, last_error_at NULL,
-         next_check_at, revoked_version NULL, revoked_at NULL)
+ref_meta(singleton=1, reference_version, snapshot_format_version, edition_code, lines_per_page, layout_import_id,
+         layout_verified, layout_withdrawn, metadata_withdrawn, fetched_at, checked_at, update_available,
+         last_error_code NULL, last_error_at NULL, failures, next_attempt_at NULL, revoked_version NULL, revoked_at NULL)
 ref_surahs(number PK, name_ar, name_translit, ayah_count)
 ref_paras(number PK, start_surah, start_ayah, end_surah, end_ayah)
 ref_layout_lines(page, line, surah, ayah_start, ayah_end, PRIMARY KEY (page, line))
@@ -151,9 +163,13 @@ from entity tables or the outbox.
 1. After a successful online sign-in and the F12 bootstrap, `ReferenceSync.ensure()` runs. It never blocks sign-in,
    navigation, or Daily Entry.
 2. With no cache: `GET /version`, then `GET /snapshot`.
-3. **Verify** before applying: decompress, `sha256(body)` equals the ETag and the `/version` answer; the format is
-   supported; the body passes the Zod schema; row-level sanity (Surah numbers 1–114 unique, Para numbers unique, line
-   keys unique, `ayahEnd ≥ ayahStart`). Any failure discards the download.
+3. **Verify** before applying: the format is supported; the body passes the strict Zod schema; row-level sanity
+   (Surah and Para numbers unique, line keys unique, `ayahEnd ≥ ayahStart`, Para end not before start); and the SHA-256
+   of the canonical serialization equals the version `/version` announced. Any failure discards the download.
+   **As built:** the app's HTTP client parses JSON, so the device hashes the canonical re-serialization of the parsed
+   body, which reproduces the server's bytes exactly (a domain test proves `canonicalJson(JSON.parse(body)) === body`).
+   The device does not send `If-None-Match`; it downloads only when `/version` says its copy is not current. If the
+   data changed between the two calls, it asks `/version` once more and verifies against the new version.
 4. **Swap atomically** in one SQLite transaction: delete the `ref_*` rows, insert the new rows, write `ref_meta`. A
    crash rolls back to the previous state.
 5. **UI states** (design.md §8): while fetching, "Preparing Quran references…"; on failure, the empty state "No Quran
@@ -246,16 +262,18 @@ need legal review before any licence is accepted.**
    screenshots) cannot be controlled by any app.
 3. **Server copies.** Withdrawn layout and metadata rows stay in Postgres (history tables have no deletes, AGENTS
    §12), unused and no longer distributed. Whether a licensor can require their deletion, and how that interacts with
-   audit retention, is plan question **P2**.
+   audit retention, awaits legal review (DEC-B81, P2: retained, never distributed, records unchanged).
 4. **Derived values in records.** Stored records keep canonical numbers: Surah and Ayat numbers, Para numbers, and a
    confirmed Total Lines count with its layout import id. These are the madrasa's records, never recalculated or
    deleted by a withdrawal (FR-SAB-008). Whether line counts derived from a withdrawn layout may be retained is part of
    the legal review (P2).
 5. **Evidence kept.** The manifest (which versions contained which sources, when they were built and revoked), the
    licence records, and the audit events show what was distributed and when distribution stopped.
-6. **Optional limit on offline exposure.** A maximum cache age after which an offline device stops using the snapshot
-   would bound how long withdrawn data stays usable offline, at the cost of offline line counts on devices that stay
-   offline longer. It is **not** part of this design; plan question **P3**.
+6. **No maximum age (decided, DEC-B82 / P3).** A valid snapshot stays usable offline until the device reconnects and
+   learns it was revoked or superseded. This bounds nothing for a device that never reconnects (point 1).
+7. **Server retention (decided, DEC-B81 / P2).** Withdrawn data is kept securely for audit and legal review, never
+   distributed again, and never presented as approved. Historical student records and recorded line counts are not
+   changed. **Permanent deletion and the retention period remain subject to legal review.**
 
 ## 7. Testing
 
@@ -277,7 +295,9 @@ The detailed test plan is in the implementation plan §6. In short:
 - **Residual risk:** an offline device keeps withdrawn data until it reconnects (§6). Readiness risk S3 is addressed
   by requiring licence terms that cover device caching (OD-QR-3) and by the revocation rule (§3.4).
 
-## 9. Open points for the product owner
+## 9. Decisions and open points
 
-The plan questions P1–P4 ([implementation plan §8](../handover/F06-snapshot-implementation-plan.md)) and OD-QR-9
-(attribution text and where it is shown).
+- **Decided 2026-11-09:** P1 (DEC-B80), P2 (DEC-B81), P3 (DEC-B82), P4 (DEC-B83), P5 (DEC-B84); see the decision log.
+- **Open:** OD-QR-9 (attribution wording and where it is shown; the snapshot already carries the licence's credit
+  text, and the reference screen lists it). Legal review of deletion and retention (P2). Every external Quran-data
+  blocker in SRS §17.3.

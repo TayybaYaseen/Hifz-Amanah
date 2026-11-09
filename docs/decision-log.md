@@ -406,3 +406,21 @@ The product owner reviewed the F06 implementation and test report and decided:
 
 **Still open:** the Taj printing, the licences (Tarteel, Taj Company, Tanzil verification), the reviewer, OD-QR-9
 (attribution), and the plan questions P1–P4 (`F06-snapshot-implementation-plan.md` §8).
+
+### 2026-11-09 — Snapshot plan questions P1–P5 decided; F06 snapshot implemented (DEC-B80…B84)
+
+The product owner authorized the F06 completion ("Final F06 implementation, testing & pull request") and decided the
+plan questions of `docs/handover/F06-snapshot-implementation-plan.md` §8:
+
+| ID | Question | Answer |
+|---|---|---|
+| DEC-B80 (P1) | Are Admin-edited Surah/Para rows derived from a withdrawn source excluded from snapshots? | **Yes.** Admin edits do not make derived data independently redistributable. Only data with a registered, approved source (or entered by an Admin with no imported origin) is included. History and audit are kept |
+| DEC-B81 (P2) | Server deletion after a withdrawal; historical line counts? | Do not delete immediately: retain securely for audit and legal review, stop distributing, never present the withdrawn layout as approved. Historical student records and recorded line counts are never modified. **Permanent deletion and retention periods remain subject to legal review** (no legal conclusion drawn) |
+| DEC-B82 (P3) | A maximum offline snapshot age? | **No** expiry in the MVP. A valid snapshot stays usable offline until the device learns it was revoked or superseded. The app shows the cached version, last successful download, update available, revoked, and unavailable states |
+| DEC-B83 (P4) | Offline flow host while F05 Daily Entry does not exist | Build reusable F06 range-selection components and services; integrate with Daily Entry when it exists; until then an isolated F06 screen hosts them. Do not redesign F05; keep F05-dependent criteria pending |
+| DEC-B84 (P5) | Physical-verification evidence | Migration 0011 preserves the exact printing identifier, reviewer, approval date, decision, signed-report hash, the stored signed report, and the paper sign-off reference (or documented digital equivalent). Production verification is refused without them. No reviewer, printing, or approval is invented |
+
+**Implemented (synthetic data only):** server migration 0011, the snapshot API, licence-withdrawal revocation, the
+evidence gate, workspace migration 5 (not 4: F04 uses 4), the device cache, background sync and refresh, revocation
+handling, the reference screen with reusable range fields, the F06-AC24 API E2E test, and the Maestro flow
+`offline-reference.yaml`. Results and remaining blockers: the implementation plan's §9 and the pull request.

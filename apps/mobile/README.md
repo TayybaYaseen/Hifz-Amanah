@@ -110,6 +110,31 @@ Teacher, Admin, and Owner only; Student and Parent stay online-only and read-onl
 - The SQL driver is a small hand-written interface over `expo-sqlite`; Drizzle (named in the approved stack) is not
   used yet.
 
+### Quran reference cache (F06, ADR-018)
+
+Code: [`src/features/quran`](src/features/quran) (`referenceCache.ts`, `referenceSync.ts`, `referenceView.ts`,
+`rangeCheck.ts`, `QuranReferenceContext.tsx`, `QuranReferenceScreen.tsx`). Owner, Admin, and Teacher only, in the
+workspace database; Student and Parent never download it. F12 code, the outbox, and the sync protocol are not changed.
+
+- **Workspace migration 5** (4 is F04 attendance) adds `ref_meta`, `ref_surahs`, `ref_paras`, `ref_layout_lines`, and
+  `ref_attribution`. Nothing references them, so the cache is disposable. The existing F12 migration test replays
+  every migration, including this one, over a populated outbox.
+- **First sync** runs in the background after an online sign-in and never blocks sign-in or entry. **Refresh** runs
+  on start, foreground, connectivity regained, after each F12 sync cycle, once a day, and from the Refresh button.
+  Each check calls `GET /quran/reference/version?have=` and downloads only when the copy is not current.
+- **Before activation** the download must have format 1, pass the strict Zod schema and row sanity checks, and its
+  canonical bytes must hash (SHA-256, `expo-crypto`) to the announced version. Then the whole cache is replaced in one
+  SQLite transaction. A failed, malformed, interrupted, or killed download leaves the last valid snapshot in place.
+  Failures back off from 1 minute to 1 hour; Refresh ignores the backoff.
+- **Revocation (DEC-B79):** a `REVOKED` answer deletes the cached rows at once and then fetches the current snapshot.
+  `403 ACCESS_REVOKED`, or F12 locking the workspace, deletes them too. An offline device keeps its copy until its next
+  successful check; nothing can reach it sooner.
+- **No maximum age (P3):** an old snapshot stays usable offline. The status card shows the version, last download,
+  update available, revoked, unavailable, and every failure, always as icon and text.
+- **More → Quran references on this device** shows the status and the reusable `RangeFields`: offline Para,
+  field errors, and the Total Lines pre-fill (or manual entry, always allowed). It is the isolated F06 host until F05
+  Daily Entry exists (plan P4); F05 reuses `RangeFields` and `checkRange`.
+
 ### App lock (F12-AC18, NFR-OFF-011; decision Q12)
 
 - A 6-digit PIN is required as the base; fingerprint (Android Class 3 "strong" biometrics only) is an optional

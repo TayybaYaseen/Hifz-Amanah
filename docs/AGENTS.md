@@ -160,6 +160,7 @@ Breaking any of these is a bug, even if a test or UI mock seems to want it.
 
 - Write the entity **and** its outbox operation in **one SQLite transaction** before showing "Saved on device".
 - Show "Synced" **only** after the server acknowledges the operation. Keep these states distinct: pending, syncing, synced, failed, action-required.
+- The Quran reference cache (F06, ADR-018) is separate from F12: its own `ref_*` tables, never referenced by records or the outbox, replaced only whole after its SHA-256 checks out. A revoked version is deleted on the next successful check; never claim an offline device can be wiped. No snapshot carries Quran text, word data, test data, or data from a withdrawn source.
 - Offline-creatable entities use **client-generated UUIDv7** IDs. Every operation has an `op_id`; replaying it must not create duplicates.
 - **Never use last-write-wins** for attempts, attendance, quantities, quality, mistakes, or homework. Preserve both versions as a conflict for explicit resolution.
 - Local schema migrations must keep the outbox intact. Test them with pending operations.
