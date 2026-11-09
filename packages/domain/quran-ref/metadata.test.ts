@@ -71,8 +71,16 @@ describe('F06 · seed validation (FR-SAB-007, DEC-B31)', () => {
 
   it('a production seed must name its licence, reviewer, and approval date', () => {
     const seed = syntheticSeed({ provenance: { sourceName: 'X', sourceUrl: null, licence: ' ', reviewedBy: null, approvedOn: 'soon', synthetic: false } });
-    expect(codes(validateSeed(seed, ctx()))).toEqual(['provenance.licence:REQUIRED', 'provenance.reviewedBy:REQUIRED', 'provenance.approvedOn:REQUIRED']);
-    expect(validateSeed(production(syntheticSeed()), ctx({ allowSynthetic: false }))).toEqual([]);
+    expect(codes(validateSeed(seed, ctx()))).toEqual([
+      'provenance.licence:REQUIRED',
+      'provenance.reviewedBy:REQUIRED',
+      'provenance.approvedOn:REQUIRED',
+      'formatVersion:V2_REQUIRED',
+    ]);
+  });
+
+  it('FR-SAB-011/013 (DEC-B72): a production seed in format 1 is refused, because it names no source files and no signed report', () => {
+    expect(codes(validateSeed(production(syntheticSeed()), ctx({ allowSynthetic: false })))).toEqual(['formatVersion:V2_REQUIRED']);
   });
 
   it('a production seed must be complete: 114 Surahs and 30 contiguous Paras (F06-AC18 shape)', () => {

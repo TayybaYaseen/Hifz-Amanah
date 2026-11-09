@@ -47,6 +47,8 @@ export interface MushafEditionView {
   linesPerPage: number;
   /** Null until the exact publisher is approved (DEFERRED: DEC-B70). */
   publisher: string | null;
+  /** The exact printing, once identified on a physical Mushaf (DEC-B71; null until then). */
+  printingId: string | null;
   pageCount: number | null;
   verification: 'UNVERIFIED' | 'VERIFIED';
   /** A verified page/line layout has been imported for this madrasa. */
@@ -149,6 +151,22 @@ export interface QuranImportView {
   counts: Record<string, number>;
   appliedAt: string;
   active: boolean;
+  /** 1 or 2 (ADR-017 §6.1). Production imports are format 2. */
+  seedFormatVersion: 1 | 2;
+  /** The reviewer's approving decision from the signed validation report; null for test data without one. */
+  reviewDecision: 'APPROVED' | 'APPROVED_WITH_FINDINGS' | null;
+  validationReportSha256: string | null;
+  /** The registered source files this import was built from, with each one's current licence status (FR-SAB-011). */
+  sources: QuranImportSourceView[];
+}
+
+export interface QuranImportSourceView {
+  provider: string;
+  resourceId: string | null;
+  resourceName: string;
+  fileSha256: string;
+  role: 'METADATA' | 'LAYOUT' | 'WORDS';
+  licenceStatus: 'LICENSE_REVIEW_REQUIRED' | 'OPEN_LICENCE_VERIFIED' | 'PERMISSION_GRANTED' | 'REFUSED';
 }
 
 export interface ImportListResponse {

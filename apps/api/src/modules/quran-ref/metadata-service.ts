@@ -29,7 +29,7 @@ import {
   validateParaBoundary,
   validateSurah,
   type AyahRange,
-  type LayoutLine,
+  type LayoutRow,
   type MetadataFinding,
   type ParaBoundary,
   type SurahMeta,
@@ -119,16 +119,18 @@ export class QuranMetadataService {
   async countLinesFor(db: Executor, organizationId: string, range: AyahRange): Promise<{ edition: string; totalLines: number | null; importId: string | null }> {
     const { edition, importId } = await this.activeLayout(db, organizationId);
     if (!importId) return { edition, totalLines: null, importId: null };
+    // Ayat lines only: Surah-heading and Bismillah lines never count (FR-SAB-012; DEFERRED: OD-QR-11).
     const rows = await db
       .selectFrom('mushaf_layout_lines')
-      .select(['page', 'line', 'surah', 'ayah_start', 'ayah_end'])
+      .select(['page', 'line', 'surah', 'line_type', 'ayah_start', 'ayah_end'])
       .where('organization_id', '=', organizationId)
       .where('import_id', '=', importId)
+      .where('line_type', '=', 'AYAH')
       .where('surah', '=', range.surah)
       .where('ayah_end', '>=', range.ayahStart)
       .where('ayah_start', '<=', range.ayahEnd)
       .execute();
-    const lines: LayoutLine[] = rows.map((r) => ({ page: r.page, line: r.line, surah: r.surah, ayahStart: r.ayah_start, ayahEnd: r.ayah_end }));
+    const lines: LayoutRow[] = rows.map((r) => ({ page: r.page, line: r.line, surah: r.surah, lineType: r.line_type, ayahStart: r.ayah_start, ayahEnd: r.ayah_end }));
     return { edition, totalLines: countLines(range, lines), importId };
   }
 
@@ -138,7 +140,7 @@ export class QuranMetadataService {
     requireRole(actor, 'quran.view');
     return withTenant(this.db, actor.organizationId, async (tx) => {
       const { edition } = await this.activeLayout(tx, actor.organizationId);
-      const rows = await tx.selectFrom('mushaf_editions').select(['code', 'name', 'lines_per_page', 'publisher', 'page_count', 'verification']).orderBy('code').execute();
+      const rows = await tx.selectFrom('mushaf_editions').select(['code', 'name', 'lines_per_page', 'publisher', 'printing_id', 'page_count', 'verification']).orderBy('code').execute();
       const layouts = new Set((await tx.selectFrom('mushaf_layouts').select('edition').where('organization_id', '=', actor.organizationId).execute()).map((r) => r.edition));
       return {
         active: edition,
@@ -147,6 +149,7 @@ export class QuranMetadataService {
           name: r.name,
           linesPerPage: r.lines_per_page,
           publisher: r.publisher,
+          printingId: r.printing_id,
           pageCount: r.page_count,
           verification: r.verification,
           hasLayout: layouts.has(r.code),
@@ -301,6 +304,18 @@ export class QuranMetadataService {
     return withTenant(this.db, actor.organizationId, async (tx) => {
       const active = new Set((await tx.selectFrom('mushaf_layouts').select('import_id').where('organization_id', '=', actor.organizationId).execute()).map((r) => r.import_id));
       const rows = await tx.selectFrom('quran_imports').selectAll().where('organization_id', '=', actor.organizationId).orderBy('applied_at', 'desc').orderBy('id', 'desc').execute();
+      // The source files behind each import, with each source's current licence status (FR-SAB-011).
+      const links = await tx
+        .selectFrom('quran_import_sources as l')
+        .innerJoin('quran_sources as s', 's.id', 'l.source_id')
+        .select(['l.import_id', 'l.role', 's.id', 's.provider', 's.resource_id', 's.resource_name', 's.file_sha256'])
+        .where('l.organization_id', '=', actor.organizationId)
+        .execute();
+      const sourceIds = [...new Set(links.map((l) => l.id))];
+      const licences = sourceIds.length
+        ? await tx.selectFrom('quran_source_licences').select(['source_id', 'status']).where('source_id', 'in', sourceIds).orderBy('recorded_at', 'desc').orderBy('id', 'desc').execute()
+        : [];
+      const currentStatus = (id: string) => licences.find((l) => l.source_id === id)?.status ?? 'LICENSE_REVIEW_REQUIRED';
       return {
         items: rows.map((r) => ({
           id: r.id,
@@ -317,6 +332,19 @@ export class QuranMetadataService {
           checksum: r.checksum,
           counts: r.counts,
           appliedAt: r.applied_at.toISOString(),
+          seedFormatVersion: r.seed_format_version,
+          reviewDecision: r.review_decision,
+          validationReportSha256: r.validation_report_sha256,
+          sources: links
+            .filter((l) => l.import_id === r.id)
+            .map((l) => ({
+              provider: l.provider,
+              resourceId: l.resource_id,
+              resourceName: l.resource_name,
+              fileSha256: l.file_sha256,
+              role: l.role,
+              licenceStatus: currentStatus(l.id),
+            })),
           // Metadata imports are always in effect (row by row); a layout import only while it is the active one.
           active: r.kind === 'METADATA' || active.has(r.id),
         })),

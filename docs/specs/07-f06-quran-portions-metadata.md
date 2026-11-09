@@ -16,6 +16,8 @@
 | Range, Para, metadata, and seed validation (`packages/domain/quran-ref`) | Built, unit-tested |
 | Tables, edition catalogue, import provenance, versioned layouts (migration 0009) | Built |
 | Admin edit API with audit, review list, Total Lines lookup, seed loader | Built, integration-tested |
+| ADR-017 backend (DEC-B72): migration 0010, seed format 2 (typed lines, word positions), source catalogue with append-only licence history, licence gate (incl. publisher clearance for layouts), reviewer sign-off check, `npm run quran:source` | Built 2026-11-09; unit-tested (49 domain tests) and integration-tested (35 F06 integration tests pass). Synthetic data only |
+| Offline snapshot and device cache (FR-SAB-014) | Not started: waits on OD-QR-7 |
 | E2E (API) | AC1–AC4, AC6, AC7 real and passing; AC5 and AC8–AC17 need F05's portion endpoints; AC19's record part needs F05 records |
 | Mobile screens and Maestro flows | Not started |
 | **Production Quran seed and 16-line layout** | **Blocked.** No dataset is approved. Nothing was generated or entered from memory (DEC-B31; candidates in [F06-quran-dataset-candidates.md](../handover/F06-quran-dataset-candidates.md)) |

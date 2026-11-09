@@ -43,7 +43,7 @@ describe('F06 · metadata reads and the empty state', () => {
     const editions = (await h.call('GET', '/quran/editions', teacher)).json();
     expect(editions.active).toBe('INDOPAK_16_LINE');
     expect(editions.editions).toEqual([
-      { code: 'INDOPAK_16_LINE', name: '16-line Indo-Pak Mushaf', linesPerPage: 16, publisher: null, pageCount: null, verification: 'UNVERIFIED', hasLayout: false },
+      { code: 'INDOPAK_16_LINE', name: '16-line Indo-Pak Mushaf', linesPerPage: 16, publisher: null, printingId: null, pageCount: null, verification: 'UNVERIFIED', hasLayout: false },
     ]);
   });
 
@@ -209,7 +209,14 @@ describe('F06 · seed loader (FR-SAB-007, DEC-B31)', () => {
       const rows = await audit(i.id);
       expect(rows.map((r) => r.action)).toEqual([i.kind === 'METADATA' ? 'QURAN_SEED_APPLIED' : 'QURAN_LAYOUT_APPLIED']);
     }
-    expect(imports.find((i: { kind: string }) => i.kind === 'LAYOUT').counts).toEqual({ lines: syntheticLayout().length, pages: new Set(syntheticLayout().map((l) => l.page)).size });
+    expect(imports.find((i: { kind: string }) => i.kind === 'LAYOUT').counts).toEqual({
+      lines: syntheticLayout().length,
+      pages: new Set(syntheticLayout().map((l) => l.page)).size,
+      // Format-1 lines are all Ayat lines (migration 0010 counts each line type).
+      ayahLines: syntheticLayout().length,
+      surahNameLines: 0,
+      basmallahLines: 0,
+    });
     const { n } = await withTenant(h.db, await orgId('ALIF'), (tx) => tx.selectFrom('quran_surahs').select((eb) => eb.fn.countAll<string>().as('n')).executeTakeFirstOrThrow());
     expect(Number(n)).toBe(114);
   });
@@ -267,7 +274,7 @@ describe('F06 · seed loader (FR-SAB-007, DEC-B31)', () => {
     await expect(prodLoader.apply(organizationId, syntheticSeed())).rejects.toBeInstanceOf(SeedRejectedError);
     const unreviewed: QuranSeed = { ...syntheticSeed(), provenance: { ...syntheticSeed().provenance, synthetic: false } };
     const error = await prodLoader.apply(organizationId, unreviewed).catch((e: SeedRejectedError) => e);
-    expect((error as SeedRejectedError).issues.map((i) => i.path)).toEqual(['provenance.reviewedBy', 'provenance.approvedOn']);
+    expect((error as SeedRejectedError).issues.map((i) => i.path)).toEqual(['provenance.reviewedBy', 'provenance.approvedOn', 'formatVersion']); // production needs format 2 (DEC-B72)
     // The database also refuses a non-synthetic import without a reviewer and approval date.
     await expect(
       sql`INSERT INTO quran_imports (id, organization_id, kind, dataset_key, dataset_version, source_name, licence, synthetic, checksum, counts, applied_at)

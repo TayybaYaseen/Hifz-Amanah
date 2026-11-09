@@ -74,7 +74,11 @@ const TABLES = [
   'mushaf_layouts',
   'quran_paras',
   'quran_surahs',
+  'quran_import_sources',
   'quran_imports',
+  // The source catalogue is global; tests register synthetic sources only, so a reset clears it.
+  'quran_source_licences',
+  'quran_sources',
   // F04 calendar tables (attendance_records is reset through its sync handler's tables).
   'calendar_exceptions',
   'class_schedules',

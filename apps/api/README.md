@@ -153,17 +153,50 @@ licence are approved. The default edition is `INDOPAK_16_LINE` (16 lines per pag
 | `GET /quran/imports` | Owner, Admin | — | `200 { items }`: each dataset applied, with source, licence, reviewer, approval date, `synthetic`, checksum, counts, and whether a layout import is the active one |
 
 **Seed loader** ([`src/modules/quran-ref/seed.ts`](src/modules/quran-ref/seed.ts)). The input is a JSON file
-(`format: hifz-quran-seed`, `formatVersion: 1`) with `datasetKey`, `datasetVersion`, `provenance` (source, licence,
-reviewer, approval date, `synthetic`), optional `metadata` (Surahs and Paras), and `layouts` (per edition: lines per page
-and `{page, line, surah, ayahStart, ayahEnd}` rows).
+(`format: hifz-quran-seed`) with `datasetKey`, `datasetVersion`, `provenance` (source, licence, reviewer, approval
+date, `synthetic`), optional `metadata` (Surahs and Paras), and `layouts` (per edition: lines per page and line rows).
+- **Format 1:** Ayat lines only, as `{page, line, surah, ayahStart, ayahEnd}`. It is accepted for synthetic test data only.
+- **Format 2** (ADR-017, migration `0010_quran_ref_v2.sql`) adds:
+  - typed lines `{page, line, lineType: AYAH|SURAH_NAME|BASMALLAH, isCentered, surah, ayahStart, wordStart, ayahEnd,
+    wordEnd, srcFirstWordId, srcLastWordId}`; heading and Bismillah lines carry no Ayat or words;
+  - `sources[]` (`{provider, resourceId, fileSha256, role: METADATA|LAYOUT|WORDS}`);
+  - `validationReport` (`{sha256, decision, signedBy, signedOn}`);
+  - optional Surah display fields (`revelationPlace`, `revelationOrder`, `bismillahPre`).
 - A seed with any issue is refused whole.
-- A production seed must name its reviewer and approval date, and must be complete: 114 Surahs and 30 contiguous Paras.
+- **Format-2 checks:** lines must run in page/line order with no gap or overlap (word positions and source word IDs
+  contiguous), each Surah's heading line comes before its Ayat, and Surahs follow in order.
+- **A production seed (DEC-B72, FR-SAB-011, FR-SAB-013) must:**
+  - be format 2 and complete: 114 Surahs, 30 contiguous Paras, a layout covering every Surah with no missing page, and
+    the edition's page count once one is recorded;
+  - name its reviewer and approval date, and carry an `APPROVED` or `APPROVED_WITH_FINDINGS` report signed by that
+    reviewer on that date (`REJECTED` and `PENDING` are always refused);
+  - cite registered sources only (the licence gate, below), with no synthetic source.
+- **Licence gate:** every cited source must be registered and its latest licence record `OPEN_LICENCE_VERIFIED` or
+  `PERMISSION_GRANTED`. A `LAYOUT` source also needs `publisherClearanceRef`: the printed edition's publisher's
+  permission or legal advice (Taj Company for the Taj layout, DEC-B71). Refusal codes: `UNREGISTERED`,
+  `LICENCE_NOT_CLEARED`, `PUBLISHER_CLEARANCE_REQUIRED`, `SYNTHETIC_SOURCE`.
+- Total Lines counts Ayat lines only (FR-SAB-012; DEFERRED: OD-QR-11).
 - Synthetic seeds are refused unless `NODE_ENV=test`.
 - Each (madrasa, kind, dataset, version, edition) is applied once. Re-applying is a no-op, and the same version with
   changed content is refused.
 - A newer metadata version updates rows still marked `SEED` but keeps Admin edits.
 - A newer layout is a new import; the old lines stay and `mushaf_layouts` points at the new one.
 - `QURAN_SEED_FILE` (unset until approved) is applied to each new madrasa inside the workspace-creation transaction.
+
+**Source catalogue** ([`src/modules/quran-ref/sources.ts`](src/modules/quran-ref/sources.ts)). `quran_sources` (one
+row per downloaded file, with its SHA-256) and `quran_source_licences` (append-only licence history, where the latest
+row is current) are global. The tenant role can only read them. They are written by the maintainer's privileged step on
+the owner connection:
+
+```text
+npm run quran:source -- list
+npm run quran:source -- register <file.json>          # RegisterSourceInput; starts LICENSE_REVIEW_REQUIRED
+npm run quran:source -- licence <sourceId> <file.json> # RecordLicenceInput; a cleared status needs permissionRef
+```
+
+The tool downloads nothing and refuses synthetic sources. Recording a cleared status is the product owner's decision,
+backed by written evidence. `GET /quran/imports` shows each import's format, review decision, report hash, and its
+sources with their current licence status.
 
 ## Sync routes (F12)
 

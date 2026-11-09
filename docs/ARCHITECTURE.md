@@ -288,13 +288,20 @@ quran-ref (per organization, Admin-maintained; migration 0009_quran_ref.sql, F06
   mushaf_layouts(organization_id, edition, import_id)                                 -- the active layout per edition
   mushaf_layout_lines(organization_id, import_id, page, line, surah, ayah_start, ayah_end)
                                                                                       -- verified imports only; never derived
-  -- PROPOSED (ADR-017, not approved, not migrated): quran_sources (global: provider, resource_id, download_url,
-  --   downloaded_on, file_name, file_sha256, licence_name, licence_status, permission_ref, attribution_text);
-  --   quran_import_sources(organization_id, import_id, source_id, role); quran_imports + seed_format_version, approval_status,
-  --   validation_report_sha256; mushaf_layout_lines + line_type[AYAH|SURAH_NAME|BASMALLAH], is_centered,
-  --   word_start, word_end, src_first_word_id, src_last_word_id (ayah_* NULL on non-AYAH lines);
-  --   optional quran_divisions(kind[RUKU|HIZB|RUB_AL_HIZB|MANZIL7], number, start/end surah+ayah) per OD-QR-5.
-  --   Not stored: Quran text, word tables, quran_ayahs. Student records keep canonical (surah, ayah) values only.
+  -- 0010_quran_ref_v2.sql (ADR-017, DEC-B72):
+  quran_sources(id, provider, resource_name, resource_id, category, source_url, download_url, downloaded_on,
+                file_name, file_sha256, source_version, notes, synthetic, registered_at, registered_by)  -- global
+  quran_source_licences(id, source_id, status[LICENSE_REVIEW_REQUIRED|OPEN_LICENCE_VERIFIED|PERMISSION_GRANTED|REFUSED],
+                licence_name, permission_ref, publisher_clearance_ref, attribution_text, recorded_at, recorded_by)
+                                                                   -- global, append-only; the latest row is current
+  quran_import_sources(organization_id, import_id, source_id, role[METADATA|LAYOUT|WORDS])        -- tenant, RLS
+  quran_imports + seed_format_version, review_decision, validation_report_sha256  -- production: format 2, signed
+  mushaf_editions + printing_id, printing_notes, page_count_source                 -- Taj profile (DEC-B71)
+  quran_surahs + revelation_place, revelation_order, bismillah_pre                 -- display only
+  mushaf_layout_lines + line_type[AYAH|SURAH_NAME|BASMALLAH], is_centered, word_start, word_end,
+                src_first_word_id, src_last_word_id (ayah_* NULL on non-AYAH lines)
+  -- Later phase (DEC-B71): quran_divisions. Not stored: Quran text, word tables, quran_ayahs.
+  -- Student records keep canonical (surah, ayah) values only.
 
 hifz
   daily_records(id, organization_id, student_id, class_id NULL, report_date, session_label NULL,

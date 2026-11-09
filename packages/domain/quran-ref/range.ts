@@ -44,13 +44,30 @@ export interface ParaBoundary {
   end: AyahRef;
 }
 
-/** One line of a page/line layout (one Mushaf edition): which Ayat of one Surah appear on it. Header and Bismillah lines have no row. */
+/** One Ayat line of a page/line layout (one Mushaf edition): which Ayat of one Surah appear on it. */
 export interface LayoutLine {
   page: number;
   line: number;
   surah: number;
   ayahStart: number;
   ayahEnd: number;
+}
+
+/** The kinds of printed line a layout stores (FR-SAB-012, ADR-017 §3.8). */
+export const LINE_TYPES = ['AYAH', 'SURAH_NAME', 'BASMALLAH'] as const;
+export type LineType = (typeof LINE_TYPES)[number];
+
+/**
+ * Any stored layout row: an Ayat line, or a Surah-heading or Bismillah line with no Ayat. A row without `lineType`
+ * is an Ayat line (format-1 imports).
+ */
+export interface LayoutRow {
+  page: number;
+  line: number;
+  surah: number;
+  lineType?: LineType;
+  ayahStart: number | null;
+  ayahEnd: number | null;
 }
 
 export interface AyahRange {
@@ -175,9 +192,12 @@ export function paraFor(ref: AyahRef, paras: readonly ParaBoundary[]): number | 
  * Lines a single-Surah range covers on the given edition's verified layout (FR-SAB-008): every layout line of that Surah holding at
  * least one Ayat of the range. Null when the layout does not cover every Ayat of the range, so Total Lines is left
  * for the Teacher to enter and nothing is guessed (F05 edge case "no line data").
+ *
+ * Only Ayat lines count; Surah-heading and Bismillah lines never do (FR-SAB-012). This keeps the behaviour built
+ * before line types existed. Whether headings should count is still open: DEFERRED: OD-QR-11.
  */
-export function countLines(range: AyahRange, layout: readonly LayoutLine[]): number | null {
-  const lines = layout.filter((l) => l.surah === range.surah && l.ayahEnd >= range.ayahStart && l.ayahStart <= range.ayahEnd);
+export function countLines(range: AyahRange, layout: readonly LayoutRow[]): number | null {
+  const lines = ayahLines(layout).filter((l) => l.surah === range.surah && l.ayahEnd >= range.ayahStart && l.ayahStart <= range.ayahEnd);
   if (lines.length === 0) return null;
   // Every Ayat in the range must appear on some line.
   const covered = new Set<number>();
@@ -186,6 +206,16 @@ export function countLines(range: AyahRange, layout: readonly LayoutLine[]): num
   }
   if (covered.size !== range.ayahEnd - range.ayahStart + 1) return null;
   return new Set(lines.map((l) => `${l.page}:${l.line}`)).size;
+}
+
+/** The Ayat lines of a layout (rows typed `AYAH`, or untyped format-1 rows), with their Ayat present. */
+export function ayahLines(layout: readonly LayoutRow[]): LayoutLine[] {
+  const out: LayoutLine[] = [];
+  for (const l of layout) {
+    if ((l.lineType ?? 'AYAH') !== 'AYAH' || l.ayahStart === null || l.ayahEnd === null) continue;
+    out.push({ page: l.page, line: l.line, surah: l.surah, ayahStart: l.ayahStart, ayahEnd: l.ayahEnd });
+  }
+  return out;
 }
 
 /**

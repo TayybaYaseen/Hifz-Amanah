@@ -5,7 +5,7 @@
 // matches the Quran. The production seed comes only from an approved, reviewed dataset (FR-SAB-007, DEC-B31).
 // Not exported from the package index on purpose; tests import this file by path.
 import type { LayoutLine, ParaBoundary, SurahRecord } from './range.ts';
-import { SEED_FORMAT, SEED_FORMAT_VERSION, type QuranSeed } from './metadata.ts';
+import { SEED_FORMAT, SEED_FORMAT_VERSION, type QuranSeedV1, type QuranSeedV2, type SeedLineV2 } from './metadata.ts';
 
 export const SYNTHETIC_AYAH_COUNT = 20;
 
@@ -49,7 +49,7 @@ export const syntheticLayout = (surahs = 3, linesPerPage = 16): LayoutLine[] => 
   return lines;
 };
 
-export const syntheticSeed = (overrides: Partial<QuranSeed> = {}): QuranSeed => ({
+export const syntheticSeed = (overrides: Partial<QuranSeedV1> = {}): QuranSeedV1 => ({
   format: SEED_FORMAT,
   formatVersion: SEED_FORMAT_VERSION,
   datasetKey: 'synthetic-test',
@@ -59,3 +59,67 @@ export const syntheticSeed = (overrides: Partial<QuranSeed> = {}): QuranSeed => 
   layouts: [{ edition: 'INDOPAK_16_LINE', linesPerPage: 16, lines: syntheticLayout() }],
   ...overrides,
 });
+
+// ---------- Format 2 (typed lines with word positions; ADR-017 §6.1) ----------
+// Invented shapes only: every synthetic Ayat has SYNTHETIC_WORDS_PER_AYAH "words" and a line holds
+// SYNTHETIC_WORDS_PER_LINE of them, so Ayat break across lines; each Surah gets a heading line and a Bismillah line.
+// Word IDs are 1, 2, 3, … across the fixture. None of it describes a real Mushaf page.
+
+export const SYNTHETIC_WORDS_PER_AYAH = 6;
+export const SYNTHETIC_WORDS_PER_LINE = 8;
+
+export const syntheticLayoutV2 = (surahs = 3, linesPerPage = 16): SeedLineV2[] => {
+  const lines: SeedLineV2[] = [];
+  let page = 1;
+  let line = 0;
+  let wordId = 0;
+  const next = () => {
+    line += 1;
+    if (line > linesPerPage) {
+      line = 1;
+      page += 1;
+    }
+    return { page, line };
+  };
+  for (let s = 1; s <= surahs; s++) {
+    lines.push({ ...next(), lineType: 'SURAH_NAME', isCentered: true, surah: s });
+    lines.push({ ...next(), lineType: 'BASMALLAH', isCentered: true, surah: s });
+    const total = SYNTHETIC_AYAH_COUNT * SYNTHETIC_WORDS_PER_AYAH;
+    for (let first = 0; first < total; first += SYNTHETIC_WORDS_PER_LINE) {
+      const last = Math.min(first + SYNTHETIC_WORDS_PER_LINE, total) - 1;
+      const at = (k: number) => ({ ayah: Math.floor(k / SYNTHETIC_WORDS_PER_AYAH) + 1, word: (k % SYNTHETIC_WORDS_PER_AYAH) + 1 });
+      const a = at(first);
+      const b = at(last);
+      lines.push({
+        ...next(),
+        lineType: 'AYAH',
+        isCentered: false,
+        surah: s,
+        ayahStart: a.ayah,
+        wordStart: a.word,
+        ayahEnd: b.ayah,
+        wordEnd: b.word,
+        srcFirstWordId: wordId + 1,
+        srcLastWordId: wordId + (last - first + 1),
+      });
+      wordId += last - first + 1;
+    }
+  }
+  return lines;
+};
+
+export const syntheticSeedV2 = (overrides: Partial<QuranSeedV2> = {}): QuranSeedV2 => ({
+  format: SEED_FORMAT,
+  formatVersion: 2,
+  datasetKey: 'synthetic-test-v2',
+  datasetVersion: '1',
+  provenance: { sourceName: 'Synthetic test fixture', sourceUrl: null, licence: 'Test data, not Quran metadata', reviewedBy: null, approvedOn: null, synthetic: true },
+  sources: [],
+  validationReport: null,
+  metadata: { surahs: syntheticSurahs(), paras: syntheticParas() },
+  layouts: [{ edition: 'INDOPAK_16_LINE', linesPerPage: 16, lines: syntheticLayoutV2() }],
+  ...overrides,
+});
+
+/** A synthetic SHA-256-shaped value (not the hash of anything). */
+export const syntheticSha = (n: number): string => n.toString(16).padStart(64, '0');
