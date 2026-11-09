@@ -1799,7 +1799,7 @@ This is the central register of every decision that was open anywhere in the rep
   - OD-QR-4: nominate the qualified Quran reviewer (as DEC-B31 above).
   - OD-QR-5: *closed 2026-11-09 by DEC-B71:* Ruku, Hizb, quarter-Hizb (Rub al-Hizb), and seven-Manzil divisions are later-phase candidates, unless an approved source and a clear MVP need are established.
   - OD-QR-6: *closed 2026-11-09 by DEC-B72* (ADR-017 accepted; FR-SAB-011…014 approved).
-  - OD-QR-7: offline distribution: API snapshot after sign-in (recommended) or bundled in the APK (FR-SAB-014). **Still open.**
+  - OD-QR-7: offline distribution: API snapshot after sign-in (recommended) or bundled in the APK (FR-SAB-014). **Still open.** Proposal: [handover/F06-decision-proposal-OD-QR-7-10-11.md](handover/F06-decision-proposal-OD-QR-7-10-11.md); design: [ADR-018](adr/ADR-018-quran-reference-snapshot-offline-cache.md) (Proposed).
   - OD-QR-8: *closed 2026-11-09 by DEC-B74* (page/line selection not in the MVP).
   - OD-QR-9: the attribution requirements (wording, and where it is shown; recommended: About screen, all three locales).
   - OD-QR-10: whether Para quarters become selectable positions (recommended: not in MVP; they remain amounts).

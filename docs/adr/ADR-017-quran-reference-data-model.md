@@ -440,12 +440,14 @@ documentation sample, which is not proven to be resource 11. Word IDs and positi
 | OD-QR-11 | Do Surah-heading and Bismillah lines count in Total Lines? | No (as built); confirm with teachers |
 | OD-QR-12 | *(Added 2026-11-09, readiness review R1.)* Must a Sabqi/Manzil Surah/Ayat range lie within the portion's Para? | Product owner to decide; until then it is not enforced |
 
-## 13. Planned acceptance criteria (reserved IDs, not yet active)
+## 13. Acceptance criteria F06-AC20…AC27 (activated 2026-11-09)
+
+Activated with their API E2E tests; the authoritative wording is in the story specs. AC24 is pending until the snapshot exists (OD-QR-7). The original planning table follows.
 
 Added 2026-11-09 at the product owner's request (DEC-B71). The IDs are **reserved**. Each becomes an active
 `F06-ACnn` criterion in its story spec once ADR-017 is approved **and** its E2E test stubs exist. Until then,
 `npm run e2e:trace` would correctly fail on a criterion that has no test. The authoritative list is in the
-[F06 spec](../specs/07-f06-quran-portions-metadata.md#planned-acceptance-criteria-reserved-ids-not-yet-active).
+[F06 spec](../specs/07-f06-quran-portions-metadata.md#acceptance-criteria-f06-ac20ac27-activated-2026-11-09).
 
 | ID | Story | Criterion (summary) |
 |---|---|---|

@@ -18,7 +18,8 @@
 | Admin edit API with audit, review list, Total Lines lookup, seed loader | Built, integration-tested |
 | ADR-017 backend (DEC-B72): migration 0010, seed format 2 (typed lines, word positions), source catalogue with append-only licence history, licence gate (incl. publisher clearance for layouts), reviewer sign-off check, `npm run quran:source` | Built 2026-11-09; unit-tested (49 domain tests) and integration-tested (35 F06 integration tests pass). Synthetic data only |
 | Converter and validation tool (`npm run quran:convert`): source files → format-2 seed, checks S1–S10, JSON/Markdown report with import gate, reviewer sign step (ADR-017 §4–§7) | Built 2026-11-09; 31 unit and 4 integration tests on synthetic data. Not yet run on any real dataset (licences pending) |
-| Offline snapshot and device cache (FR-SAB-014) | Not started: waits on OD-QR-7 |
+| F06-AC20…AC27 | Activated 2026-11-09 with API E2E tests: AC20–23 and AC25–27 pass; AC24 pending (OD-QR-7) |
+| Offline snapshot and device cache (FR-SAB-014) | Not started: waits on OD-QR-7. Design: [ADR-018](../adr/ADR-018-quran-reference-snapshot-offline-cache.md) (Proposed); decision proposal: [OD-QR-7/10/11](../handover/F06-decision-proposal-OD-QR-7-10-11.md) |
 | E2E (API) | AC1–AC4, AC6, AC7 real and passing; AC5 and AC8–AC17 need F05's portion endpoints; AC19's record part needs F05 records |
 | Mobile screens and Maestro flows | Not started |
 | **Production Quran seed and 16-line layout** | **Blocked.** No dataset is approved. Nothing was generated or entered from memory (DEC-B31; candidates in [F06-quran-dataset-candidates.md](../handover/F06-quran-dataset-candidates.md)) |
@@ -32,9 +33,9 @@ Its story specs follow this page in `docs/specs/` and share the `07-` prefix, on
 
 | Spec | Story | Detailed criteria |
 |---|---|---|
-| [SPEC-US-024](07-us-024-maintain-quran-metadata.md) | US-024 — Maintain Quran metadata | F06-AC1, F06-AC2, F06-AC3, F06-AC4, F06-AC18, F06-AC19 |
-| [SPEC-US-025](07-us-025-select-para-and-ayat-range.md) | US-025 — Select Para and Ayat range | F06-AC5, F06-AC6, F06-AC7 |
-| [SPEC-US-026](07-us-026-use-16-line-indo-pak-mushaf.md) | US-026 — Use 16-line Indo-Pak Mushaf | F06-AC8, F06-AC9, F06-AC17 |
+| [SPEC-US-024](07-us-024-maintain-quran-metadata.md) | US-024 — Maintain Quran metadata | F06-AC1, F06-AC2, F06-AC3, F06-AC4, F06-AC18, F06-AC19, F06-AC25, F06-AC26, F06-AC27 |
+| [SPEC-US-025](07-us-025-select-para-and-ayat-range.md) | US-025 — Select Para and Ayat range | F06-AC5, F06-AC6, F06-AC7, F06-AC22, F06-AC24 |
+| [SPEC-US-026](07-us-026-use-16-line-indo-pak-mushaf.md) | US-026 — Use 16-line Indo-Pak Mushaf | F06-AC8, F06-AC9, F06-AC17, F06-AC20, F06-AC21, F06-AC23 |
 | [SPEC-US-027](07-us-027-select-portion-quantities.md) | US-027 — Select portion quantities | F06-AC10, F06-AC11, F06-AC12, F06-AC13, F06-AC14, F06-AC15, F06-AC16 |
 
 ## Context
@@ -135,7 +136,9 @@ stops the import (ADR-017 §4).
 - Quran reference metadata is kept separate from student lesson records. Existing records keep their original
   Surah/Ayat references after any reference-data update.
 
-### Planned acceptance criteria (reserved IDs, not yet active)
+### Acceptance criteria F06-AC20…AC27 (activated 2026-11-09)
+
+**Activated 2026-11-09** with their API E2E tests in `e2e/api/f06-quran-portions.spec.ts`. The authoritative wording is now in the story specs (US-024: AC25–27; US-025: AC22, AC24; US-026: AC20, AC21, AC23). The wording was tightened to what the system can enforce: the physical-Mushaf comparison is the reviewer's signed evidence, not an automated check (AC20, AC21). AC24's test stays pending until the snapshot exists (OD-QR-7). The table below is the planning text, kept for history.
 
 Added 2026-11-09 (DEC-B71). The IDs are reserved. Each criterion moves into its story spec as an active `F06-ACnn`
 bullet only once ADR-017 is approved **and** its E2E test stubs exist (`npm run e2e:trace` requires a test for every

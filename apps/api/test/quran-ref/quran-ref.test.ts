@@ -43,7 +43,7 @@ describe('F06 · metadata reads and the empty state', () => {
     const editions = (await h.call('GET', '/quran/editions', teacher)).json();
     expect(editions.active).toBe('INDOPAK_16_LINE');
     expect(editions.editions).toEqual([
-      { code: 'INDOPAK_16_LINE', name: '16-line Indo-Pak Mushaf', linesPerPage: 16, publisher: null, printingId: null, pageCount: null, verification: 'UNVERIFIED', hasLayout: false },
+      { code: 'INDOPAK_16_LINE', name: '16-line Indo-Pak Mushaf', linesPerPage: 16, publisher: null, printingId: null, pageCount: null, verification: 'UNVERIFIED', hasLayout: false, layoutVerified: false },
     ]);
   });
 

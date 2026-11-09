@@ -365,3 +365,19 @@ The product owner instructed "start implementation" and answered:
 **Still open:** OD-QR-7 (snapshot vs. APK bundle), OD-QR-10, OD-QR-11 (Total Lines keeps the built behaviour, counting
 Ayat lines only, until decided), and every external blocker: the Taj printing, the licences (Tarteel, Taj Company, and
 Tanzil verification), the reviewer, and the word-ID pairing.
+
+### 2026-11-09 — F06-AC20…AC27 activated; OD-QR-7/10/11 proposal; ADR-018 proposed (no decision taken)
+
+At the product owner's request:
+- **F06-AC20…AC27 were activated** in the story specs with API E2E tests (synthetic data only).
+  - AC20–23 and AC25–27 pass. AC24 stays pending until the snapshot exists (OD-QR-7).
+  - The wording was tightened to what the system enforces. Agreement with the physical Taj Mushaf remains the
+    reviewer's signed evidence, not an automated check.
+- **New, small behaviour (AC20):** `GET /quran/editions` reports `layoutVerified`, true only when the madrasa's active
+  layout is a production import with an approving, signed review. The global edition `verification` is unchanged.
+- **Proposed, awaiting the product owner:**
+  - OD-QR-7 (API snapshot), OD-QR-10 (Para quarters stay quantities), OD-QR-11 (Ayat lines only), in
+    `docs/handover/F06-decision-proposal-OD-QR-7-10-11.md`;
+  - the snapshot and cache design in ADR-018, which needs no F12 change.
+
+  None of these is approved.

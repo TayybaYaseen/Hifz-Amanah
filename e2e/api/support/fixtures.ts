@@ -48,6 +48,40 @@ export interface TestControl {
    * to a madrasa by code (F06). No real Quran seed exists until a dataset is approved (DEC-B31).
    */
   seedSyntheticQuran(organizationCode?: string): Promise<Record<string, unknown>>;
+  /**
+   * Applies a given seed file to a madrasa (F06). Returns the status and body: refusals are results, not errors.
+   * Tests only ever pass synthetic values.
+   */
+  applyQuranSeed(seed: unknown, organizationCode?: string): Promise<{ status: number; body: Record<string, unknown> }>;
+  /** Runs the converter on the SYNTHETIC sources (optionally production-flagged, or with a named defect) (F06). */
+  convertSyntheticQuran(options?: { production?: boolean; datasetVersion?: string; defect?: QuranSourceDefect }): Promise<QuranConversion>;
+  /** The reviewer sign step; a refusal returns status 400 with its reasons. */
+  signQuranDataset(seed: unknown, report: unknown, review: QuranReview): Promise<{ status: number; body: Record<string, unknown> }>;
+  /** Registers a source file in the catalogue (synthetic file; `synthetic: false` only for production-path tests). */
+  registerQuranSource(source: { provider: string; resourceId: string | null; category: string; fileName: string; fileSha256: string; synthetic: boolean }): Promise<{ id: string }>;
+  /** Appends a licence record to a registered source. */
+  recordQuranLicence(sourceId: string, licence: { status: string; licenceName?: string | null; permissionRef: string | null; publisherClearanceRef: string | null; attributionText?: string | null }): Promise<void>;
+}
+
+export type QuranSourceDefect = 'UNMAPPED_WORD_ID' | 'LINE_SPANS_SURAHS' | 'COVERAGE_GAP' | 'HEADING_WITH_WORDS';
+
+export interface QuranReview {
+  reviewer: string;
+  qualification: string | null;
+  mushafPrinting: string;
+  decision: 'APPROVED' | 'APPROVED_WITH_FINDINGS' | 'REJECTED';
+  signedOn: string;
+  findings: { part: string; description: string; blocking: boolean }[];
+}
+
+export interface QuranConversion {
+  seed: Record<string, unknown> | null;
+  report: {
+    seedSha256: string | null;
+    checks: { id: string; result: string; details: string[] }[];
+    sources: { file: string; provider: string; resourceId: string | null; role: string; fileName: string; fileSha256: string }[];
+    gate: { importReady: boolean; blockers: string[] };
+  } & Record<string, unknown>;
 }
 
 export interface Session {
@@ -109,6 +143,19 @@ export const test = base.extend<Fixtures>({
       search: async (text) => json(await ctx.post('search', { data: { text } })),
       rosterIds: async () => json(await ctx.get('roster/ids')),
       seedSyntheticQuran: async (organizationCode = 'ALIF') => json(await ctx.post('quran/seed', { data: { organizationCode } })),
+      applyQuranSeed: async (seed, organizationCode = 'ALIF') => {
+        const res = await ctx.post('quran/seed', { data: { organizationCode, seed } });
+        return { status: res.status(), body: (await res.json()) as Record<string, unknown> };
+      },
+      convertSyntheticQuran: async (options = {}) => (await json(await ctx.post('quran/convert', { data: options }))) as unknown as QuranConversion,
+      signQuranDataset: async (seed, report, review) => {
+        const res = await ctx.post('quran/sign', { data: { seed, report, review } });
+        return { status: res.status(), body: (await res.json()) as Record<string, unknown> };
+      },
+      registerQuranSource: async (source) => (await json(await ctx.post('quran/sources', { data: source }))) as unknown as { id: string },
+      recordQuranLicence: async (sourceId, licence) => {
+        await json(await ctx.post(`quran/sources/${sourceId}/licence`, { data: { licenceName: null, attributionText: null, ...licence } }));
+      },
       setAiProvider: async () => notYet('AI provider stub (F15)'),
       aiProviderCalls: async () => notYet('AI provider stub (F15)'),
       setPushProviderFailing: async () => notYet('push stub (F16)'),

@@ -141,7 +141,16 @@ export class QuranMetadataService {
     return withTenant(this.db, actor.organizationId, async (tx) => {
       const { edition } = await this.activeLayout(tx, actor.organizationId);
       const rows = await tx.selectFrom('mushaf_editions').select(['code', 'name', 'lines_per_page', 'publisher', 'printing_id', 'page_count', 'verification']).orderBy('code').execute();
-      const layouts = new Set((await tx.selectFrom('mushaf_layouts').select('edition').where('organization_id', '=', actor.organizationId).execute()).map((r) => r.edition));
+      const active = await tx
+        .selectFrom('mushaf_layouts as m')
+        .innerJoin('quran_imports as i', (j) => j.onRef('i.id', '=', 'm.import_id').onRef('i.organization_id', '=', 'm.organization_id'))
+        .select(['m.edition', 'i.synthetic', 'i.review_decision', 'i.validation_report_sha256'])
+        .where('m.organization_id', '=', actor.organizationId)
+        .execute();
+      const layouts = new Set(active.map((r) => r.edition));
+      // Verified for this madrasa only when its active layout is a production import with an approving, signed review
+      // (FR-SAB-013; F06-AC20). Test data and unsigned imports never count.
+      const verified = new Set(active.filter((r) => !r.synthetic && r.review_decision !== null && r.validation_report_sha256 !== null).map((r) => r.edition));
       return {
         active: edition,
         editions: rows.map((r) => ({
@@ -153,6 +162,7 @@ export class QuranMetadataService {
           pageCount: r.page_count,
           verification: r.verification,
           hasLayout: layouts.has(r.code),
+          layoutVerified: verified.has(r.code),
         })),
       };
     });

@@ -51,8 +51,14 @@ export interface MushafEditionView {
   printingId: string | null;
   pageCount: number | null;
   verification: 'UNVERIFIED' | 'VERIFIED';
-  /** A verified page/line layout has been imported for this madrasa. */
+  /** A page/line layout has been imported for this madrasa. */
   hasLayout: boolean;
+  /**
+   * The madrasa's active layout is a production import with an approving review signed by the named reviewer
+   * (FR-SAB-013, F06-AC20). False for test data and unsigned imports. Not the same as `verification`, which records the
+   * edition's own verification against the physical Mushaf (DEC-B71).
+   */
+  layoutVerified: boolean;
 }
 
 export interface EditionsResponse {

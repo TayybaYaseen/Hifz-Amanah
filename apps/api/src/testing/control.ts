@@ -20,6 +20,11 @@ import { newTotpSecret, totpForStep, totpStep } from '../modules/identity/totp.t
 import { TEST_PASSWORD, classes as fixtureClasses, madaris, students as fixtureStudents } from '../../../../e2e/fixtures/personas.ts';
 import { seedPersonas } from './seed.ts';
 import { parseSeed, SeedRejectedError, type QuranSeedLoader } from '../modules/quran-ref/seed.ts';
+import { QuranSourceRegistry } from '../modules/quran-ref/sources.ts';
+import { convertSources, type ValidationReport } from '../modules/quran-ref/converter/convert.ts';
+import { signDataset, SignRefusedError } from '../modules/quran-ref/converter/sign.ts';
+import { syntheticFiles, syntheticManifest, syntheticSources } from '../modules/quran-ref/converter/synthetic-sources.ts';
+import type { QuranSeedV2 } from '@hifz/domain/quran-ref';
 // Synthetic, test-only Quran fixture (never real metadata); this module is registered only when NODE_ENV=test.
 import { syntheticSeed } from '@hifz/domain/quran-ref/synthetic-fixture';
 
@@ -49,6 +54,9 @@ interface ControlDeps {
   quranSeeds: QuranSeedLoader;
   sync: { control: SyncControl; registry: SyncRegistry };
 }
+
+/** Test-only control routes that carry a whole synthetic seed and report (F06). */
+const QURAN_BODY_LIMIT = 32 * 1024 * 1024;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -211,7 +219,8 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
       // The ids of the seeded fixture classes and students, keyed as in e2e/fixtures/personas.ts (A1, S1, …).
       // F06: applies a SYNTHETIC Quran seed (default: the synthetic fixture; or a seed in the body) to the madrasa
       // with this code. The loader refuses anything not marked synthetic-or-approved, and synthetic only in tests.
-      scope.post('/quran/seed', async (request, reply) => {
+      // A whole synthetic seed is larger than the default 1 MB body limit (test-only route; real seeds load from a file).
+      scope.post('/quran/seed', { bodyLimit: QURAN_BODY_LIMIT }, async (request, reply) => {
         const input = z.strictObject({ organizationCode: z.string(), seed: z.unknown().optional() }).parse(request.body ?? {});
         const org = await deps.db.selectFrom('organizations').select('id').where('code', '=', input.organizationCode).executeTakeFirst();
         if (!org) throw new AppError('NOT_FOUND');
@@ -222,6 +231,87 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
           if (error instanceof SeedRejectedError) return reply.status(400).send({ issues: error.issues });
           throw error;
         }
+      });
+
+      // ---------- F06 · converter, sign step, and source catalogue (ADR-017; F06-AC20…AC27) ----------
+      // SYNTHETIC SOURCES ONLY. The converter runs on the invented fixture (synthetic-sources.ts), never on real data.
+      // `production: true` flags the converted dataset as production so tests can prove the gates: the values are
+      // still synthetic, and they exist only in the throwaway E2E database, which every test resets.
+      const quranSources = new QuranSourceRegistry(deps.db, deps.clock, { allowSynthetic: true });
+
+      scope.post('/quran/convert', async (request) => {
+        const input = z
+          .strictObject({
+            production: z.boolean().default(false),
+            datasetVersion: z.string().max(40).default('1'),
+            /** A named defect in the synthetic sources, to prove the converter refuses it. */
+            defect: z.enum(['UNMAPPED_WORD_ID', 'LINE_SPANS_SURAHS', 'COVERAGE_GAP', 'HEADING_WITH_WORDS']).optional(),
+          })
+          .parse(request.body ?? {});
+        const src = syntheticSources();
+        const ayahRows = src.layout.filter((l) => l.line_type === 'ayah');
+        if (input.defect === 'UNMAPPED_WORD_ID') ayahRows[5]!.last_word_id = 999_999;
+        if (input.defect === 'LINE_SPANS_SURAHS') {
+          const last = ayahRows.filter((l) => l.surah_number === 1).at(-1)!;
+          last.last_word_id = (last.last_word_id as number) + 3;
+        }
+        if (input.defect === 'COVERAGE_GAP') src.layout.splice(src.layout.indexOf(ayahRows[3]!), 1);
+        if (input.defect === 'HEADING_WITH_WORDS') src.layout.find((l) => l.line_type === 'surah_name')!.first_word_id = 1;
+        const manifest = syntheticManifest({
+          datasetVersion: input.datasetVersion,
+          provenance: { sourceName: 'Synthetic test sources', sourceUrl: null, licence: 'Test data, not Quran metadata', synthetic: !input.production },
+        });
+        // Production-flagged runs cite their own provider, so the catalogue never mixes them up with test-data sources
+        // registered for the same synthetic files (the loader refuses a production seed citing a test source).
+        if (input.production) for (const f of Object.values(manifest.files)) f.provider = 'SYNTH_PROD';
+        return convertSources(manifest, syntheticFiles(src), { now: deps.clock.now() });
+      });
+
+      scope.post('/quran/sign', { bodyLimit: QURAN_BODY_LIMIT }, async (request, reply) => {
+        const input = z.strictObject({ seed: z.unknown(), report: z.unknown(), review: z.unknown() }).parse(request.body ?? {});
+        try {
+          return signDataset(input.seed as QuranSeedV2, input.report as ValidationReport, input.review);
+        } catch (error) {
+          if (error instanceof SignRefusedError) return reply.status(400).send({ reasons: error.reasons });
+          throw error;
+        }
+      });
+
+      scope.post('/quran/sources', async (request) => {
+        const input = z
+          .strictObject({
+            provider: z.string(),
+            resourceId: z.string().nullable(),
+            category: z.string(),
+            fileName: z.string(),
+            fileSha256: z.string(),
+            /** False only for the production-path tests; the file is still synthetic. */
+            synthetic: z.boolean(),
+          })
+          .parse(request.body ?? {});
+        return quranSources.register(
+          {
+            provider: input.provider,
+            resourceName: `Synthetic test source (${input.resourceId ?? '-'})`,
+            resourceId: input.resourceId,
+            category: input.category,
+            sourceUrl: 'https://example.invalid/synthetic',
+            downloadUrl: null,
+            downloadedOn: '2026-11-09',
+            fileName: input.fileName,
+            fileSha256: input.fileSha256,
+            sourceVersion: null,
+            notes: 'E2E test fixture, not a Quran dataset',
+            registeredBy: 'E2E test',
+          },
+          { synthetic: input.synthetic },
+        );
+      });
+
+      scope.post('/quran/sources/:id/licence', async (request) => {
+        const { id } = z.object({ id: z.string().regex(UUID) }).parse(request.params);
+        await quranSources.recordLicence(id, { recordedBy: 'E2E test', ...(request.body as object) });
+        return { ok: true };
       });
 
       scope.get('/roster/ids', async () => {

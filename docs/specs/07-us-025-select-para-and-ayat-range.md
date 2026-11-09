@@ -38,7 +38,7 @@ Spec wording (from F06):
 
 Requirements this story covers. SRS.md has no story-to-requirement table, so this list is derived from the requirement text and the criteria below.
 
-- **Functional:** FR-SAB-001, FR-SAB-002
+- **Functional:** FR-SAB-001, FR-SAB-002, FR-SAB-009, FR-SAB-014
 - **Non-functional:** Not applicable
 - **SRS acceptance tests cited:** None
 
@@ -61,6 +61,8 @@ From the F06 feature spec. The original IDs are kept because tests cite them. Cr
 - **F06-AC5** — **(US-025) Given** a Para between 1 and 30, **when** the Teacher saves a portion, **then** it is accepted. Para 0 or Para 31 is rejected.
 - **F06-AC6** — **(US-025) Given** a Surah with 7 Ayat, **when** the Teacher enters Ayat 3 to 9 for it, **then** the field shows an error that names the maximum Ayat.
 - **F06-AC7** — **(US-025) Given** a range whose end Ayat is before its start Ayat in the same Surah, **when** the Teacher saves, **then** the range field shows an error.
+- **F06-AC22** — **(US-025) Given** the madrasa's active Surah Ayat counts (seed plus Admin edits), **when** a range has an Ayat beyond the Surah's count, an end before its start, or an unknown Surah, **then** it is rejected naming the field (and the maximum Ayat); after an Admin lowers a Surah's Ayat count, a range that was valid is rejected. A range is not checked against a Para boundary (DEC-B73). *(Added 2026-11-09, DEC-B71, DEC-B72; activated with its E2E test.)*
+- **F06-AC24** — **(US-025) Given** a Teacher device that has synced the reference snapshot and is offline, **when** a Surah/Ayat range is chosen, **then** the derived Para, the validation result, and the Total Lines pre-fill equal what the server returns for the same snapshot version. *(Added 2026-11-09, DEC-B72; its E2E test is pending until the snapshot exists, DEFERRED: OD-QR-7.)*
 
 ## Business rules
 
@@ -121,6 +123,8 @@ Nothing specific to this story in the source documents.
 
 **API (Playwright):**
 
+- [e2e/api/f06-quran-portions.spec.ts](../../e2e/api/f06-quran-portions.spec.ts) — F06-AC22 (US-025) ranges are validated against the active Ayat counts, including after an Admin correction
+- [e2e/api/f06-quran-portions.spec.ts](../../e2e/api/f06-quran-portions.spec.ts) — F06-AC24 (US-025) offline lookups from the cached reference snapshot match the server (pending: OD-QR-7)
 - [e2e/api/f06-quran-portions.spec.ts](../../e2e/api/f06-quran-portions.spec.ts) — F06-AC5 (US-025) Para 1–30 is accepted; 0 and 31 are rejected
 - [e2e/api/f06-quran-portions.spec.ts](../../e2e/api/f06-quran-portions.spec.ts) — F06-AC6 (US-025) an Ayat past the Surah end is rejected naming the maximum
 - [e2e/api/f06-quran-portions.spec.ts](../../e2e/api/f06-quran-portions.spec.ts) — F06-AC7 (US-025) an end Ayat before the start Ayat is rejected
@@ -139,13 +143,13 @@ Nothing specific to this story in the source documents.
 
 None specific to this story. See the [feature open questions](07-f06-quran-portions-metadata.md#open-questions).
 
-- **2026-11-09, DEC-B71:** the target publisher is Taj Company. The exact printing, page count, and page/line layout are unverified, and every candidate dataset is `LICENSE_REVIEW_REQUIRED` (Taj Company's position is a prerequisite for Taj layout data). Planned criteria F06-AC22, F06-AC24 (reserved, not yet active) and the open decisions OD-QR-1…11 are listed in the [feature spec](07-f06-quran-portions-metadata.md#planned-acceptance-criteria-reserved-ids-not-yet-active).
+- **2026-11-09, DEC-B71:** the target publisher is Taj Company. The exact printing, page count, and page/line layout are unverified, and every candidate dataset is `LICENSE_REVIEW_REQUIRED` (Taj Company's position is a prerequisite for Taj layout data). Criteria F06-AC22, F06-AC24 were activated on 2026-11-09 with their E2E tests (AC24's test is pending until the snapshot exists, OD-QR-7) and the open decisions OD-QR-1…11 are listed in the [feature spec](07-f06-quran-portions-metadata.md#acceptance-criteria-f06-ac20ac27-activated-2026-11-09).
 
 ## Traceability
 
 - **Story:** US-025 → SPEC-US-025 (this file)
-- **Detailed criteria:** F06-AC5, F06-AC6, F06-AC7
-- **Requirements:** FR-SAB-001, FR-SAB-002
+- **Detailed criteria:** F06-AC5, F06-AC6, F06-AC7, F06-AC22, F06-AC24
+- **Requirements:** FR-SAB-001, FR-SAB-002, FR-SAB-009, FR-SAB-014
 - **SRS acceptance tests:** None
 - **Business rules:** SRS §9 #15
 - **Design:** design.md §13; **Architecture:** ARCHITECTURE.md §18 epic 6

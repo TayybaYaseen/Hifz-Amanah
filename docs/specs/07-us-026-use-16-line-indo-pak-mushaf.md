@@ -38,7 +38,7 @@ Spec wording (from F06):
 
 Requirements this story covers. SRS.md has no story-to-requirement table, so this list is derived from the requirement text and the criteria below.
 
-- **Functional:** FR-SAB-006, FR-QTY-002, FR-QTY-005, FR-QTY-009
+- **Functional:** FR-SAB-006, FR-QTY-002, FR-QTY-005, FR-QTY-009, FR-SAB-012, FR-SAB-013
 - **Non-functional:** Not applicable
 - **SRS acceptance tests cited:** AC-QTY-02
 
@@ -61,6 +61,9 @@ From the F06 feature spec. The original IDs are kept because tests cite them. Cr
 - **F06-AC8** — **(US-026) Given** a portion measured in lines, **when** it is saved, **then** the unit is `LINES` with a whole number, counted on the madrasa's Mushaf edition (the 16-line Indo-Pak Mushaf, DEC-B70).
 - **F06-AC9** — **(US-026) Given** 10 lines assigned and 6 lines completed, **when** the remaining quantity is calculated, **then** it is 4 lines (AC-QTY-02).
 - **F06-AC17** — **(US-026) Given** a Lines, Ayat, or Pages quantity, **when** 2.5 is entered, **then** it is rejected; whole numbers are accepted. *(Added 2026-10-30, DEC-B26.)*
+- **F06-AC20** — **(US-026) Given** the madrasa's Mushaf edition, **when** an Owner, Admin, or Teacher reads the edition list, **then** it shows the edition's publisher and printing identifier as recorded (empty until the printing is verified on a physical Mushaf, DEC-B71), and it shows the madrasa's layout as verified only when the active layout import is a production import with an approving review signed by the named reviewer; test data and unsigned imports never show as verified, and no route lets any role mark an edition verified. *(Added 2026-11-09, DEC-B71, DEC-B72; activated with its E2E test.)*
+- **F06-AC21** — **(US-026) Given** a signed layout import, **when** Total Lines is looked up for a single-Surah range, **then** it equals the number of Ayat lines the imported page/line mapping gives that range; and a layout whose mapping has an unmapped word ID, a line spanning two Surahs, a gap, or an overlap is refused whole and nothing is stored. Agreement with the physical Taj Mushaf is the reviewer's signed evidence (verification kit), not an automated check. *(Added 2026-11-09, DEC-B71, DEC-B72; activated with its E2E test.)*
+- **F06-AC23** — **(US-026) Given** a layout with Surah-heading, Bismillah, and Ayat lines, **when** it is imported and Total Lines is counted, **then** the three line types are stored separately, only Ayat lines hold Ayat and words, only Ayat lines are counted (as built; DEFERRED: OD-QR-11), and a heading or Bismillah line carrying Ayat or words is refused. *(Added 2026-11-09, DEC-B71, DEC-B72; activated with its E2E test.)*
 
 ## Business rules
 
@@ -115,6 +118,9 @@ Nothing specific to this story in the source documents.
 
 **API (Playwright):**
 
+- [e2e/api/f06-quran-portions.spec.ts](../../e2e/api/f06-quran-portions.spec.ts) — F06-AC20 (US-026) the edition shows its recorded publisher and printing, and a layout counts as verified only after a signed production review
+- [e2e/api/f06-quran-portions.spec.ts](../../e2e/api/f06-quran-portions.spec.ts) — F06-AC21 (US-026) Total Lines follows the imported page/line mapping, and a mapping with unmapped IDs, a Surah-spanning line, a gap, or an overlap is refused
+- [e2e/api/f06-quran-portions.spec.ts](../../e2e/api/f06-quran-portions.spec.ts) — F06-AC23 (US-026) Surah-heading, Bismillah, and Ayat lines are stored apart, and only Ayat lines count toward Total Lines
 - [e2e/api/f06-quran-portions.spec.ts](../../e2e/api/f06-quran-portions.spec.ts) — F06-AC8 (US-026) line quantities are whole LINES
 - [e2e/api/f06-quran-portions.spec.ts](../../e2e/api/f06-quran-portions.spec.ts) — F06-AC9 (US-026) 10 lines assigned and 6 completed leave 4 lines (AC-QTY-02)
 - [e2e/api/f06-quran-portions.spec.ts](../../e2e/api/f06-quran-portions.spec.ts) — F06-AC17 (US-026) Lines, Ayat, and Pages are whole numbers only
@@ -133,13 +139,13 @@ Nothing specific to this story in the source documents.
 
 None specific to this story. See the [feature open questions](07-f06-quran-portions-metadata.md#open-questions).
 
-- **2026-11-09, DEC-B71:** the target publisher is Taj Company. The exact printing, page count, and page/line layout are unverified, and every candidate dataset is `LICENSE_REVIEW_REQUIRED` (Taj Company's position is a prerequisite for Taj layout data). Planned criteria F06-AC20, F06-AC21, F06-AC23 (reserved, not yet active) and the open decisions OD-QR-1…11 are listed in the [feature spec](07-f06-quran-portions-metadata.md#planned-acceptance-criteria-reserved-ids-not-yet-active).
+- **2026-11-09, DEC-B71:** the target publisher is Taj Company. The exact printing, page count, and page/line layout are unverified, and every candidate dataset is `LICENSE_REVIEW_REQUIRED` (Taj Company's position is a prerequisite for Taj layout data). Criteria F06-AC20, F06-AC21, F06-AC23 were activated on 2026-11-09 with their E2E tests and the open decisions OD-QR-1…11 are listed in the [feature spec](07-f06-quran-portions-metadata.md#acceptance-criteria-f06-ac20ac27-activated-2026-11-09).
 
 ## Traceability
 
 - **Story:** US-026 → SPEC-US-026 (this file)
-- **Detailed criteria:** F06-AC8, F06-AC9, F06-AC17
-- **Requirements:** FR-SAB-006, FR-QTY-002, FR-QTY-005, FR-QTY-009
+- **Detailed criteria:** F06-AC8, F06-AC9, F06-AC17, F06-AC20, F06-AC21, F06-AC23
+- **Requirements:** FR-SAB-006, FR-QTY-002, FR-QTY-005, FR-QTY-009, FR-SAB-012, FR-SAB-013
 - **SRS acceptance tests:** AC-QTY-02
 - **Business rules:** SRS §9 #4
 - **Design:** design.md §13; **Architecture:** ARCHITECTURE.md §18 epic 6
