@@ -198,6 +198,51 @@ The tool downloads nothing and refuses synthetic sources. Recording a cleared st
 backed by written evidence. `GET /quran/imports` shows each import's format, review decision, report hash, and its
 sources with their current licence status.
 
+**Converter and validation tool** ([`src/modules/quran-ref/converter`](src/modules/quran-ref/converter); ADR-017 §4–§7).
+This is offline maintainer tooling. It downloads nothing and imports nothing.
+
+```text
+npm run quran:convert -- convert <manifest.json> --out <dir> [--check-sources]
+npm run quran:convert -- sign <dir> <review.json>
+```
+
+- **The manifest** (`hifz-quran-source-manifest` v1) names the dataset, provenance, edition (`code`, `linesPerPage`, and
+  the verified `pageCount` or null), and four source files, each with `provider` and `resourceId`. Paths are relative
+  to the manifest. The files use the provider's published columns:
+  - a Surah list (`id, name_simple, name_arabic, revelation_order, revelation_place, verses_count, bismillah_pre`);
+  - a Juz list (`juz_number, first_verse_key, last_verse_key`);
+  - layout `pages` rows (`page_number, line_number, line_type, is_centered, first_word_id, last_word_id, surah_number`);
+  - word rows (`word_index, word_key, surah, ayah`).
+
+  A SQLite source is exported to JSON rows with the same column names. Word text is read and discarded; no Quran text
+  reaches the seed or the report.
+- **`convert`** hashes each raw file (SHA-256) and runs checks **S1–S10**:
+  - S1: the files parse;
+  - S2: Surah numbering and fields;
+  - S3: Juz keys;
+  - S4: word IDs unique, keys consistent, positions in sequence, Quran order;
+  - S5: cross-source Ayat counts;
+  - S6: layout rows (types, slots, word IDs only on Ayat lines, every ID mapped, one Surah per line, `surah_number`
+    agrees);
+  - S7: every word on exactly one line, with no gap or overlap;
+  - S8: no missing page, the verified page count, short pages listed;
+  - S9: one heading per Surah, with Bismillah lines compared with `bismillah_pre`;
+  - S10: the existing domain rules on the built seed.
+
+  It writes `report.json` and `report.md`, which hold the checks, cross-source comparison, short pages, a 40-page
+  reviewer sample, the review block, and the import gate. It writes `seed.json` **only when no check failed**. A failure
+  exits 1. `--check-sources` reads the source catalogue (`DATABASE_URL`) so the gate shows each file's licence status.
+  Otherwise licences are reported `NOT_CHECKED`, never assumed.
+- **`sign`** attaches the reviewer's signed decision (verification kit Part F: reviewer, qualification, printing,
+  decision, date, findings) and writes `seed.signed.json`, `report.signed.json`, and `report.signed.md`. The seed's
+  `validationReport.sha256` is the signed report's hash. It refuses:
+  - a seed changed since conversion, a failed check, or a second signature;
+  - an approval with a blocking finding, or `APPROVED` with findings listed (use `APPROVED_WITH_FINDINGS`).
+
+  A `REJECTED` decision is recorded, and that seed is then refused at import.
+- **The gate in the report is advisory.** The seed loader enforces the licence and review gates again at import.
+  Synthetic manifests are accepted only with `NODE_ENV=test`.
+
 ## Sync routes (F12)
 
 Protocol v1, decisions in [ADR-015](../../docs/adr/ADR-015-sync-protocol-idempotency-conflicts.md); shapes in

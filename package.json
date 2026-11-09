@@ -18,6 +18,7 @@
     "api:e2e-server": "npm run e2e-server -w @hifz/api",
     "db:migrate": "npm run migrate -w @hifz/api",
     "quran:source": "npm run quran:source -w @hifz/api --",
+    "quran:convert": "npm run quran:convert -w @hifz/api --",
     "docs:check": "node scripts/check-traceability.mjs",
     "e2e:trace": "node e2e/scripts/traceability.mjs",
     "e2e:gate": "node e2e/scripts/spec-gate.mjs",

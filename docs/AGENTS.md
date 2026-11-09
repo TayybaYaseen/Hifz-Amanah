@@ -53,6 +53,7 @@ Do not guess commands that don't exist. Mobile-only commands (`npm start`, `npm 
 | API for E2E runs (fresh in-memory database, seeded personas, test-control API) on port 3000 | `npm run api:e2e-server` |
 | Apply migrations to `DATABASE_URL` | `npm run db:migrate` |
 | Quran source catalogue (privileged; `list`, `register <file>`, `licence <id> <file>`; see `apps/api/README.md`) | `npm run quran:source -- list` |
+| Quran source converter (offline; `convert <manifest> --out <dir>`, `sign <dir> <review>`; see `apps/api/README.md`) | `npm run quran:convert -- convert <manifest.json> --out <dir>` |
 | E2E traceability (every criterion has an E2E test) | `npm run e2e:trace` |
 | **Spec completion gate** (one story spec) | `npm run e2e:gate -- US-022` |
 | Feature gate (every story in a feature) | `npm run e2e:gate -- F05` |
