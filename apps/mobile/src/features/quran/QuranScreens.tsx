@@ -100,7 +100,14 @@ export function QuranMetadataScreen({ canEdit, onAddSurah, onEditSurah, onAddPar
             {edition.verification === 'VERIFIED' ? `✓ ${t('quran.edition.verified')}` : `ℹ ${t('quran.edition.unverified')}`}
           </AppText>
           <AppText role="helper" color={colors.textSecondary} testID="quran.edition.layout">
-            {edition.hasLayout ? `✓ ${t('quran.edition.layoutLoaded')}` : `ℹ ${t('quran.edition.noLayout')}`}
+            {/* DEC-B78/B79: "verified" only after a signed production review; a withdrawn layout is never shown as approved. */}
+            {edition.layoutWithdrawn
+              ? `⚠ ${t('quran.edition.layoutWithdrawn')}`
+              : edition.layoutVerified
+                ? `✓ ${t('quran.edition.layoutVerified')}`
+                : edition.hasLayout
+                  ? `ℹ ${t('quran.edition.layoutLoaded')}`
+                  : `ℹ ${t('quran.edition.noLayout')}`}
           </AppText>
         </Card>
       ) : null}

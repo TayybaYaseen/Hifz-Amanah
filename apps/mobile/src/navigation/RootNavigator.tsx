@@ -24,6 +24,7 @@ import { HomeScreen } from '../features/home/HomeScreen.tsx';
 import { BulkEntryScreen } from '../features/attendance/BulkEntryScreen.tsx';
 import { HolidaysScreen, LeaveApprovalsScreen, TimetableScreen } from '../features/attendance/CalendarScreens.tsx';
 import { ParaFormScreen, QuranMetadataScreen, QuranReviewScreen, SurahFormScreen } from '../features/quran/QuranScreens.tsx';
+import { QuranReferenceScreen } from '../features/quran/QuranReferenceScreen.tsx';
 import { MoreScreen } from '../features/home/MoreScreen.tsx';
 import { ProfileScreen } from '../features/profile/ProfileScreen.tsx';
 import { WorkspaceScreen } from '../features/settings/WorkspaceScreen.tsx';
@@ -63,6 +64,8 @@ type AppStack = {
   Timetable: { klass: ClassResponse };
   // F06 Quran metadata (Owner/Admin edit; Teacher reads)
   QuranMetadata: undefined;
+  // F06 Quran references on this device (offline snapshot; Owner/Admin/Teacher with a workspace)
+  QuranReference: undefined;
   SurahForm: { surah: SurahView | null };
   ParaForm: { para: ParaView | null; surahs: SurahView[] };
   QuranReview: undefined;
@@ -223,6 +226,7 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
             onLeave={() => navigation.navigate('LeaveApprovals')}
             onHolidays={() => navigation.navigate('Holidays')}
             onQuran={() => navigation.navigate('QuranMetadata')}
+            onQuranReference={() => navigation.navigate('QuranReference')}
           />
         )}
       </App.Screen>
@@ -289,6 +293,10 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
           </App.Screen>
           <App.Screen name="Holidays" options={{ title: t('holidays.title') }}>
             {() => <HolidaysScreen canManage={staff} />}
+          </App.Screen>
+          {/* F06: the cached reference snapshot and the offline range check (ADR-018; plan P4). */}
+          <App.Screen name="QuranReference" options={{ title: t('quranRef.title') }}>
+            {() => <QuranReferenceScreen />}
           </App.Screen>
           {/* F06: Quran metadata. Owner/Admin edit; a Teacher reads it with no edit controls (F06-AC2). */}
           <App.Screen name="QuranMetadata" options={{ title: t('quran.title') }}>

@@ -17,6 +17,7 @@ import { LocaleProvider, initialLocale } from './i18n/LocaleContext.tsx';
 import { RootNavigator, navigationRef } from './navigation/RootNavigator.tsx';
 import { AppLockProvider } from './app-lock/AppLockContext.tsx';
 import { SyncProvider } from './sync/SyncContext.tsx';
+import { QuranReferenceProvider } from './features/quran/QuranReferenceContext.tsx';
 
 export default function App() {
   const [fontsLoaded] = useFonts({ Inter_400Regular, Inter_600SemiBold, NotoNastaliqUrdu_400Regular, NotoNaskhArabic_400Regular });
@@ -37,11 +38,13 @@ export default function App() {
       <LocaleProvider initial={locale}>
         <SessionProvider>
           <SyncProvider>
-            <AppLockProvider>
-              <NavigationContainer ref={navigationRef}>
-                <RootNavigator />
-              </NavigationContainer>
-            </AppLockProvider>
+            <QuranReferenceProvider>
+              <AppLockProvider>
+                <NavigationContainer ref={navigationRef}>
+                  <RootNavigator />
+                </NavigationContainer>
+              </AppLockProvider>
+            </QuranReferenceProvider>
           </SyncProvider>
         </SessionProvider>
       </LocaleProvider>

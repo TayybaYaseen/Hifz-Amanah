@@ -9,7 +9,7 @@ import type { MeResponse } from '@hifz/contracts';
 import { AppScreen, Button } from '../../components/ui.tsx';
 import { useSync } from '../../sync/SyncContext.tsx';
 
-export function MoreScreen({ me, onProfile, onAccounts, onWorkspace, onClasses, onStudents, onSyncQueue, onLeave, onHolidays, onQuran }: {
+export function MoreScreen({ me, onProfile, onAccounts, onWorkspace, onClasses, onStudents, onSyncQueue, onLeave, onHolidays, onQuran, onQuranReference }: {
   me: MeResponse;
   onProfile: () => void;
   onAccounts: () => void;
@@ -20,6 +20,7 @@ export function MoreScreen({ me, onProfile, onAccounts, onWorkspace, onClasses, 
   onLeave: () => void;
   onHolidays: () => void;
   onQuran: () => void;
+  onQuranReference: () => void;
 }) {
   const { t } = useTranslation();
   const sync = useSync();
@@ -34,6 +35,8 @@ export function MoreScreen({ me, onProfile, onAccounts, onWorkspace, onClasses, 
       {staff ? <Button testID="more.leave" variant="secondary" label={t('more.leave')} onPress={onLeave} /> : null}
       {roster ? <Button testID="more.holidays" variant="secondary" label={t('more.holidays')} onPress={onHolidays} /> : null}
       {roster ? <Button testID="more.quran" variant="secondary" label={t('more.quran')} onPress={onQuran} /> : null}
+      {/* F06: the offline reference snapshot exists only where F12 opened a workspace (staff; ADR-018). */}
+      {roster && sync.enabled ? <Button testID="more.quranRef" variant="secondary" label={t('more.quranRef')} onPress={onQuranReference} /> : null}
       <Button testID="more.workspace" variant="secondary" label={t('more.workspace')} onPress={onWorkspace} />
       {staff ? <Button testID="more.accounts" variant="secondary" label={t('more.accounts')} onPress={onAccounts} /> : null}
       {sync.enabled ? <Button testID="more.syncQueue" variant="secondary" label={t('more.syncQueue')} onPress={onSyncQueue} /> : null}
