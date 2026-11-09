@@ -3,9 +3,10 @@
 **Document:** `design.md`  
 **Product:** HifzAmanah  
 **Tagline:** A Trusted Companion for Quran Memorization  
-**Version:** 1.7  
+**Version:** 1.8  
 **Design direction:** Premium Islamic + Modern SaaS  
 **Requirements baseline:** `SRS.md` v1.12, `user-stories.md` v1.4, and `ARCHITECTURE.md` v1.2  
+**Changes in 1.8 (2026-11-09):** The target Mushaf is the 16-line Indo-Pak Mushaf (SRS §17 DEC-B70), replacing the standard 15-line Mushaf in §4.7 (Total Lines) and the decisions list. No screen changed.  
 **Changes in 1.7 (2026-11-01):** The Sabaq portion card now takes a Surah, a start and end Ayat, and a line count. Total Lines is pre-filled from the 15-line Mushaf layout for the Teacher to confirm, and the Para is derived. Sabaq offers no Para presets (SRS FR-SAB-001…009, FR-QTY-010, §17 DEC-B60…B64). Sabqi and Manzil are unchanged. Updated §4.7, §4.9, §4.10, §4.15, §5.3, §5.4, §7, §10, §11, §13.  
 **Changes in 1.6:** Applied the decision review of 2026-10-30 (SRS §17). §11 now records how each open decision was closed.
 - **Attendance:** Present, Late, Half day, Leave, or Absent. Leave replaces excused absence (§4.7, §4.8, §4.14).
@@ -397,7 +398,7 @@ Each section supports an **Add portion** action. Sabqi and Manzil must support m
 - **Sabaq** (SRS FR-SAB-001…003, FR-SAB-008):
   - Surah (required; one Surah per portion), Starting Ayat, Ending Ayat
   - Para: derived from the range and shown read-only, e.g. "Para 1"
-  - Total Lines: pre-filled from the 15-line Mushaf layout once the range is chosen. The Teacher confirms or corrects it, and the field shows "From Mushaf layout" until it is changed
+  - Total Lines: pre-filled from the Mushaf layout (16-line Indo-Pak, DEC-B70) once the range is chosen. The Teacher confirms or corrects it, and the field shows "From Mushaf layout" until it is changed
   - Assigned Lines (defaults to Total Lines) and Completed Lines, both whole numbers
   - Remaining Lines, calculated and read-only
   - No unit picker: the unit is always shown as "lines"
@@ -1110,7 +1111,7 @@ The product-owner decision review of 2026-10-30 closed every item that was open 
 **Earlier decisions (SRS §16), still in force**
 - One account and User ID per madrasa; login is User ID + password; email OTP resets the password; no forced password change at first login.
 - The Madrasa Admin sets the daily-report mode: one report per student/date (the default) or multiple sessions.
-- Quran metadata is Admin-managed, and only the standard 15-line Mushaf is supported.
+- Quran metadata is Admin-managed, and only the 16-line Indo-Pak Mushaf is supported (DEC-B70).
 - Timezone `Asia/Karachi`; the week starts on Monday.
 - Students and Parents use the Android app only; there is no browser portal.
 - An Excel file holds at most 1,000 students/records.

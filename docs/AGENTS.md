@@ -132,7 +132,7 @@ Breaking any of these is a bug, even if a test or UI mock seems to want it.
 15. Students and Parents see only **published** reports. A Teacher (assigned classes) or Admin publishes after the period is fully synced (FR-RPT-010). The visible field set is FR-PORT-006.
 
 **Quran metadata**
-16. Quran metadata (Surah/Ayat/Para) is Admin-managed per organization, starting from a reviewed seed (FR-SAB-007). MVP supports the **standard 15-line Mushaf only**. Metadata edits never change existing records; invalid ranges are flagged for review.
+16. Quran metadata (Surah/Ayat/Para) is Admin-managed per organization, starting from a reviewed seed (FR-SAB-007). MVP counts lines on the **16-line Indo-Pak Mushaf** only (DEC-B70, 2026-11-09); the target publisher is **Taj Company** (DEC-B71). The exact Taj printing and page count (548 is only a candidate), the dataset, its licence, the layout source, and the reviewer are still open (SRS §17.3): never generate, guess, or type in Quran metadata or line layouts. Editions are rows in `mushaf_editions`, not constants. Metadata edits never change existing records; invalid ranges are flagged for review.
 
 ## 6. Security and privacy rules
 

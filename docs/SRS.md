@@ -2,8 +2,12 @@
 
 **Document type:** Software Requirements Specification\
 **Status:** Consolidated planning baseline; not implemented\
-**Version:** 1.13\
-**Last updated:** 2026-11-02\
+**Version:** 1.17\
+**Last updated:** 2026-11-09\
+**Changes in 1.17:** The product owner approved ADR-017 and FR-SAB-011…014 (§17 DEC-B72), decided that a Sabqi/Manzil range need not lie within its Para (DEC-B73, closes OD-QR-12), and moved page/line selection (FR-SAB-015) out of the MVP (DEC-B74, closes OD-QR-8). The delivery mechanism of FR-SAB-014 (OD-QR-7), OD-QR-10 and OD-QR-11 stay open. No dataset, licence, or physical verification is approved.\
+**Changes in 1.16:** The product owner decided that the **Taj Company** edition is the primary target publisher (§17 DEC-B71). The Indo-Pak 16-line profile is the candidate target. The exact printing, the page count (548 is a candidate from QUL resource 11), and the page/line mapping stay unverified until checked against a physical Taj Mushaf from the target madaris. The F06 MVP priorities are recorded: Surah, Ayat, and Para metadata, the Taj edition profile, the verified layout, and the offline snapshot. Ruku, Hizb, quarter-Hizb, and seven-Manzil divisions are later-phase candidates (OD-QR-5 closed). Licensing is unchanged: everything is still `LICENSE_REVIEW_REQUIRED`, and Taj Company permission is now an explicit prerequisite. Changed: FR-SAB-006, FR-SAB-011 and FR-SAB-013 (the last two proposed), §1.5, and §17.3. No approved quantity, Sabaq, Sabqi, Manzil, or homework rule changed.\
+**Changes in 1.15:** Quran reference data research and design (2026-11-09). Added **proposed** requirements FR-SAB-011…015 (provenance and licence gate, layout line structure, import validation and sign-off, offline reference snapshot, page/line selection). They are **not approved**; the design is ADR-017 (Proposed). §1.5 now separates a one-time reviewed seed import from a runtime provider. §17.3 lists open decisions OD-QR-1…11. No approved requirement changed.\
+**Changes in 1.14:** The target Mushaf is the **16-line Indo-Pak (South Asian) Mushaf** (§17 DEC-B70), replacing the standard 15-line Mushaf. The exact publisher/edition, the Quran metadata dataset, its licence approval, the verified page/line layout source, and the reviewer stay open (§17.3). Editions are data, so more can be added later; each madrasa counts lines on one edition. Changed: FR-SAB-006…008, the §1.5 Mushaf line, the §15/§16 Mushaf lines, and the DEC-B31 and DEC-B64 rows. No other requirement changed.\
 **Changes in 1.13:** Register rows DEC-B65…B69, decided while implementing F01: session lifetime, recent sign-in, progressive sign-in delay, embedded Postgres for local runs, and the current password for an email change. No requirement text changed.\
 **Changes in 1.12:** Sabaq is now measured in lines over one Surah's Ayat range (§17 DEC-B60…B64). Para-fraction options (Rubu, Half, Salasah, Complete) are not offered for Sabaq. Sabqi and Manzil are unchanged.
 - New requirements: FR-SAB-008…010, FR-QTY-010, FR-HW-018; business rule §9 #18; acceptance tests AC-QTY-07/08, AC-HW-10, AC-XLS-07.
@@ -157,7 +161,8 @@ validation.
 -   Quran metadata is maintained by the Madrasa Admin in the MVP.
     - Each madrasa starts from a reviewed seed shipped with the app (FR-SAB-007).
     - No external metadata vendor is integrated at run time.
--   The MVP uses the standard 15-line Mushaf only.
+    - A one-time, reviewed, versioned **seed import** from a published dataset (e.g. QUL, Tanzil) is not a runtime integration: the app never contacts the provider while it runs, and Teachers use HifzAmanah's own copy offline (FR-SAB-007, FR-SAB-014).
+-   The MVP counts lines on one Mushaf edition: the 16-line Indo-Pak Mushaf (DEC-B70, 2026-11-09). The target publisher is **Taj Company** (DEC-B71, 2026-11-09). The exact Taj printing, its page count, and its page/line layout are still to be verified against a physical Taj Mushaf (§17.3).
 -   Authentication is built into the HifzAmanah API; no third-party identity provider is used (§17 DEC-B05).
 -   Production hosting is AWS in the Mumbai region, and OTP email goes through Amazon SES (§17 DEC-B53, DEC-B06).
 -   Android push notifications are the only selected MVP notification channel; delivery provider and operational setup remain implementation choices.
@@ -419,15 +424,21 @@ status, and optional teacher remarks. Statuses keep their meanings (FR-ATT-001):
 
 **FR-SAB-005:** Quran metadata (Surah, Ayat, and Para information) is managed by the Madrasa Admin, who can add/edit the reference information used by teachers. The MVP must not assume an external metadata provider or license has been selected. Validation uses the active admin-maintained metadata.
 
-**FR-SAB-006:** The MVP supports the standard 15-line Mushaf only. Line counting and line-based portions must use this defined layout; multiple Mushaf editions are out of MVP scope.
+**FR-SAB-006:** *Revised 2026-11-09 (DEC-B70):* The target Mushaf is the 16-line Indo-Pak (South Asian) Mushaf. Line counting and line-based portions use this edition's verified page/line layout.
+- The edition is identified in the data, and each madrasa counts lines on one configured edition.
+- The data model allows further editions to be added without redesign. Offering several editions to users is still out of MVP scope.
+- Indo-Pak printings differ in page and line breaks, so no layout is assumed. The exact publisher/edition and its page/line layout must be identified and verified first (§17.3).
+- *2026-11-09 (DEC-B71):* the primary target publisher is **Taj Company**, the edition the target madaris mainly use. The candidate profile is Taj Indo-Pak 16-line. A candidate 548-page layout exists (QUL resource 11). It is **not verified**: the exact printing, the page count, the page numbering, and every line break must be confirmed against a physical Taj Mushaf from the target madaris before the edition is marked verified (FR-SAB-013). That Taj Company publishes the printed Mushaf grants no rights to any digital file. Digital use needs its own licence or written permission (FR-SAB-011).
 
-**FR-SAB-007:** The app ships a reviewed Quran metadata seed covering Surahs, Ayat counts, Para boundaries, and the standard 15-line layout.
+**FR-SAB-007:** The app ships a reviewed Quran metadata seed covering Surahs, Ayat counts, Para boundaries, and the page/line layout of the target edition (FR-SAB-006).
+- *2026-11-09:* no dataset is approved yet. Until one is, no Quran metadata or layout is loaded into production, and none may be generated, guessed, or entered from memory.
+- Every import records its source, licence, dataset version, reviewer, and approval date. Imports are versioned and repeatable.
 - The seed is built from a published dataset whose licence has been checked.
 - A qualified reviewer nominated by the product owner reviews it before release.
 - Each madrasa starts from the seed. Admin edits to it are audited.
 - When an edit affects ranges already used by records, those records keep their stored ranges and are never changed automatically. Any that are no longer valid are listed for Admin review.
 
-**FR-SAB-008 (line count, added 2026-11-01, DEC-B64):** When the Teacher chooses a Sabaq Surah and Ayat range, the app pre-fills Total Lines from the 15-line Mushaf layout (FR-SAB-006, FR-SAB-007). The Teacher confirms or corrects it, and the confirmed number is stored with the edition it was counted on. A stored line count is never recalculated automatically, including after a metadata or layout edit (FR-SAB-007).
+**FR-SAB-008 (line count, added 2026-11-01, DEC-B64):** When the Teacher chooses a Sabaq Surah and Ayat range, the app pre-fills Total Lines from the edition's verified page/line layout (FR-SAB-006, FR-SAB-007). The Teacher confirms or corrects it. The confirmed number is stored with the edition it was counted on, and with whether it came from the layout or was entered by hand. *2026-11-09:* while no verified layout is loaded, Total Lines is not pre-filled and the Teacher enters it. A stored line count is never recalculated automatically, including after a metadata or layout edit (FR-SAB-007).
 
 **FR-SAB-009 (Sabaq validation, added 2026-11-01):** The server and the app reject a Sabaq portion when:
 - the Surah, starting Ayat, or ending Ayat is missing, or an Ayat is outside the Surah's Ayat count;
@@ -439,6 +450,24 @@ status, and optional teacher remarks. Statuses keep their meanings (FR-ATT-001):
 Missing performance data is never read as completed lines (FR-QTY-008).
 
 **FR-SAB-010 (compatibility, added 2026-11-01):** No Sabaq record has been created yet, because the system is not implemented. If a Sabaq portion with a Para-fraction quantity ever reaches the system (for example, from a `DailyRecords` workbook built on an earlier template version), it is rejected for correction and never converted. There is no approved conversion between Para fractions and lines (FR-QTY-004).
+
+#### 5.6.1 Quran reference data requirements (2026-11-09)
+
+> From the Quran data research ([handover/F06-quran-dataset-candidates.md](handover/F06-quran-dataset-candidates.md)); design in [ADR-017](adr/ADR-017-quran-reference-data-model.md). **FR-SAB-011…014 were approved on 2026-11-09 (DEC-B72).** FR-SAB-014's delivery mechanism (API snapshot vs. APK bundle, OD-QR-7) is still open. **FR-SAB-015 is not in the MVP** (DEC-B74). Approval of these requirements approves **no dataset, licence, or physical verification**; those stay open (§17.3).
+
+**FR-SAB-011 (approved 2026-11-09, DEC-B72): Provenance and licence gate.** Every downloaded source file is recorded with its provider, resource name and ID, source and download URLs, download date, file name, SHA-256, source version, licence name, licence status (`LICENSE_REVIEW_REQUIRED`, `OPEN_LICENCE_VERIFIED`, `PERMISSION_GRANTED`, `REFUSED`), permission reference, and required attribution. A production import is refused unless every source it uses is `OPEN_LICENCE_VERIFIED` or `PERMISSION_GRANTED`. Required attribution is shown in the app in all three locales.
+- A file being publicly downloadable does not make it redistributable, and a website's software licence (e.g. QUL's MIT licence) does not cover the datasets it serves.
+- For a layout of the Taj Company edition, `PERMISSION_GRANTED` needs the written permission of the dataset's provider **and** confirmation from Taj Company (or legal advice) that digital use of its page/line layout is permitted. Owning a printed Taj Mushaf grants no digital redistribution right.
+
+**FR-SAB-012 (approved 2026-11-09, DEC-B72): Layout line structure.** The page/line layout stores every printed line of the edition with its type (`AYAH`, `SURAH_NAME`, `BASMALLAH`) and alignment. An `AYAH` line stores its Surah and its first and last Ayat with the word position inside each. Word-level source IDs are converted once, offline. If any source word ID cannot be mapped, or the lines do not cover every Ayat exactly once in order, the import stops and reports it. No Quran text is stored. Only `AYAH` lines count toward Total Lines (FR-SAB-008), subject to OD-QR-11.
+
+**FR-SAB-013 (approved 2026-11-09, DEC-B72): Import validation and human sign-off.** Before a dataset version can be applied in production, an automated validation report must pass (114 Surahs, 30 contiguous Paras, every page and line present and unique, every Ayat covered, cross-source differences listed). A qualified reviewer must then compare it with the printed Mushaf of the configured edition and sign the report. Mismatches are reported, never corrected silently. The edition becomes verified only after sign-off.
+- For the Taj Company edition (DEC-B71), the comparison uses a **physical Taj Mushaf used by the target madaris**. It covers the Taj verification checklist ([handover/F06-quran-dataset-candidates.md §6](handover/F06-quran-dataset-candidates.md)): the exact printing, the total page count, the 16-line page structure, page numbering and the opening and ending pages, Surah heading and Bismillah positions, Ayat-to-page and Ayat-to-line mapping, and alignment and line breaks.
+- Validation is reproducible: the same source files (same SHA-256) and the same converter version always give the same seed checksum and the same report.
+
+**FR-SAB-014 (approved 2026-11-09, DEC-B72; delivery mechanism open, OD-QR-7): Offline reference data.** Teacher and Admin devices hold the madrasa's active reference data (Surahs, Paras, the active layout's lines, and any approved divisions) in local storage after the first online sign-in. It is downloaded as one versioned, checksummed snapshot from the HifzAmanah API and refreshed only when the madrasa's reference version changes. Range validation, Para derivation, and the Total Lines pre-fill work offline. Reference updates never change stored records (FR-SAB-007, FR-SAB-008).
+
+**FR-SAB-015 (not in MVP, DEC-B74; kept for a later phase): Page and line selection.** When a verified layout is loaded, the Teacher may choose a Sabaq range by page, start line, and end line. The app resolves the choice to a Surah and start/end Ayat, which stay the stored canonical values. A choice that spans two Surahs or covers no Ayat line is refused with a field error. Sabqi and Manzil portions may carry an optional page/line reference for the madrasa's edition. Quantities and their units are unchanged (FR-QTY-001…010).
 
 ### 5.7 Sabqi requirements
 
@@ -1553,7 +1582,7 @@ These decisions clarify the initial workbook contract, import safety, AI behavio
 - [x] Attendance-only Bulk Entry (Present, Late, Half day, Leave, Absent; revised 2026-10-30); individual Daily Entry for Hifz portions and quality.
 - [x] Four overall performance labels; optional 1–5 quality rating with the approved named scale (FR-ATT-009); detailed mistake categories, severity, and repeated flag.
 - [x] Teacher-marked, Admin-approved Leave (replaced excused absence on 2026-10-30).
-- [x] Admin-managed Quran metadata and standard 15-line Mushaf for MVP.
+- [x] Admin-managed Quran metadata; the 16-line Indo-Pak Mushaf for MVP (DEC-B70; publisher/edition, dataset, and layout source still open).
 - [x] Professional default PDF with Admin customization.
 - [x] Excel maximum 1,000 students/records per file as applicable; append-first validated import.
 - [x] Admin-selectable AI provider, AI enable/disable, usage limits, and privacy controls.
@@ -1590,7 +1619,7 @@ This register supersedes conflicting earlier draft statements in this document. 
 ### 16.3 Quran reference, Mushaf, reports, and access (Q131–Q135)
 
 - Quran metadata (Surah, Ayat, Para) is managed by Madrasa Admin, who can add/edit the reference information used by teachers.
-- MVP supports standard 15-line Mushaf only.
+- MVP counts lines on the 16-line Indo-Pak Mushaf only (*revised 2026-11-09*, DEC-B70).
 - PDF reports use a professional default template; Admin can customize logo, colors, headings, and layout.
 - Student and Parent use the Android app only; no separate web portal in MVP. Access remains read-only and permission-scoped.
 - Excel import/export limit: maximum 1,000 students/records per file as applicable; larger data must be split into multiple files.
@@ -1706,7 +1735,7 @@ This is the central register of every decision that was open anywhere in the rep
 | DEC-B28 | Mistake notes | Optional, private by default | Approved | PO Q&A | Useful detail, privacy-safe | FR-ATT-012 | US-028 | F07-AC15 |
 | DEC-B29 | Offline homework confirmation (D2) | Allowed; the server re-checks the source on sync, and a changed source becomes a conflict | Approved | PO Q&A | Teachers work offline in class | FR-HW-017 | US-037 | F08-AC20, F08-AC21 |
 | DEC-B30 | Due date and homework missed through absence or holiday | Next scheduled class day; missed homework carries over unchanged and is never failed | Approved | PO Q&A | "Saturday's homework is for Monday" | FR-HW-004, FR-HW-016 | US-036, US-038 | F08-AC18, F08-AC19 |
-| DEC-B31 | Quran metadata source (gate #3) | Reviewed seed plus audited Admin edits; the reviewer is to be nominated by the product owner | Approved | PO Q&A | No manual entry of 6,236 Ayat | FR-SAB-007 | US-024 | F06-AC18 |
+| DEC-B31 | Quran metadata source (gate #3) | Reviewed seed plus audited Admin edits; the reviewer is to be nominated by the product owner. *2026-11-09:* the seed loader is built (versioned, repeatable, provenance recorded). The dataset, its licence approval, and the reviewer are still open (§17.3), so no production seed exists | Approved (dataset still open) | PO Q&A | No manual entry of 6,236 Ayat | FR-SAB-007 | US-024 | F06-AC18 |
 | DEC-B32 | Metadata change on used ranges | Records kept; invalid ones flagged for review | Approved | PO Q&A | No silent history change | FR-SAB-007 | US-024 | F06-AC19 |
 | DEC-B33 | Report publishing (D3) | Teacher (assigned classes) or Admin publishes; all changes must be synced | Approved | PO Q&A | Teacher checks before parents see it | FR-RPT-010 | US-044, US-045 | F10-AC13…15 |
 | DEC-B34 | Recurring difficulty | 3 or more attempts with Major/Repeated, or Not Remembered 3+ times | Approved | PO Q&A | Fewer false alarms | FR-MNR-006 | US-040 | F09-AC10 |
@@ -1739,12 +1768,17 @@ This is the central register of every decision that was open anywhere in the rep
 | DEC-B61 | Total Lines vs. Assigned Lines *(2026-11-01)* | Total Lines = lines the range covers; Assigned Lines ≤ Total and defaults to it. A carry-forward keeps the range and Total and assigns the remaining lines | Approved | PO Q&A 2026-11-01 | Keeps the original reference on carried-forward work | FR-SAB-003, FR-HW-018 | US-020, US-035 | F05-AC21, F08-AC22 |
 | DEC-B62 | Can one Sabaq portion cross Surahs? *(2026-11-01)* | No. One Surah per portion; a lesson crossing Surahs is two portions | Approved | PO Q&A 2026-11-01 | Matches the Surah + start/end Ayat fields | FR-SAB-002 | US-020 | F05-AC21 |
 | DEC-B63 | Para on a Sabaq portion *(2026-11-01)* | Derived from the range, not entered | Approved | PO Q&A 2026-11-01 | Keeps Para-wise reports and the Sabqi default | FR-SAB-001, FR-SBQ-003 | US-020, US-021 | F05-AC10, F05-AC21 |
-| DEC-B64 | Where does Total Lines come from? *(2026-11-01)* | Pre-filled from the 15-line Mushaf layout; the Teacher confirms or corrects; stored with its edition and never recalculated | Approved | PO Q&A 2026-11-01 | Explicit count that respects the edition | FR-SAB-008 | US-020 | F05-AC21 |
+| DEC-B64 | Where does Total Lines come from? *(2026-11-01)* | Pre-filled from the Mushaf layout (the 16-line Indo-Pak edition since DEC-B70); the Teacher confirms or corrects; stored with its edition and never recalculated | Approved | PO Q&A 2026-11-01 | Explicit count that respects the edition | FR-SAB-008 | US-020 | F05-AC21 |
 | DEC-B65 | Session lifetime *(2026-11-02)* | Access token about 15 minutes, refreshed silently. A session ends 30 days after sign-in; refreshing does not extend it. Sign-out, password reset, deactivation, and a two-factor reset still end it at once | Approved | PO Q&A 2026-11-02 | A month of daily use without signing in again | FR-AUTH-003 | US-001 | F01-AC5, F01-AC6 |
 | DEC-B66 | "Recent sign-in" for recovery-code regeneration *(2026-11-02)* | Signed in within the last 15 minutes; refreshing a session does not count as signing in | Approved | PO Q&A 2026-11-02 | Short enough to stop a borrowed session | FR-AUTH-016 | US-072 | F01-AC32 |
 | DEC-B67 | Progressive sign-in delay *(2026-11-02)* | After 5 failures within 15 minutes: 1 s, 2 s, 4 s, 8 s, then 8 s per attempt; applied the same way to unknown User IDs | Approved | PO Q&A 2026-11-02 | Slows guessing without revealing which IDs exist | FR-AUTH-014 | US-001 | F01-AC4, F01-AC25 |
 | DEC-B68 | Database for local development and tests without Docker *(2026-11-02)* | Embedded Postgres (PGlite) over the normal wire protocol, with the same driver and SQL. Docker Compose stays the CI setup; production stays managed Postgres | Approved | PO Q&A 2026-11-02 | Docker is not available on the development machine | NFR-MNT-005 | all | API integration and E2E runs |
 | DEC-B69 | Does changing the email on My profile need the current password? *(2026-11-02)* | Yes. The server checks it under the sign-in throttle; a wrong or missing password changes nothing. Display name and language need no password | Approved | PO request 2026-11-02 (F01 code review M5) | The email receives reset codes, so a borrowed session must not redirect recovery | FR-AUTH-006 | US-071 | F01-AC27, F01-AC29 |
+| DEC-B70 | Which Mushaf is the target? *(2026-11-09)* | The 16-line Indo-Pak (South Asian) Mushaf, replacing the standard 15-line Mushaf. Editions are data, so more can be added later. The exact publisher/edition and its page/line layout are not yet identified (§17.3) | Approved (edition details open) | PO instruction 2026-11-09 (F06) | The Mushaf the target madaris use; Indo-Pak printings differ, so no layout is assumed | FR-SAB-006…008 | US-020, US-026 | F05-AC21, F06-AC8 |
+| DEC-B71 | Which publisher is the target? *(2026-11-09)* | **Taj Company** is the primary target publisher/edition; the candidate profile is Taj Indo-Pak 16-line. The exact printing and edition identifier, the page count (548 is only a candidate, from QUL resource 11), and the page/line mapping are **not verified**; they must be checked against a physical Taj Mushaf from the target madaris. No licence follows from this decision. F06 MVP scope is Surah, Ayat, and Para metadata, the Taj edition profile, the verified layout, and the offline snapshot; Ruku, Hizb, quarter-Hizb, and seven-Manzil divisions are later-phase candidates | Approved (printing, page count, layout, licence open) | PO planning decision 2026-11-09 (F06) | The target madaris mainly use the Taj Company edition | FR-SAB-006, FR-SAB-011…015 (proposed) | US-024, US-026 | F06-AC8; planned F06-AC20…27 |
+| DEC-B72 | Approve the Quran reference data design? *(2026-11-09, OD-QR-6)* | Yes: ADR-017 is accepted, and FR-SAB-011…014 are approved. Changes go in a new migration 0010, never in an edited 0009. FR-SAB-014's delivery mechanism (OD-QR-7) stays open. **No dataset, licence, or physical verification is approved by this** | Approved | PO 2026-11-09 ("start implementation", backend first) | Lets the F06 backend be built and tested with synthetic data while licences are pending | FR-SAB-011…014 | US-024, US-026 | planned F06-AC20, AC21, AC23, AC25…27 |
+| DEC-B73 | Must a Sabqi/Manzil Surah/Ayat range lie within its Para? *(2026-11-09, OD-QR-12)* | No. It is checked against the Surah's Ayat count only (unchanged) | Approved | PO 2026-11-09 | No new rule beyond US-025 | FR-SBQ-*, FR-MNZ-* | US-025 | planned F06-AC22 |
+| DEC-B74 | Is page → start line → end line selection in the MVP? *(2026-11-09, OD-QR-8)* | No. Kept for a later phase, after a verified layout exists | Approved | PO 2026-11-09 | It needs a verified Taj layout, which is blocked on licences | FR-SAB-015 | US-020 | — |
 
 ### 17.3 Open items after this review
 
@@ -1752,5 +1786,26 @@ This is the central register of every decision that was open anywhere in the rep
   - DEC-B45, the AI provider vendor: until the FR-AI-012 comparison in Phase 7.
 - **Product-owner action items** (these are not open decisions):
   - Nominate the Quran metadata reviewer (DEC-B31).
+- **Open: Quran data (2026-11-09).** These block the production seed, F06-AC18, and the F06 gate. None may be marked resolved without the product owner's decision:
+  - the exact Taj Company printing and its edition identifier (publisher decided: Taj Company, DEC-B71; printing open);
+  - the approved Quran metadata dataset (DEC-B31);
+  - the dataset's licence approval, covering commercial use and redistribution (DEC-B31);
+  - the verified 16-line page/line layout source (DEC-B70);
+  - the reviewer responsible for approving Quran metadata (DEC-B31).
+- **Open: Quran reference data design (2026-11-09, ADR-017 Proposed).** Research: [handover/F06-quran-dataset-candidates.md](handover/F06-quran-dataset-candidates.md). Every QUL resource checked states no licence ("We don't have copyright information for this resource"), so each is `LICENSE_REVIEW_REQUIRED`. Tanzil's licence could not be verified. None is approved.
+  - OD-QR-1: *narrowed 2026-11-09 by DEC-B71.* Taj Company is the publisher. Still open: the exact Taj printing and edition identifier, and confirmation of the 16-line, 548-page profile against a physical Taj Mushaf from the target madaris.
+  - OD-QR-2: the approved source per category (recommended: Tanzil for Surahs and Para if its licence is verified, else QUL 70/68 with permission; QUL 11 for the Taj layout, only after permission).
+  - OD-QR-3: written permission and legal review. Requests go to Tarteel (QUL), **and Taj Company is a prerequisite for any Taj layout data**. Printed-Mushaf ownership grants no digital rights, and a public download is not a redistribution licence.
+  - OD-QR-4: nominate the qualified Quran reviewer (as DEC-B31 above).
+  - OD-QR-5: *closed 2026-11-09 by DEC-B71:* Ruku, Hizb, quarter-Hizb (Rub al-Hizb), and seven-Manzil divisions are later-phase candidates, unless an approved source and a clear MVP need are established.
+  - OD-QR-6: *closed 2026-11-09 by DEC-B72* (ADR-017 accepted; FR-SAB-011…014 approved).
+  - OD-QR-7: offline distribution: API snapshot after sign-in (recommended) or bundled in the APK (FR-SAB-014). **Still open.**
+  - OD-QR-8: *closed 2026-11-09 by DEC-B74* (page/line selection not in the MVP).
+  - OD-QR-9: the attribution requirements (wording, and where it is shown; recommended: About screen, all three locales).
+  - OD-QR-10: whether Para quarters become selectable positions (recommended: not in MVP; they remain amounts).
+  - OD-QR-11: whether Surah-heading and Bismillah lines count in Total Lines (recommended: no, as built).
+  - OD-QR-12: *closed 2026-11-09 by DEC-B73* (not enforced; checked against the Surah's Ayat count only).
+  - Readiness review, checklists, and permission drafts (not sent): [handover/F06-implementation-readiness.md](handover/F06-implementation-readiness.md).
+- **Product-owner action items, continued:**
   - Approve the glossary, or nominate a reviewer (DEC-B39).
   - Obtain legal confirmation of the retention policy (DEC-B44).

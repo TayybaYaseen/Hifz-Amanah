@@ -26,7 +26,7 @@ Spec wording (from F06):
 > - Surahs, with Ayat counts
 > - Para boundaries
 >
-> The MVP supports the standard 15-line Mushaf only.
+> The MVP counts lines on the 16-line Indo-Pak Mushaf only (SRS §17 DEC-B70, 2026-11-09).
 >
 > Amounts must be exact and always carry a unit. A Para fraction is never added to lines.
 >
@@ -52,7 +52,7 @@ Verbatim from [user-stories.md](../user-stories.md).
 
 1. The selected reference data and quantity are stored using canonical values independent of interface language.
 2. Rubu = 1/4, Half = 1/2, Salasah = 3/4, and Complete = 1 Para; incompatible units are not summed.
-3. MVP line-based portions follow the standard 15-line Mushaf and Admin-maintained Quran metadata.
+3. MVP line-based portions follow the 16-line Indo-Pak Mushaf and Admin-maintained Quran metadata.
 
 ### Detailed acceptance criteria
 
@@ -86,7 +86,7 @@ Rows from the F06 edge-case table that apply to this story (verbatim):
 
 **Out of scope for the whole feature** (verbatim from F06):
 
-- Mushaf editions other than the standard 15-line edition.
+- Offering users Mushaf editions other than the 16-line Indo-Pak edition (the data model allows more editions later; DEC-B70).
 - Any conversion between lines, Ayat, pages, and Para fractions.
 - Importing metadata from an external provider.
 - Showing Quran text or audio.
@@ -96,7 +96,7 @@ Rows from the F06 edge-case table that apply to this story (verbatim):
 - **Feature F06 depends on:** F02 (from the spec index)
 - **Features referenced by this story's criteria and edge cases:** None
 - **Other stories referenced:** None
-- **Other stories in F06:** [US-025](07-us-025-select-para-and-ayat-range.md), [US-026](07-us-026-use-15-line-mushaf.md), [US-027](07-us-027-select-portion-quantities.md)
+- **Other stories in F06:** [US-025](07-us-025-select-para-and-ayat-range.md), [US-026](07-us-026-use-16-line-indo-pak-mushaf.md), [US-027](07-us-027-select-portion-quantities.md)
 
 ## Related screens and UI
 
@@ -146,6 +146,8 @@ Open questions from F06 that apply to this story, with their resolutions (decisi
 
 - [x] Initial data source and governance for Quran metadata (SRS §13 #3). Can the app ship a reviewed seed? **Resolved:** Yes, a reviewed seed plus audited Admin edits (DEC-B31, FR-SAB-007).
 - [x] How are ranges reviewed when the Admin changes metadata that existing records use? **Resolved:** Records keep their ranges; invalid ones are listed for Admin review (DEC-B32, FR-SAB-007).
+
+- **2026-11-09, DEC-B71:** the target publisher is Taj Company. The exact printing, page count, and page/line layout are unverified, and every candidate dataset is `LICENSE_REVIEW_REQUIRED` (Taj Company's position is a prerequisite for Taj layout data). Planned criteria F06-AC25, F06-AC26, F06-AC27 (reserved, not yet active) and the open decisions OD-QR-1…11 are listed in the [feature spec](07-f06-quran-portions-metadata.md#planned-acceptance-criteria-reserved-ids-not-yet-active).
 
 ## Traceability
 

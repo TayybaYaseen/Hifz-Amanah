@@ -62,7 +62,7 @@ From the F05 feature spec. The original IDs are kept because tests cite them. Cr
 
 - **F05-AC10** — **(US-020) Given** a Sabaq portion for Al-Baqarah Ayat 1–10, **when** the Teacher saves it, **then** it stores the Surah, the starting and ending Ayat, Total Lines, Assigned and Completed Lines in the unit `LINES`, the Para derived from the range, the status, mistakes, quality, and remarks. *(Revised 2026-11-01, DEC-B60, DEC-B63.)*
 - **F05-AC20** — **(US-020) Given** the Sabaq section, **when** the Teacher enters a quantity, **then** only lines are offered: Rubu, Half, Salasah, and Complete do not appear, and the API rejects a Sabaq portion in any unit other than `LINES`. The Sabqi and Manzil sections still offer all four Para presets. *(Added 2026-11-01, DEC-B60.)*
-- **F05-AC21** — **(US-020) Given** a Teacher who chooses Al-Baqarah Ayat 1–10 for Sabaq, **when** the range is set, **then** Total Lines is pre-filled from the 15-line Mushaf layout, the Teacher can confirm or correct it, Assigned Lines defaults to Total Lines, and the Para is shown as derived, not entered. A range that crosses into the next Surah, or whose starting Ayat is after its ending Ayat, is refused with a field error. *(Added 2026-11-01, DEC-B61…B64.)*
+- **F05-AC21** — **(US-020) Given** a Teacher who chooses Al-Baqarah Ayat 1–10 for Sabaq, **when** the range is set, **then** Total Lines is pre-filled from the Mushaf layout (16-line Indo-Pak, DEC-B70), the Teacher can confirm or correct it, Assigned Lines defaults to Total Lines, and the Para is shown as derived, not entered. A range that crosses into the next Surah, or whose starting Ayat is after its ending Ayat, is refused with a field error. *(Added 2026-11-01, DEC-B61…B64.)*
 - **F05-AC22** — **(US-020) Given** a Sabaq portion with 10 assigned lines, **when** the Teacher records 7 completed lines, **then** Remaining Lines shows 3. Completed 11, Assigned Lines above Total Lines, or a fractional line count is refused with a field error. Marked Not Remembered with no completed value, it stores 0 completed lines and 10 remaining. *(Added 2026-11-01, FR-SAB-003, FR-SAB-009.)*
 
 ## Business rules
@@ -105,7 +105,7 @@ From the [feature edge cases](09-f05-daily-hifz-entry.md#edge-cases):
 ## Dependencies
 
 - **Feature F05 depends on:** F03, F06, F07, F12 (from the spec index)
-- **Features referenced by this story's criteria and edge cases:** F06 (Quran metadata, 15-line layout, line counts), F08 (Sabaq carry-forward, F08-AC22), F14 (Sabaq rows in `DailyRecords`, F14-AC23)
+- **Features referenced by this story's criteria and edge cases:** F06 (Quran metadata, 16-line Indo-Pak layout, line counts), F08 (Sabaq carry-forward, F08-AC22), F14 (Sabaq rows in `DailyRecords`, F14-AC23)
 - **Other stories referenced:** [US-021](09-us-021-record-sabqi-portions.md) (the Sabqi default uses the derived Sabaq Para)
 - **Other stories in F05:** [US-018](09-us-018-create-individual-daily-report.md), [US-019](09-us-019-choose-daily-report-mode.md), [US-021](09-us-021-record-sabqi-portions.md), [US-022](09-us-022-record-manzil-portions.md), [US-023](09-us-023-record-repeated-attempts.md)
 

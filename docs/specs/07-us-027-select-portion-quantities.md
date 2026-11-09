@@ -26,7 +26,7 @@ Spec wording (from F06):
 > - Surahs, with Ayat counts
 > - Para boundaries
 >
-> The MVP supports the standard 15-line Mushaf only.
+> The MVP counts lines on the 16-line Indo-Pak Mushaf only (SRS §17 DEC-B70, 2026-11-09).
 >
 > Amounts must be exact and always carry a unit. A Para fraction is never added to lines.
 >
@@ -88,7 +88,7 @@ Rows from the F06 edge-case table that apply to this story (verbatim):
 
 **Out of scope for the whole feature** (verbatim from F06):
 
-- Mushaf editions other than the standard 15-line edition.
+- Offering users Mushaf editions other than the 16-line Indo-Pak edition (the data model allows more editions later; DEC-B70).
 - Any conversion between lines, Ayat, pages, and Para fractions.
 - Importing metadata from an external provider.
 - Showing Quran text or audio.
@@ -98,7 +98,7 @@ Rows from the F06 edge-case table that apply to this story (verbatim):
 - **Feature F06 depends on:** F02 (from the spec index)
 - **Features referenced by this story's criteria and edge cases:** None
 - **Other stories referenced:** None
-- **Other stories in F06:** [US-024](07-us-024-maintain-quran-metadata.md), [US-025](07-us-025-select-para-and-ayat-range.md), [US-026](07-us-026-use-15-line-mushaf.md)
+- **Other stories in F06:** [US-024](07-us-024-maintain-quran-metadata.md), [US-025](07-us-025-select-para-and-ayat-range.md), [US-026](07-us-026-use-16-line-indo-pak-mushaf.md)
 
 ## Related screens and UI
 

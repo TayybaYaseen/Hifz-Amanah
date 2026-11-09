@@ -2,8 +2,11 @@
 
 **Document type:** System architecture (planning baseline)
 **Status:** Planning only — not implemented
-**Version:** 1.2
-**Last updated:** 2026-11-01
+**Version:** 1.5
+**Last updated:** 2026-11-09
+**Changes in 1.5:** Taj Company is the primary target publisher (SRS §17 DEC-B71). The 16-line, 548-page layout is a candidate only, unverified until it is checked against a physical Taj Mushaf. ADR-017 (still Proposed) now has a Taj edition profile, puts divisions in a later phase, and lists the F06 MVP priorities. No table, rule, or migration changed.
+**Changes in 1.4:** Quran reference data design, **proposed and not approved**: [ADR-017](adr/ADR-017-quran-reference-data-model.md) extends the `quran-ref` tables (source catalogue, line types and word positions, optional divisions), adds an offline reference snapshot for devices (§8.1), and defines the import validation and sign-off. Nothing was implemented. Open decisions OD-QR-1…11 are in SRS §17.3.
+**Changes in 1.3:** The target Mushaf is the 16-line Indo-Pak Mushaf (SRS §17 DEC-B70). The `quran-ref` tables (§6.3) now hold an edition catalogue, import provenance, and versioned page/line layouts (migration 0009, F06). No Quran data is shipped until a dataset is approved (DEC-B31, SRS §17.3).
 **Requirements baseline:** `SRS.md` v1.12 (decision register §17), `user-stories.md` v1.4 (73 stories / 17 epics), `design.md` v1.7
 **Changes in 1.2:** Sabaq is measured in lines over one Surah's Ayat range (SRS §17 DEC-B60…B64, ADR-014). Quantity validation now depends on the section (§6.2). Sabaq fields were added to `lesson_portions` and `homework_portions` (§6.3), with a Sabaq carry-forward rule (§9.2), Excel rules (§11), compatibility notes (§6.6), and tests (§17). Sabqi and Manzil are unchanged.
 **Changes in 1.1:** Every "Proposed" item and ADR-001…011 was approved on 2026-10-30 (SRS §17 DEC-B51). The open gates are closed, and §7.3 is the approved matrix. The data model gained new attendance statuses, Leave, two-factor sign-in, the "all classes" flag, extra portions, and publishing. Two items are Deferred: the Android application ID and the AI provider vendor.
@@ -174,7 +177,7 @@ Each module owns its tables, services, and API routes. Other modules call it onl
 | `access` | Policy engine: role + tenant + assignment scope + audience projection | FR-SEC-*, US-008, US-046, US-068 |
 | `roster` | Classes, teacher assignments, students, enrollments (with history), guardian links | FR-CLS-*, FR-STU-*, US-010…012 |
 | `calendar` | Class schedules, holidays/closures/no-class days, attendance (Present/Late/Half day/Leave/Absent), Leave approval | FR-CAL-*, US-013…017 |
-| `quran-ref` | Admin-managed Surah/Ayat/Para metadata, 15-line Mushaf configuration, range validation. Its service exposes `paraFor(surah, ayah)` and `countLines(surah, ayahStart, ayahEnd, edition)` for Sabaq (FR-SAB-001, FR-SAB-008) | FR-SAB-005…008, US-024…026 |
+| `quran-ref` | Admin-managed Surah/Ayat/Para metadata, Mushaf edition configuration (16-line Indo-Pak by default, DEC-B70; target publisher Taj Company, DEC-B71, printing and layout unverified), the versioned seed loader with import provenance, range validation, and the review list. Its service exposes `paraFor(surah, ayah)` and `countLines(surah, ayahStart, ayahEnd, edition)` for Sabaq (FR-SAB-001, FR-SAB-008) | FR-SAB-005…008, US-024…026 |
 | `hifz` | Daily records, lesson portions, attempts, mistakes, quality, performance labels, note visibility. Validates each portion with the section's quantity rule from `packages/domain/quantity` | FR-DAY-*, FR-SAB/SBQ/MNZ-*, FR-QTY-010, FR-ATT-*, US-018…032 |
 | `homework` | Assignments, portions, suggestion engine, review/confirm/revise lifecycle | FR-HW-*, US-033…038 |
 | `reporting` | Weekly/monthly reports, report cache, PDF rendering, report templates | FR-WKR/MNR/RPT/PDF/EXP-*, US-039…043, US-055…057 |
@@ -206,7 +209,7 @@ A quantity is stored as **`(unit, numerator, denominator)`**. Never use floats.
 | Canonical unit | Allowed values | UI presets |
 |---|---|---|
 | `PARA` | rational, 0 < q ≤ 1 per portion (denominator 4 in MVP) | Rubu = 1/4, Half = 1/2, Salasah = 3/4, Complete = 1 |
-| `LINES` | integer ≥ 0 (15-line Mushaf) | — |
+| `LINES` | integer ≥ 0 (counted on the madrasa's Mushaf edition, 16-line Indo-Pak by default) | — |
 | `AYAT` | integer ≥ 0 | — |
 | `PAGES` | integer ≥ 0 | — |
 
@@ -271,10 +274,27 @@ calendar
                      absent_note NULL,                                                   -- FR-DAY-010, internal
                      recorded_by, row_version)
 
-quran-ref (per organization, Admin-maintained)
-  quran_surahs(organization_id, number, name_ar, name_translit, ayah_count)
-  quran_paras(organization_id, number, start_surah, start_ayah, end_surah, end_ayah)
-  mushaf_layout(organization_id, edition='STANDARD_15_LINE', page, line, surah, ayah_start, ayah_end)
+quran-ref (per organization, Admin-maintained; migration 0009_quran_ref.sql, F06)
+  mushaf_editions(code PK, name, lines_per_page, publisher NULL, page_count NULL,     -- global catalogue, not tenant data
+                  verification[UNVERIFIED|VERIFIED])                                  -- a new edition is a row (DEC-B70)
+  organizations.mushaf_edition DEFAULT 'INDOPAK_16_LINE'                              -- the edition this madrasa counts on
+  quran_imports(id, organization_id, kind[METADATA|LAYOUT], edition NULL, dataset_key, dataset_version,
+                source_name, source_url, licence, reviewed_by, approved_on, synthetic, checksum, counts,
+                applied_at, applied_by)                                               -- provenance, FR-SAB-007, DEC-B31
+  quran_surahs(id, organization_id, number, name_ar, name_translit, ayah_count,
+               source[SEED|ADMIN], import_id NULL, row_version)                       -- name_ar byte-exact (BR-15)
+  quran_paras(id, organization_id, number, start_surah, start_ayah, end_surah, end_ayah,
+              source[SEED|ADMIN], import_id NULL, row_version)
+  mushaf_layouts(organization_id, edition, import_id)                                 -- the active layout per edition
+  mushaf_layout_lines(organization_id, import_id, page, line, surah, ayah_start, ayah_end)
+                                                                                      -- verified imports only; never derived
+  -- PROPOSED (ADR-017, not approved, not migrated): quran_sources (global: provider, resource_id, download_url,
+  --   downloaded_on, file_name, file_sha256, licence_name, licence_status, permission_ref, attribution_text);
+  --   quran_import_sources(organization_id, import_id, source_id, role); quran_imports + seed_format_version, approval_status,
+  --   validation_report_sha256; mushaf_layout_lines + line_type[AYAH|SURAH_NAME|BASMALLAH], is_centered,
+  --   word_start, word_end, src_first_word_id, src_last_word_id (ayah_* NULL on non-AYAH lines);
+  --   optional quran_divisions(kind[RUKU|HIZB|RUB_AL_HIZB|MANZIL7], number, start/end surah+ayah) per OD-QR-5.
+  --   Not stored: Quran text, word tables, quran_ayahs. Student records keep canonical (surah, ayah) values only.
 
 hifz
   daily_records(id, organization_id, student_id, class_id NULL, report_date, session_label NULL,
@@ -460,6 +480,9 @@ For `STUDENT` and `PARENT` audiences it removes `notes.visibility = INTERNAL`, i
 ```text
 SQLite (per signed-in account + organization; local migrations in apps/mobile/src/local-db/migrations.ts)
   entity tables (mirror of permitted server data + local edits; added by F04/F05/F08)
+  ref_* tables  PROPOSED (ADR-017 §8.2): read-only Quran reference cache (surahs, paras, active layout lines,
+                divisions) + ref_meta(reference_version, snapshot_sha256); filled from one checksummed snapshot
+                after the first online sign-in; never in the outbox; droppable and re-fetchable
   outbox(op_id, seq, entity, entity_id, op_type, command, payload, base_version,
          depends_on[], state[PENDING|SYNCING|SYNCED|FAILED|ACTION_REQUIRED],
          attempts, last_error, next_attempt_at, failure_code, failure_fields,
@@ -737,6 +760,7 @@ App (online, Teacher/Admin) → POST /analytics/{studentId}/ai-recommendation
 | ADR-014 | Quantity rules chosen by section: Sabaq = `LINES` over a single-Surah range with `total_lines`; Sabqi/Manzil unchanged (extends ADR-005; no conversion) | Approved 2026-11-01 (SRS DEC-B60…B64) |
 | ADR-015 | Sync protocol v1: `op_hash` idempotency, stored terminal results, `RETRY` not stored, one open conflict per row, per-organization advisory lock for a gap-free pull cursor ([docs/adr/ADR-015](adr/ADR-015-sync-protocol-idempotency-conflicts.md); refines ADR-003/004) | Accepted 2026-11-08 (F12 plan §10 answers); amended 2026-11-08 after the re-review (per-row send order, client `seq` in the own-change rule, Retry keeps `seq`, `CONFLICT_GONE`) |
 | ADR-016 | Row-level security pattern: `hifz_tenant` role, `SET LOCAL ROLE` + `app.current_org_id` per transaction, `FORCE` RLS ([docs/adr/ADR-016](adr/ADR-016-postgres-row-level-security-pattern.md); implements ADR-006) | Accepted 2026-11-08 (F12 decision Q9) |
+| ADR-017 | Quran reference data: extend `quran-ref` (source catalogue + licence gate, line-level 16-line layout with line types and word positions, optional divisions), offline snapshot cache on devices, import validation and reviewer sign-off ([docs/adr/ADR-017](adr/ADR-017-quran-reference-data-model.md)) | Accepted 2026-11-09 (SRS DEC-B72); §8 delivery waits on OD-QR-7 |
 
 ### 19.1 Implementation gates (closed 2026-10-30)
 
