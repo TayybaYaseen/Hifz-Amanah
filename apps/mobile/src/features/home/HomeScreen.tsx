@@ -10,7 +10,7 @@ import { isolate } from '../../i18n/direction.ts';
 import { useSync } from '../../sync/SyncContext.tsx';
 import { colors } from '../../theme/tokens.ts';
 
-export function HomeScreen({ me, onMore, onSyncQueue }: { me: MeResponse; onMore: () => void; onSyncQueue: () => void }) {
+export function HomeScreen({ me, onMore, onSyncQueue, onAttendance }: { me: MeResponse; onMore: () => void; onSyncQueue: () => void; onAttendance: () => void }) {
   const { t } = useTranslation();
   const sync = useSync();
   return (
@@ -30,6 +30,8 @@ export function HomeScreen({ me, onMore, onSyncQueue }: { me: MeResponse; onMore
           {t('home.workspace', { role: t(`roles.${me.role}`), madrasa: isolate(me.organization.name) })}
         </AppText>
       </Card>
+      {/* F04: Bulk Entry, for the roles that record attendance (Teacher, Admin, Owner). */}
+      {sync.enabled ? <Button testID="nav.attendance" label={t('home.attendance')} onPress={onAttendance} /> : null}
       <Button testID="nav.more" variant="secondary" label={t('home.more')} onPress={onMore} />
     </AppScreen>
   );

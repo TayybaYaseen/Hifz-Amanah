@@ -19,7 +19,7 @@ export class ApiFailure extends Error {
 export type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
 export interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH';
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT';
   body?: unknown;
   /** Bearer access token, when the call needs a session. */
   token?: string | null;

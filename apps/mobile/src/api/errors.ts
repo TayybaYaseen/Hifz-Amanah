@@ -23,6 +23,14 @@ const KNOWN_FIELD_ISSUES = new Set([
   'BEFORE_CURRENT_START',
   'OVERLAPS_HISTORY',
   'CLASS_INACTIVE',
+  // F04 calendar (packages/contracts/src/calendar.ts CALENDAR_FIELD_ISSUES)
+  'TOO_LONG',
+  'FUTURE',
+  'HOLIDAY',
+  'CLOSURE',
+  'NO_CLASS',
+  'UNSCHEDULED',
+  'NOT_ENROLLED',
 ]);
 
 export function errorKeys(err: unknown): ErrorKeys {
