@@ -52,6 +52,8 @@ Do not guess commands that don't exist. Mobile-only commands (`npm start`, `npm 
 | API dev server (embedded Postgres in `apps/api/.data` unless `DATABASE_URL` is set) | `npm run api:dev` |
 | API for E2E runs (fresh in-memory database, seeded personas, test-control API) on port 3000 | `npm run api:e2e-server` |
 | Apply migrations to `DATABASE_URL` | `npm run db:migrate` |
+| Quran source catalogue (privileged; `list`, `register <file>`, `licence <id> <file>`; see `apps/api/README.md`) | `npm run quran:source -- list` |
+| Quran source converter (offline; `convert <manifest> --out <dir>`, `sign <dir> <review>`; see `apps/api/README.md`) | `npm run quran:convert -- convert <manifest.json> --out <dir>` |
 | E2E traceability (every criterion has an E2E test) | `npm run e2e:trace` |
 | **Spec completion gate** (one story spec) | `npm run e2e:gate -- US-022` |
 | Feature gate (every story in a feature) | `npm run e2e:gate -- F05` |
@@ -132,7 +134,7 @@ Breaking any of these is a bug, even if a test or UI mock seems to want it.
 15. Students and Parents see only **published** reports. A Teacher (assigned classes) or Admin publishes after the period is fully synced (FR-RPT-010). The visible field set is FR-PORT-006.
 
 **Quran metadata**
-16. Quran metadata (Surah/Ayat/Para) is Admin-managed per organization, starting from a reviewed seed (FR-SAB-007). MVP supports the **standard 15-line Mushaf only**. Metadata edits never change existing records; invalid ranges are flagged for review.
+16. Quran metadata (Surah/Ayat/Para) is Admin-managed per organization, starting from a reviewed seed (FR-SAB-007). MVP counts lines on the **16-line Indo-Pak Mushaf** only (DEC-B70, 2026-11-09); the target publisher is **Taj Company** (DEC-B71). The exact Taj printing and page count (548 is only a candidate), the dataset, its licence, the layout source, and the reviewer are still open (SRS §17.3): never generate, guess, or type in Quran metadata or line layouts. Editions are rows in `mushaf_editions`, not constants. Metadata edits never change existing records; invalid ranges are flagged for review.
 
 ## 6. Security and privacy rules
 
@@ -158,6 +160,7 @@ Breaking any of these is a bug, even if a test or UI mock seems to want it.
 
 - Write the entity **and** its outbox operation in **one SQLite transaction** before showing "Saved on device".
 - Show "Synced" **only** after the server acknowledges the operation. Keep these states distinct: pending, syncing, synced, failed, action-required.
+- The Quran reference cache (F06, ADR-018) is separate from F12: its own `ref_*` tables, never referenced by records or the outbox, replaced only whole after its SHA-256 checks out. A revoked version is deleted on the next successful check; never claim an offline device can be wiped. No snapshot carries Quran text, word data, test data, or data from a withdrawn source.
 - Offline-creatable entities use **client-generated UUIDv7** IDs. Every operation has an `op_id`; replaying it must not create duplicates.
 - **Never use last-write-wins** for attempts, attendance, quantities, quality, mistakes, or homework. Preserve both versions as a conflict for explicit resolution.
 - Local schema migrations must keep the outbox intact. Test them with pending operations.

@@ -9,6 +9,7 @@
 //   `row_version INTEGER` (null until the server acknowledged it); see sync/registry.ts.
 import { PROTOCOL_VERSION } from '@hifz/contracts';
 import { attendanceMigration } from '../features/attendance/local.ts';
+import { quranReferenceMigration } from '../features/quran/referenceCache.ts';
 import type { SqlDriver, SqlExecutor } from './driver.ts';
 
 export interface Migration {
@@ -140,6 +141,8 @@ export const WORKSPACE_MIGRATIONS: readonly Migration[] = [
   },
   // F04: attendance_records (the attendance_record entity) and class_roster_cache.
   attendanceMigration(4),
+  // F06: the Quran reference cache (ref_*), disposable and referenced by nothing (ADR-018 §4.1).
+  quranReferenceMigration(5),
 ];
 
 /** The device index: which workspace databases exist on this phone, and the device ID. */

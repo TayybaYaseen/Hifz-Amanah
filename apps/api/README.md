@@ -131,6 +131,140 @@ Sync scope: the roster supplies the sync module's scope provider ([`src/modules/
 and writes `scope_changes` (next pull answers `scopeReset`) for each Teacher whose classes change: assignment added or
 removed, a student moved into or out of their class, "all classes" set or cleared, and Admin ↔ Teacher role changes.
 
+## Quran reference routes (F06)
+
+Surahs, Para boundaries, Mushaf editions, the Total Lines lookup, the review list, and import provenance (US-024…026).
+Shapes in [`packages/contracts/src/quran.ts`](../../packages/contracts/src/quran.ts); pure rules in
+`packages/domain/quran-ref` and `packages/domain/quantity`; code in [`src/modules/quran-ref`](src/modules/quran-ref);
+migrations `0009_quran_ref.sql`, `0010_quran_ref_v2.sql`, `0011_quran_reference_snapshots.sql`. **There is no DELETE
+route and no line-layout editor.** Page/line data comes only from an approved import.
+
+**No Quran data ships yet** (SRS §17.3, DEFERRED: DEC-B31). Every madrasa starts empty until a dataset's accuracy and
+licence are approved. The default edition is `INDOPAK_16_LINE` (16 lines per page, DEC-B70); its publisher is unset.
+
+| Route | Who | Body / query | Result |
+|---|---|---|---|
+| `GET /quran/editions` | Owner, Admin, Teacher | — | `200 { active, editions: [{code, name, linesPerPage, publisher, printingId, pageCount, verification, hasLayout, layoutVerified, layoutWithdrawn}] }`. `layoutVerified` is true only for this madrasa's active layout when it is a production import with an approving signed review, its physical-verification evidence stored, and every source still licensed (DEC-B78). It records human sign-off; it is not an automated proof that the layout matches the printed Mushaf. Signed test data never counts. `layoutWithdrawn`: a source licence was withdrawn, so the layout is no longer used (DEC-B79) |
+| `GET /quran/reference/version` | Owner, Admin, Teacher | `?format=<highest the app reads>&have=<cached version>` | `200 { snapshotFormatVersion, referenceVersion, bytes, builtAt, layout: {importId, verified, withdrawn}, metadataWithdrawn, empty, cached?: {referenceVersion, status: CURRENT|SUPERSEDED|REVOKED|UNKNOWN, revokedAt?, reasonCode?: LICENCE_WITHDRAWN} }`. A version from another madrasa is `UNKNOWN`. `400` bad query; `403` Student/Parent; `426 UPGRADE_REQUIRED` below the oldest served format. Schema: [`quran-reference.ts`](../../packages/contracts/src/quran-reference.ts) (ADR-018) |
+| `GET /quran/reference/snapshot` | Owner, Admin, Teacher | `?format=`; optional `If-None-Match: "<version>"` | `200` the canonical JSON body (sorted keys, no whitespace); `ETag` and `X-Reference-Version` = `sha256(body)`; `Cache-Control: private, no-store`. `304` when `If-None-Match` is current. Holds Surahs, Paras, and the active layout's **Ayat lines only** as compact rows: no Quran text, no word data. Data from a withdrawn source is left out (including Admin-edited rows of a withdrawn import, P1); test data never leaves a test build. `429 RATE_LIMITED` above 30 downloads per user per hour |
+| `GET /quran/surahs` · `GET /quran/paras` | Owner, Admin, Teacher | — | `200 { items, empty }`. `empty` drives "No Quran reference data yet — ask your Admin" |
+| `GET /quran/line-count` | Owner, Admin, Teacher | `?surah=&ayahStart=&ayahEnd=` | `200 { edition, totalLines, source: LAYOUT|UNAVAILABLE, layoutImportId, para, issues }`, computed by `evaluateRange` (packages/domain), the same function the app runs offline on its snapshot (F06-AC24). `totalLines` is null when no usable layout covers the range (none, or withdrawn), so the Teacher enters it (FR-SAB-008). `issues` carries range errors, e.g. `{field: ayahEnd, code: OUT_OF_RANGE, max: 7}` (F06-AC6) |
+| `PUT /quran/surahs/:number` | Owner, Admin | `{ nameAr, nameTranslit, ayahCount, rowVersion }` (`rowVersion` null to create) | `200 { surah, recordsNeedingReview }`; `QURAN_SURAH_CREATED|UPDATED` audit with before/after values. `nameAr` is stored byte-for-byte (F06-AC3). `400 fields.<field>: REQUIRED|TOO_LONG|OUT_OF_RANGE`; `409 CONFLICT_STALE` when `rowVersion` is not current |
+| `PUT /quran/paras/:number` | Owner, Admin | `{ start: {surah, ayah}, end: {surah, ayah}, rowVersion }` | `200 { para, recordsNeedingReview }`; `QURAN_PARA_CREATED|UPDATED` audit. `400 fields.end: END_BEFORE_START` (F06-AC4), `fields.<start|end>: UNKNOWN_SURAH|OUT_OF_RANGE` with `fields.<start|end>.max` |
+| `GET /quran/review` | Owner, Admin | — | `200 { findings, records }`. Findings: `MISSING_SURAHS|MISSING_PARAS` (numbers), `PARA_INVALID`, `PARA_OVERLAP|PARA_GAP`, `LAYOUT_MISSING`. `records` lists stored ranges that no longer fit (none until F05 registers its records); they are never changed (F06-AC19) |
+| `GET /quran/imports` | Owner, Admin | — | `200 { items }`: each dataset applied, with source, licence, reviewer, approval date, `synthetic`, checksum, counts, review decision, report hash, `mushafPrinting`, `signOffRef`, `validationReportStored`, its sources with their current licence status, and whether a layout import is the active one |
+
+**Seed loader** ([`src/modules/quran-ref/seed.ts`](src/modules/quran-ref/seed.ts)). The input is a JSON file
+(`format: hifz-quran-seed`) with `datasetKey`, `datasetVersion`, `provenance` (source, licence, reviewer, approval
+date, `synthetic`), optional `metadata` (Surahs and Paras), and `layouts` (per edition: lines per page and line rows).
+- **Format 1:** Ayat lines only, as `{page, line, surah, ayahStart, ayahEnd}`. It is accepted for synthetic test data only.
+- **Format 2** (ADR-017, migration `0010_quran_ref_v2.sql`) adds:
+  - typed lines `{page, line, lineType: AYAH|SURAH_NAME|BASMALLAH, isCentered, surah, ayahStart, wordStart, ayahEnd,
+    wordEnd, srcFirstWordId, srcLastWordId}`; heading and Bismillah lines carry no Ayat or words;
+  - `sources[]` (`{provider, resourceId, fileSha256, role: METADATA|LAYOUT|WORDS}`);
+  - `validationReport` (`{sha256, decision, signedBy, signedOn, mushafPrinting, signOffRef}`);
+  - optional Surah display fields (`revelationPlace`, `revelationOrder`, `bismillahPre`).
+- A seed with any issue is refused whole.
+- **Format-2 checks:** lines must run in page/line order with no gap or overlap (word positions and source word IDs
+  contiguous), each Surah's heading line comes before its Ayat, and Surahs follow in order.
+- **A production seed (DEC-B72, FR-SAB-011, FR-SAB-013) must:**
+  - be format 2 and complete: 114 Surahs, 30 contiguous Paras, a layout covering every Surah with no missing page, and
+    the edition's page count once one is recorded;
+  - name its reviewer and approval date, and carry an `APPROVED` or `APPROVED_WITH_FINDINGS` report signed by that
+    reviewer on that date (`REJECTED` and `PENDING` are always refused);
+  - cite registered sources only (the licence gate, below), with no synthetic source;
+  - **(0011, DEC-B78, plan P5)** name the exact printing the reviewer compared against (`mushafPrinting`) and where the
+    paper sign-off or its documented digital equivalent is held (`signOffRef`), and come **with the signed validation
+    report itself**. The loader checks that the report's canonical SHA-256 is the signed one, that it validated this
+    seed, and that its reviewer, date, decision, printing, and sign-off reference match the seed
+    (`validationReport.report: REQUIRED|INVALID|HASH_MISMATCH`, `…report.seedSha256: SEED_MISMATCH`,
+    `…report.review.<field>: REPORT_MISMATCH`). The report is stored with the import (`quran_imports.validation_report`).
+    The system records human approval; it never checks the physical Mushaf itself.
+- **Licence gate:** every cited source must be registered and its latest licence record `OPEN_LICENCE_VERIFIED` or
+  `PERMISSION_GRANTED`. A `LAYOUT` source also needs `publisherClearanceRef`: the printed edition's publisher's
+  permission or legal advice (Taj Company for the Taj layout, DEC-B71). Refusal codes: `UNREGISTERED`,
+  `LICENCE_NOT_CLEARED`, `PUBLISHER_CLEARANCE_REQUIRED`, `SYNTHETIC_SOURCE`.
+- Total Lines counts Ayat lines only (FR-SAB-012; DEC-B77).
+- Synthetic seeds are refused unless `NODE_ENV=test`.
+- Each (madrasa, kind, dataset, version, edition) is applied once. Re-applying is a no-op, and the same version with
+  changed content is refused.
+- A newer metadata version updates rows still marked `SEED` but keeps Admin edits.
+- A newer layout is a new import; the old lines stay and `mushaf_layouts` points at the new one.
+- `QURAN_SEED_FILE` (unset until approved) is applied to each new madrasa inside the workspace-creation transaction,
+  with its signed report from `QURAN_SEED_REPORT_FILE` (also unset until approved). A production seed without the report
+  is refused.
+
+**Source catalogue** ([`src/modules/quran-ref/sources.ts`](src/modules/quran-ref/sources.ts)). `quran_sources` (one
+row per downloaded file, with its SHA-256) and `quran_source_licences` (append-only licence history, where the latest
+row is current) are global. The tenant role can only read them. They are written by the maintainer's privileged step on
+the owner connection:
+
+```text
+npm run quran:source -- list
+npm run quran:source -- register <file.json>          # RegisterSourceInput; starts LICENSE_REVIEW_REQUIRED
+npm run quran:source -- licence <sourceId> <file.json> # RecordLicenceInput; a cleared status needs permissionRef
+```
+
+The tool downloads nothing and refuses synthetic sources. Recording a cleared status is the product owner's decision,
+backed by written evidence.
+
+**Licence withdrawal (DEC-B79, ADR-018 §3.4).** Recording a licence that no longer clears a source (for example
+`REFUSED`, or a layout without publisher clearance) marks every recorded snapshot version that carried that source as
+revoked, in every madrasa, in the same transaction, with a `QURAN_REFERENCE_REVOKED` audit event; the command prints
+how many versions it revoked. From then on the data is left out of snapshots, not used for Total Lines, and not shown as
+verified. **Nothing is deleted**: the imported rows stay for audit and legal review (plan P2; deletion and retention
+periods await legal review). Devices delete a revoked copy on their **next successful online check**; a device that
+stays offline cannot be reached before then. `GET /quran/reference/version` also revokes such a version itself if the
+licence row was written some other way. `GET /quran/imports` shows each import's format, review decision, report hash, and its
+sources with their current licence status.
+
+**Converter and validation tool** ([`src/modules/quran-ref/converter`](src/modules/quran-ref/converter); ADR-017 §4–§7).
+This is offline maintainer tooling. It downloads nothing and imports nothing.
+
+```text
+npm run quran:convert -- convert <manifest.json> --out <dir> [--check-sources]
+npm run quran:convert -- sign <dir> <review.json>
+```
+
+- **The manifest** (`hifz-quran-source-manifest` v1) names the dataset, provenance, edition (`code`, `linesPerPage`, and
+  the verified `pageCount` or null), and four source files, each with `provider` and `resourceId`. Paths are relative
+  to the manifest. The files use the provider's published columns:
+  - a Surah list (`id, name_simple, name_arabic, revelation_order, revelation_place, verses_count, bismillah_pre`);
+  - a Juz list (`juz_number, first_verse_key, last_verse_key`);
+  - layout `pages` rows (`page_number, line_number, line_type, is_centered, first_word_id, last_word_id, surah_number`);
+  - word rows (`word_index, word_key, surah, ayah`).
+
+  A SQLite source is exported to JSON rows with the same column names. Word text is read and discarded; no Quran text
+  reaches the seed or the report.
+- **`convert`** hashes each raw file (SHA-256) and runs checks **S1–S10**:
+  - S1: the files parse;
+  - S2: Surah numbering and fields;
+  - S3: Juz keys;
+  - S4: word IDs unique, keys consistent, positions in sequence, Quran order;
+  - S5: cross-source Ayat counts;
+  - S6: layout rows (types, slots, word IDs only on Ayat lines, every ID mapped, one Surah per line, `surah_number`
+    agrees);
+  - S7: every word on exactly one line, with no gap or overlap;
+  - S8: no missing page, the verified page count, short pages listed;
+  - S9: one heading per Surah, with Bismillah lines compared with `bismillah_pre`;
+  - S10: the existing domain rules on the built seed.
+
+  It writes `report.json` and `report.md`, which hold the checks, cross-source comparison, short pages, a 40-page
+  reviewer sample, the review block, and the import gate. It writes `seed.json` **only when no check failed**. A failure
+  exits 1. `--check-sources` reads the source catalogue (`DATABASE_URL`) so the gate shows each file's licence status.
+  Otherwise licences are reported `NOT_CHECKED`, never assumed.
+- **`sign`** attaches the reviewer's signed decision (verification kit Part F: reviewer, qualification, printing,
+  `signOffRef` (where the paper sign-off is held), decision, date, findings) and writes `seed.signed.json`,
+  `report.signed.json`, and `report.signed.md`. The seed's `validationReport.sha256` is the signed report's hash. Load
+  `report.signed.json` with the seed (`QURAN_SEED_REPORT_FILE`). It refuses:
+  - an approval without `signOffRef` (`SIGN_OFF_REF_REQUIRED`); the tool never invents one;
+  - a seed changed since conversion, a failed check, or a second signature;
+  - an approval with a blocking finding, or `APPROVED` with findings listed (use `APPROVED_WITH_FINDINGS`).
+
+  A `REJECTED` decision is recorded, and that seed is then refused at import.
+- **The gate in the report is advisory.** The seed loader enforces the licence and review gates again at import.
+  Synthetic manifests are accepted only with `NODE_ENV=test`.
+
 ## Sync routes (F12)
 
 Protocol v1, decisions in [ADR-015](../../docs/adr/ADR-015-sync-protocol-idempotency-conflicts.md); shapes in
@@ -197,7 +331,16 @@ F03 seeds the fixture classes, Teachers, and students of `e2e/fixtures/personas.
 from 90 days before today) and adds:
 - `GET /__test/roster/ids`: `{ classes: { A1, A2, B1 }, students: { S1, S2, S3, SB1 } }` ids of the seeded fixtures.
 
+F06 adds:
+- `POST /__test/quran/seed { organizationCode, seed? }`: applies a **synthetic** Quran seed (default: the fixture in
+  `packages/domain/quran-ref/synthetic-fixture.ts`, which matches no real Mushaf) to that madrasa. `400 { issues }` if
+  refused. Real Quran data is never loaded through test control.
+
 ## Not yet built
+
+- F06: the production Quran seed and 16-line layout (blocked on the dataset, licence, edition, and reviewer; SRS §17.3);
+  syncing Quran metadata to devices for offline Daily Entry (arrives with F05); the review list's record source (F05/F08);
+  an operator CLI that applies an approved seed to existing madaris.
 
 - The per-IP throttle (F17-AC13) and the F17 audit query API arrive with F17.
 - Row-level security (ADR-006, ADR-016) covers the sync and roster tables. The F01/F02 tables (`users`, `memberships`,

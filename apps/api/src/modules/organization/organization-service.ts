@@ -13,7 +13,8 @@ import {
 } from '@hifz/contracts';
 import type { Clock } from '../../platform/clock.ts';
 import type { Selectable } from 'kysely';
-import type { Db, OrganizationsTable } from '../../platform/db.ts';
+import type { Db, OrganizationsTable, Tx } from '../../platform/db.ts';
+import { enterTenant } from '../../platform/tenant.ts';
 import { AppError, fieldError } from '../../platform/errors.ts';
 import { accessActor, can } from '../access/policy.ts';
 import { recordAudit } from '../audit/audit.ts';
@@ -31,6 +32,13 @@ export interface NewWorkspace {
 
 type Organization = Selectable<OrganizationsTable>;
 
+/**
+ * Runs at the end of the workspace-creation transaction, already switched to the new madrasa's tenant role: the
+ * Quran seed loader uses it so each new madrasa starts from the approved seed (FR-SAB-007). Absent while no seed is
+ * approved (DEFERRED: DEC-B31); a failure rolls the whole workspace back.
+ */
+export type WorkspaceSeeder = (tx: Tx, organizationId: string) => Promise<void>;
+
 const toResponse = (org: Organization, canEdit: boolean): OrganizationSettingsResponse => ({
   id: org.id,
   name: org.name,
@@ -44,10 +52,12 @@ const toResponse = (org: Organization, canEdit: boolean): OrganizationSettingsRe
 export class OrganizationService {
   private readonly db: Db;
   private readonly clock: Clock;
+  private readonly seeder: WorkspaceSeeder | null;
 
-  constructor(db: Db, clock: Clock) {
+  constructor(db: Db, clock: Clock, seeder: WorkspaceSeeder | null = null) {
     this.db = db;
     this.clock = clock;
+    this.seeder = seeder;
   }
 
   private row(organizationId: string): Promise<Organization> {
@@ -179,6 +189,10 @@ export class OrganizationService {
         summary: { loginId, role: 'OWNER', hasEmail: input.owner.email != null },
         at: now,
       });
+      if (this.seeder) {
+        await enterTenant(tx, organizationId);
+        await this.seeder(tx, organizationId);
+      }
     });
     return { organizationId, ownerUserId };
   }

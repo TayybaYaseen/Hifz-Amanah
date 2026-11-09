@@ -258,3 +258,169 @@ The F01 code review (finding M5) then showed that a borrowed session could chang
 - `SRS.md` v1.13: register rows DEC-B65…B69.
 - `apps/api`: values in `src/modules/identity/rules.ts`; embedded Postgres in `src/platform/embedded-postgres.ts`.
 - Also while implementing F01 (no product decision needed): each organization has a short `code` used for the suggested User ID prefix (FR-AUTH-013), and the E2E personas' User IDs use hyphens (`teacher-a1`) because FR-AUTH-013 allows no dots.
+
+### 2026-11-09 — Target Mushaf (DEC-B70) and the Quran seed (DEC-B31)
+
+While F06 was being implemented, the product owner decided the target Mushaf:
+
+| ID | Question | Answer |
+|---|---|---|
+| DEC-B70 | Which Mushaf is the target? | The 16-line Indo-Pak (South Asian) Mushaf, replacing the standard 15-line Mushaf. The database supports more editions later |
+
+**Still open** (SRS §17.3; none may be marked resolved without the product owner):
+- The exact publisher/edition of the 16-line Indo-Pak Mushaf. Printings differ in page and line breaks.
+- The approved Quran metadata dataset (DEC-B31).
+- The dataset's licence approval, covering commercial use and redistribution.
+- The verified 16-line page/line layout source.
+- The reviewer responsible for approving Quran metadata (DEC-B31 action item).
+
+**DEC-B31 status:** the seed mechanism is built (versioned, repeatable, provenance recorded, synthetic data refused outside tests). No dataset has been imported, and no Quran metadata was generated or entered from memory. The candidate comparison is in `docs/handover/F06-quran-dataset-candidates.md`.
+
+**Applied:**
+- `SRS.md` v1.14: FR-SAB-006…008 revised; register row DEC-B70; DEC-B31 and DEC-B64 rows annotated; §17.3 lists the open Quran-data items.
+- `ARCHITECTURE.md` v1.3: `quran-ref` tables (§6.3) and module description.
+- `apps/api/migrations/0009_quran_ref.sql`: edition catalogue (one row, `INDOPAK_16_LINE`, 16 lines per page, publisher and page count unset).
+
+### 2026-11-09 — Quran reference data research and proposed design (no decision taken)
+
+Research of QUL (Tarteel AI), Tanzil, quran-meta, and Quran Foundation, at the product owner's request. Planning only:
+no code, migration, download, or import.
+
+**Findings:**
+- Every QUL resource checked (metadata 63–70, layouts 11, 12 and 313, scripts 55 and 59) states "We don't have
+  copyright information for this resource." The QUL GitHub MIT licence covers the CMS code, not the data. So each
+  resource is `LICENSE_REVIEW_REQUIRED`.
+- QUL layout 11, "Indopak 16 lines layout (Taj company)", reports 548 pages. It is word-based, and QUL does not say which
+  word script its word IDs refer to (blocker B-1).
+- tanzil.net could not be reached, so its licence is unverified. Ruku counts differ between sources (QUL 558,
+  quran-meta 556).
+
+**Proposed (awaiting approval):** ADR-017 (data model, line structure, offline snapshot, validation and sign-off) and
+SRS FR-SAB-011…015. Open decisions OD-QR-1…11 are in SRS §17.3.
+
+**Also applied:** the remaining "15-line" wording was replaced with the 16-line Indo-Pak Mushaf (DEC-B70) in
+`user-stories.md` v1.6 (US-026 retitled; criterion 3 of US-024…026), the F06 story specs (the US-026 spec was renamed
+to `07-us-026-use-16-line-indo-pak-mushaf.md`), `09-us-020`, `design.md` v1.8, and the agent pack's plan files.
+
+### 2026-11-09 — Target publisher: Taj Company (DEC-B71)
+
+The product owner decided: **the target madaris primarily use the Taj Company Quran edition.**
+
+| ID | Question | Answer |
+|---|---|---|
+| DEC-B71 | Which publisher/edition is the target? | Taj Company is the primary target publisher/edition. The candidate profile is Indo-Pak 16-line. QUL resource 11's 548-page layout is a **candidate only**. The F06 MVP covers Surah, Ayat, and Para metadata, the Taj edition profile, the verified Taj layout, and the offline snapshot. Ruku, Hizb, quarter-Hizb, and seven-Manzil divisions are later-phase candidates |
+
+**Not decided (still open, SRS §17.3):** the exact Taj printing and edition identifier; confirmation of the
+16-line/548-page profile against a physical Taj Mushaf; written permission and legal review (Tarteel, and Taj Company as
+a prerequisite for Taj layout data); the approved source per category; the qualified Quran reviewer; whether page/line
+selection is in MVP (OD-QR-8); and attribution requirements (OD-QR-9).
+
+**Licensing unchanged:** every candidate is still `LICENSE_REVIEW_REQUIRED`. The QUL website's MIT licence does not cover
+its datasets; a public download is not a redistribution licence; and Taj Company publishing a printed Mushaf grants no
+digital redistribution right.
+
+**Closed by this decision:** OD-QR-5 (divisions are a later phase). OD-QR-1 is narrowed to the exact printing.
+
+**Applied (documentation only; no code, migration, download, or import):**
+- `SRS.md` v1.16: register row DEC-B71; FR-SAB-006, §1.5, and §17.3; proposed FR-SAB-011 and FR-SAB-013 (Taj permission, physical-Mushaf check, reproducible validation).
+- `ADR-017` (still Proposed): Taj edition profile (§3.6), divisions in a later phase (§3.5), MVP priorities (§2), planned criteria (§13).
+- F06 feature spec: target edition, priorities, offline approach, planned criteria F06-AC20…27 (reserved IDs; they become active once ADR-017 is approved and E2E test stubs exist). Notes in the US-024/025/026 specs.
+- Research doc: Taj verification checklist (§6) and licensing cautions (§4).
+- `ARCHITECTURE.md` v1.5, `AGENTS.md` rule 16, and the agent pack's `OPEN_DECISIONS.md`.
+
+### 2026-11-09 — F06 implementation-readiness review (no decision taken)
+
+The product owner accepted DEC-B71 (Taj Company) as the planning direction and asked for a final readiness review before
+F06 implementation. Planning only: no code, migration, test, download, import, or commit. The reserved criteria
+F06-AC20…27 stay inactive.
+
+**Produced:**
+- `docs/handover/F06-implementation-readiness.md`: the report.
+- `docs/handover/F06-taj-verification-kit.md`: the physical Taj checklist and the reviewer sign-off template.
+- `docs/handover/F06-permission-request-drafts.md`: Tarteel and Taj Company drafts, **not sent**.
+
+**Corrections made to proposed documents:**
+- R1: an unapproved "Sabqi/Manzil range within its Para" rule was removed from ADR-017 and planned AC22. It is now open
+  as **OD-QR-12**.
+- R2: `quran_import_sources` now carries `organization_id`, as RLS requires.
+- R3: sources are registered by a privileged step, not by the tenant seed loader.
+- R4/R8: word positions and `is_centered` stay nullable for v1 imports.
+- R6: removed an Ayat number typed from memory.
+- Schema changes go in a new migration 0010, because the runner tracks file names only.
+
+**Still awaiting the product owner:** approval of ADR-017 and FR-SAB-011…015; OD-QR-1…4, 6…12; and sending the
+permission requests. Implementation waits for that approval.
+
+### 2026-11-09 — ADR-017 approved; F06 backend implementation started (DEC-B72…B74)
+
+The product owner instructed "start implementation" and answered:
+
+| ID | Question | Answer |
+|---|---|---|
+| DEC-B72 (OD-QR-6) | Approve ADR-017 and FR-SAB-011…014? | Yes. Changes go in a new migration 0010 |
+| DEC-B73 (OD-QR-12) | Must a Sabqi/Manzil range lie within its Para? | No (checked against the Surah's Ayat count only) |
+| DEC-B74 (OD-QR-8) | Page/line selection in the MVP? | No; later phase |
+| Scope | What to build first? | The backend: commit the current F06 work, then migration 0010, seed format v2, domain line types, source registration with the licence gate, and the reviewer sign-off check. Synthetic data only |
+
+**Still open:** OD-QR-7 (snapshot vs. APK bundle), OD-QR-10, OD-QR-11 (Total Lines keeps the built behaviour, counting
+Ayat lines only, until decided), and every external blocker: the Taj printing, the licences (Tarteel, Taj Company, and
+Tanzil verification), the reviewer, and the word-ID pairing.
+
+### 2026-11-09 — F06-AC20…AC27 activated; OD-QR-7/10/11 proposal; ADR-018 proposed (no decision taken)
+
+At the product owner's request:
+- **F06-AC20…AC27 were activated** in the story specs with API E2E tests (synthetic data only).
+  - AC20–23 and AC25–27 pass. AC24 stays pending until the snapshot exists (OD-QR-7).
+  - The wording was tightened to what the system enforces. Agreement with the physical Taj Mushaf remains the
+    reviewer's signed evidence, not an automated check.
+- **New, small behaviour (AC20):** `GET /quran/editions` reports `layoutVerified`, true only when the madrasa's active
+  layout is a production import with an approving, signed review. The global edition `verification` is unchanged.
+- **Proposed, awaiting the product owner:**
+  - OD-QR-7 (API snapshot), OD-QR-10 (Para quarters stay quantities), OD-QR-11 (Ayat lines only), in
+    `docs/handover/F06-decision-proposal-OD-QR-7-10-11.md`;
+  - the snapshot and cache design in ADR-018, which needs no F12 change.
+
+  None of these is approved.
+
+### 2026-11-09 — OD-QR-7, OD-QR-10, OD-QR-11 decided; verification boundary; licence withdrawal (DEC-B75…B79)
+
+The product owner reviewed the F06 implementation and test report and decided:
+
+| ID | Question | Answer |
+|---|---|---|
+| DEC-B75 (OD-QR-7) | How do Teacher and Admin devices get Quran reference data for offline use? | **Option A:** a versioned Quran reference snapshot from the HifzAmanah API after the first online sign-in (ADR-018). Not bundled in the APK |
+| DEC-B76 (OD-QR-10) | Can a Teacher pick a Para quarter as a position? | **No.** Para quantities only in the MVP. Rubu, Half, Salasah, and Complete stay amounts `(PARA, n, d)` and are never converted into Ayat or line positions |
+| DEC-B77 (OD-QR-11) | Do Surah-heading and Bismillah lines count in Total Lines? | **No.** Total Lines counts Ayat lines only; Surah-heading and Bismillah lines stay separate line types (as built). **Teacher consultation is still recommended before the final production rollout** |
+| DEC-B78 | What may the acceptance criteria and the app claim about the physical Mushaf? | Automated validation covers the digital structure, metadata, mappings, checksums, source registration, and licence gates. **Comparison with the physical Taj Mushaf is a human review responsibility.** The system preserves the reviewer's identity, the exact printing details, the review date, the decision, and the signed approval evidence. `layoutVerified = true` only after an approved, signed **production** import for that specific madrasa. Signed test data never counts as production verification. Nothing may describe the system as automatically proving that a digital layout matches the physical Mushaf |
+| DEC-B79 (ADR-018) | What happens when a source licence is withdrawn? | Withdrawn or no-longer-authorized data is excluded from every future snapshot. The server marks the affected snapshot versions as **revoked**. A device removes revoked cached data on its **next successful online connection**. No claim is made that an offline device can be wiped remotely. The legal and retention implications of already-downloaded data are documented (ADR-018 §6) |
+| Scope | What next? | Record the decisions, then prepare (not start) the implementation plan for the snapshot API, the Android cache with checksum validation, background initial sync and refresh, revocation handling, the AC24 E2E test, and the offline mobile flow. Synthetic data only; no real Quran data; no licence gate bypassed. F05 daily Hifz entry continues as a parallel milestone. F12 and migrations outside the approved scope are not changed. **The plan is reviewed by the product owner before implementation** |
+
+**Applied:**
+- `SRS.md` v1.18: register rows DEC-B75…B79; FR-SAB-012, FR-SAB-013, FR-SAB-014, FR-QTY-002 annotated; §17.3 closes
+  OD-QR-7, OD-QR-10, OD-QR-11 and lists the new questions raised by the plan.
+- ADR-018 revised (revocation, contract, legal and retention section); status "Accepted in direction, revised text
+  awaiting product-owner review".
+- F06-AC20, AC21, AC23, AC24 wording in the story specs states the verification boundary and the decisions.
+- `DEFERRED: OD-QR-11` markers removed from code and tests (no behaviour change).
+- Implementation plan: `docs/handover/F06-snapshot-implementation-plan.md` (awaiting review; nothing built).
+
+**Still open:** the Taj printing, the licences (Tarteel, Taj Company, Tanzil verification), the reviewer, OD-QR-9
+(attribution), and the plan questions P1–P4 (`F06-snapshot-implementation-plan.md` §8).
+
+### 2026-11-09 — Snapshot plan questions P1–P5 decided; F06 snapshot implemented (DEC-B80…B84)
+
+The product owner authorized the F06 completion ("Final F06 implementation, testing & pull request") and decided the
+plan questions of `docs/handover/F06-snapshot-implementation-plan.md` §8:
+
+| ID | Question | Answer |
+|---|---|---|
+| DEC-B80 (P1) | Are Admin-edited Surah/Para rows derived from a withdrawn source excluded from snapshots? | **Yes.** Admin edits do not make derived data independently redistributable. Only data with a registered, approved source (or entered by an Admin with no imported origin) is included. History and audit are kept |
+| DEC-B81 (P2) | Server deletion after a withdrawal; historical line counts? | Do not delete immediately: retain securely for audit and legal review, stop distributing, never present the withdrawn layout as approved. Historical student records and recorded line counts are never modified. **Permanent deletion and retention periods remain subject to legal review** (no legal conclusion drawn) |
+| DEC-B82 (P3) | A maximum offline snapshot age? | **No** expiry in the MVP. A valid snapshot stays usable offline until the device learns it was revoked or superseded. The app shows the cached version, last successful download, update available, revoked, and unavailable states |
+| DEC-B83 (P4) | Offline flow host while F05 Daily Entry does not exist | Build reusable F06 range-selection components and services; integrate with Daily Entry when it exists; until then an isolated F06 screen hosts them. Do not redesign F05; keep F05-dependent criteria pending |
+| DEC-B84 (P5) | Physical-verification evidence | Migration 0011 preserves the exact printing identifier, reviewer, approval date, decision, signed-report hash, the stored signed report, and the paper sign-off reference (or documented digital equivalent). Production verification is refused without them. No reviewer, printing, or approval is invented |
+
+**Implemented (synthetic data only):** server migration 0011, the snapshot API, licence-withdrawal revocation, the
+evidence gate, workspace migration 5 (not 4: F04 uses 4), the device cache, background sync and refresh, revocation
+handling, the reference screen with reusable range fields, the F06-AC24 API E2E test, and the Maestro flow
+`offline-reference.yaml`. Results and remaining blockers: the implementation plan's §9 and the pull request.

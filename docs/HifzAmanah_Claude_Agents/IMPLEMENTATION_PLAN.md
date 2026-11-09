@@ -87,7 +87,7 @@ Specs `06`–`08`.
 
 Scope:
 - Classes, teacher assignments, student profiles, enrollment history; deactivate instead of delete.
-- Quran metadata: reviewed seed plus audited Admin edits per organization; standard 15-line Mushaf only; exact quantity service `(unit, numerator, denominator)` in `packages/domain/quantity`; Sabaq line rules (ADR-014). F06 sits in this phase because F05 depends on it.
+- Quran metadata: reviewed seed plus audited Admin edits per organization; 16-line Indo-Pak Mushaf only (DEC-B70); exact quantity service `(unit, numerator, denominator)` in `packages/domain/quantity`; Sabaq line rules (ADR-014). F06 sits in this phase because F05 depends on it.
 - Timetable, holidays and closures, attendance-only Bulk Entry with the five statuses, the unmarked-students dialog, Leave request and approval.
 
 Tests: assigned-class authorization, preservation on deactivation, quantity and range validation, timezone/week-start and holiday semantics, attendance counting.

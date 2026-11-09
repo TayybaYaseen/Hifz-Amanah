@@ -31,16 +31,39 @@ const KNOWN_FIELD_ISSUES = new Set([
   'NO_CLASS',
   'UNSCHEDULED',
   'NOT_ENROLLED',
+  // F06 Quran reference (packages/domain/quran-ref). OUT_OF_RANGE with a limit comes with `<field>.max`.
+  'OUT_OF_RANGE',
+  'END_BEFORE_START',
+  'UNKNOWN_SURAH',
+  'UNKNOWN',
 ]);
+
+/** Limit suffixes the API adds beside a field issue (F06-AC6: the error names the maximum Ayat). */
+const LIMIT_SUFFIX = '.max';
 
 export function errorKeys(err: unknown): ErrorKeys {
   if (!(err instanceof ApiFailure)) return { form: 'errors.INTERNAL', fields: {} };
   if (err.code === 'VALIDATION' && Object.keys(err.fields).length) {
     const fields: Record<string, string> = {};
     for (const [field, issue] of Object.entries(err.fields)) {
+      if (field.endsWith(LIMIT_SUFFIX)) continue;
+      if (issue === 'OUT_OF_RANGE' && err.fields[`${field}${LIMIT_SUFFIX}`] !== undefined) {
+        fields[field] = 'fields.OUT_OF_RANGE_MAX';
+        continue;
+      }
       fields[field] = `fields.${KNOWN_FIELD_ISSUES.has(issue) ? issue : 'INVALID'}`;
     }
     return { form: null, fields };
   }
   return { form: `errors.${err.code}`, fields: {} };
+}
+
+/** The limit an API field issue names (`fields.<field>.max`), for messages such as "Use a number up to {max}." */
+export function fieldLimits(err: unknown): Record<string, { max: number }> {
+  if (!(err instanceof ApiFailure)) return {};
+  const out: Record<string, { max: number }> = {};
+  for (const [key, value] of Object.entries(err.fields)) {
+    if (key.endsWith(LIMIT_SUFFIX) && /^\d+$/.test(value)) out[key.slice(0, -LIMIT_SUFFIX.length)] = { max: Number(value) };
+  }
+  return out;
 }

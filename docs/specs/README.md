@@ -79,7 +79,7 @@
 | [SPEC-US-012](06-us-012-enroll-students.md) | US-012 — Enroll students | F03 | 4 |
 | [SPEC-US-024](07-us-024-maintain-quran-metadata.md) | US-024 — Maintain Quran metadata | F06 | 6 |
 | [SPEC-US-025](07-us-025-select-para-and-ayat-range.md) | US-025 — Select Para and Ayat range | F06 | 3 |
-| [SPEC-US-026](07-us-026-use-15-line-mushaf.md) | US-026 — Use 15-line Mushaf | F06 | 3 |
+| [SPEC-US-026](07-us-026-use-16-line-indo-pak-mushaf.md) | US-026 — Use 16-line Indo-Pak Mushaf | F06 | 3 |
 | [SPEC-US-027](07-us-027-select-portion-quantities.md) | US-027 — Select portion quantities | F06 | 7 |
 | [SPEC-US-013](08-us-013-configure-class-timetable.md) | US-013 — Configure class timetable | F04 | 2 |
 | [SPEC-US-014](08-us-014-manage-holidays-and-closures.md) | US-014 — Manage holidays and closures | F04 | 4 |

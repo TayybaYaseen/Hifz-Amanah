@@ -13,6 +13,8 @@ export interface OrganizationsTable {
   timezone: Generated<string>;
   week_start: Generated<'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY'>;
   daily_report_mode: Generated<'SINGLE' | 'MULTI_SESSION'>;
+  /** The Mushaf edition lines are counted on (0009; default INDOPAK_16_LINE, DEC-B70). */
+  mushaf_edition: Generated<string>;
   created_at: Timestamp;
 }
 
@@ -279,7 +281,173 @@ export interface AttendanceRecordsTable {
   row_version: ColumnType<string, number | undefined, number>;
 }
 
+// ---------- F06 · Quran reference (0009_quran_ref.sql) ----------
+
+export interface MushafEditionsTable {
+  code: string;
+  name: string;
+  lines_per_page: number;
+  publisher: string | null;
+  page_count: number | null;
+  verification: Generated<'UNVERIFIED' | 'VERIFIED'>;
+  created_at: Generated<Timestamp>;
+  /** 0010 · Taj edition profile (DEC-B71): set only after the physical-Mushaf check. */
+  printing_id: string | null;
+  printing_notes: string | null;
+  page_count_source: string | null;
+}
+
+export interface QuranImportsTable {
+  id: string;
+  organization_id: string;
+  kind: 'METADATA' | 'LAYOUT';
+  edition: string | null;
+  dataset_key: string;
+  dataset_version: string;
+  source_name: string;
+  source_url: string | null;
+  licence: string;
+  reviewed_by: string | null;
+  approved_on: string | null;
+  synthetic: boolean;
+  checksum: string;
+  counts: ColumnType<Record<string, number>, string, string>;
+  applied_at: Timestamp;
+  applied_by: string | null;
+  /** 0010 · seed format, and the reviewer's approving decision and report hash (required for production). */
+  seed_format_version: Generated<1 | 2>;
+  review_decision: 'APPROVED' | 'APPROVED_WITH_FINDINGS' | null;
+  validation_report_sha256: string | null;
+  /** 0011 · physical-verification evidence (DEC-B78): the printing compared, the paper sign-off, the signed report. */
+  mushaf_printing: ColumnType<string | null, string | null | undefined, string | null>;
+  signoff_ref: ColumnType<string | null, string | null | undefined, string | null>;
+  validation_report: ColumnType<unknown, string | null | undefined, string | null>;
+}
+
+/** 0011 · Every Quran reference snapshot version served to a madrasa (ADR-018 §3.4; DEC-B79). */
+export interface QuranReferenceSnapshotsTable {
+  organization_id: string;
+  reference_version: string;
+  snapshot_format_version: number;
+  bytes: number;
+  layout_import_id: string | null;
+  import_ids: string[];
+  source_ids: string[];
+  built_at: Timestamp;
+  revoked_at: ColumnType<Date | null, Date | null | undefined, Date | null>;
+  revoked_reason: ColumnType<'LICENCE_WITHDRAWN' | null, 'LICENCE_WITHDRAWN' | null | undefined, 'LICENCE_WITHDRAWN' | null>;
+  revoked_by_licence_id: ColumnType<string | null, string | null | undefined, string | null>;
+}
+
+/** 0010 · One downloaded source file (global; written only by the privileged `quran:source` step; FR-SAB-011). */
+export interface QuranSourcesTable {
+  id: string;
+  provider: string;
+  resource_name: string;
+  resource_id: string | null;
+  category: 'SURAHS' | 'AYAHS' | 'JUZ' | 'RUKU' | 'HIZB' | 'RUB_AL_HIZB' | 'MANZIL7' | 'LAYOUT' | 'WORDS';
+  source_url: string;
+  download_url: string | null;
+  downloaded_on: ColumnType<string, string, string>;
+  file_name: string;
+  file_sha256: string;
+  source_version: string | null;
+  notes: string | null;
+  synthetic: boolean;
+  registered_at: Timestamp;
+  registered_by: string;
+}
+
+/** 0010 · Licence status history of a source (append-only; the latest row is current). */
+export interface QuranSourceLicencesTable {
+  id: string;
+  source_id: string;
+  status: 'LICENSE_REVIEW_REQUIRED' | 'OPEN_LICENCE_VERIFIED' | 'PERMISSION_GRANTED' | 'REFUSED';
+  licence_name: string | null;
+  permission_ref: string | null;
+  publisher_clearance_ref: string | null;
+  attribution_text: string | null;
+  recorded_at: Timestamp;
+  recorded_by: string;
+}
+
+/** 0010 · The source files an import was built from (tenant data). */
+export interface QuranImportSourcesTable {
+  organization_id: string;
+  import_id: string;
+  source_id: string;
+  role: 'METADATA' | 'LAYOUT' | 'WORDS';
+}
+
+export interface QuranSurahsTable {
+  id: string;
+  organization_id: string;
+  number: number;
+  /** Stored exactly as supplied: never trimmed, normalized, translated, or transliterated (BR-15, F06-AC3). */
+  name_ar: string;
+  name_translit: string;
+  ayah_count: number;
+  /** 0010 · optional display fields copied from the source; never used in validation. */
+  revelation_place: ColumnType<'MAKKI' | 'MADANI' | null, 'MAKKI' | 'MADANI' | null | undefined, 'MAKKI' | 'MADANI' | null>;
+  revelation_order: ColumnType<number | null, number | null | undefined, number | null>;
+  bismillah_pre: ColumnType<boolean | null, boolean | null | undefined, boolean | null>;
+  source: 'SEED' | 'ADMIN';
+  import_id: string | null;
+  updated_at: Timestamp;
+  updated_by: string | null;
+  row_version: ColumnType<string, number | undefined, number>;
+}
+
+export interface QuranParasTable {
+  id: string;
+  organization_id: string;
+  number: number;
+  start_surah: number;
+  start_ayah: number;
+  end_surah: number;
+  end_ayah: number;
+  source: 'SEED' | 'ADMIN';
+  import_id: string | null;
+  updated_at: Timestamp;
+  updated_by: string | null;
+  row_version: ColumnType<string, number | undefined, number>;
+}
+
+export interface MushafLayoutsTable {
+  organization_id: string;
+  edition: string;
+  import_id: string;
+  activated_at: Timestamp;
+}
+
+export interface MushafLayoutLinesTable {
+  organization_id: string;
+  import_id: string;
+  page: number;
+  line: number;
+  surah: number;
+  /** NULL on Surah-heading and Bismillah lines (0010). */
+  ayah_start: number | null;
+  ayah_end: number | null;
+  line_type: Generated<'AYAH' | 'SURAH_NAME' | 'BASMALLAH'>;
+  is_centered: ColumnType<boolean | null, boolean | null | undefined, boolean | null>;
+  word_start: ColumnType<number | null, number | null | undefined, number | null>;
+  word_end: ColumnType<number | null, number | null | undefined, number | null>;
+  src_first_word_id: ColumnType<number | null, number | null | undefined, number | null>;
+  src_last_word_id: ColumnType<number | null, number | null | undefined, number | null>;
+}
+
 export interface Database {
+  mushaf_editions: MushafEditionsTable;
+  quran_imports: QuranImportsTable;
+  quran_sources: QuranSourcesTable;
+  quran_source_licences: QuranSourceLicencesTable;
+  quran_import_sources: QuranImportSourcesTable;
+  quran_reference_snapshots: QuranReferenceSnapshotsTable;
+  quran_surahs: QuranSurahsTable;
+  quran_paras: QuranParasTable;
+  mushaf_layouts: MushafLayoutsTable;
+  mushaf_layout_lines: MushafLayoutLinesTable;
   class_schedules: ClassSchedulesTable;
   calendar_exceptions: CalendarExceptionsTable;
   attendance_records: AttendanceRecordsTable;
