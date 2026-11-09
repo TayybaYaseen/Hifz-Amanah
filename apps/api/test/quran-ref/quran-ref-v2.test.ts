@@ -112,7 +112,11 @@ describe('F06 · migration 0010 and format-2 seeds (FR-SAB-012)', () => {
     ).rejects.toThrow(/mushaf_layout_lines_ayah_iff_type/);
     await expect(
       sql`UPDATE quran_imports SET synthetic = false, reviewed_by = 'x', approved_on = '2026-11-09' WHERE id = ${layoutImport.id}`.execute(h.db),
-    ).rejects.toThrow(/quran_imports_production_signed/);
+    ).rejects.toThrow(/quran_imports_production_(signed|evidence)/);
+    // 0011 (DEC-B78): a signed production row must also keep the printing, the sign-off reference, and the report.
+    await expect(
+      sql`UPDATE quran_imports SET synthetic = false, reviewed_by = 'x', approved_on = '2026-11-09', seed_format_version = 2, review_decision = 'APPROVED', validation_report_sha256 = ${syntheticSha(9)} WHERE id = ${layoutImport.id}`.execute(h.db),
+    ).rejects.toThrow(/quran_imports_production_evidence/);
   });
 });
 
@@ -217,7 +221,7 @@ describe('F06 · the licence gate on import (FR-SAB-011; DEC-B71)', () => {
     const layout = await testSource(2, 'LAYOUT');
     await grant(meta.id);
     await grant(layout.id, { publisherClearanceRef: 'Synthetic publisher letter (test)' });
-    const report = { sha256: syntheticSha(3), decision: 'APPROVED' as const, signedBy: 'Reviewer (synthetic)', signedOn: '2026-11-09' };
+    const report = { sha256: syntheticSha(3), decision: 'APPROVED' as const, signedBy: 'Reviewer (synthetic)', signedOn: '2026-11-09', mushafPrinting: 'Synthetic printing (test)', signOffRef: 'Synthetic sign-off (test)' };
     // Not a complete Quran, so it is refused for completeness too; the point here is the source check, which runs only
     // once the file is otherwise valid. Use a metadata-only seed to reach it.
     const res = await seed(productionShaped({ sources: [meta.ref], validationReport: report, layouts: [] }));

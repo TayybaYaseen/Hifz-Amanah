@@ -25,6 +25,9 @@ const codes = (issues: { path: string; code: string }[]) => issues.map((i) => `$
 const withLines = (lines: SeedLineV2[], over: Partial<QuranSeedV2> = {}) =>
   syntheticSeedV2({ layouts: [{ edition: 'INDOPAK_16_LINE', linesPerPage: 16, lines }], ...over });
 
+/** The physical-verification evidence a production report carries (DEC-B78); synthetic placeholders. */
+const EVIDENCE = { mushafPrinting: 'Synthetic printing (test)', signOffRef: 'Synthetic sign-off register entry (test)' };
+
 /** A seed shaped like production (complete, sourced, signed) but still made of synthetic values; never applied. */
 const productionShaped = (over: Partial<QuranSeedV2> = {}): QuranSeedV2 =>
   syntheticSeedV2({
@@ -33,7 +36,7 @@ const productionShaped = (over: Partial<QuranSeedV2> = {}): QuranSeedV2 =>
       { provider: 'SYNTH', resourceId: 'meta', fileSha256: syntheticSha(1), role: 'METADATA' },
       { provider: 'SYNTH', resourceId: 'layout', fileSha256: syntheticSha(2), role: 'LAYOUT' },
     ],
-    validationReport: { sha256: syntheticSha(3), decision: 'APPROVED', signedBy: 'Reviewer (synthetic)', signedOn: '2026-11-09' },
+    validationReport: { sha256: syntheticSha(3), decision: 'APPROVED', signedBy: 'Reviewer (synthetic)', signedOn: '2026-11-09', ...EVIDENCE },
     layouts: [{ edition: 'INDOPAK_16_LINE', linesPerPage: 16, lines: syntheticLayoutV2(114) }],
     ...over,
   });
@@ -130,20 +133,31 @@ describe('F06 · production seeds: sources and the signed report (FR-SAB-011, FR
 
   it('a rejected or pending review blocks the import, synthetic or not', () => {
     for (const decision of ['REJECTED', 'PENDING'] as const) {
-      const report = { sha256: syntheticSha(3), decision, signedBy: 'Reviewer (synthetic)', signedOn: '2026-11-09' };
+      const report = { sha256: syntheticSha(3), decision, signedBy: 'Reviewer (synthetic)', signedOn: '2026-11-09', ...EVIDENCE };
       expect(codes(validateSeed(productionShaped({ validationReport: report }), ctx()))).toEqual(['validationReport.decision:NOT_APPROVED']);
       expect(codes(validateSeed(syntheticSeedV2({ validationReport: report }), ctx()))).toEqual(['validationReport.decision:NOT_APPROVED']);
     }
   });
 
   it('the report must be signed by the reviewer named in the provenance, on the approval date', () => {
-    const report = { sha256: syntheticSha(3), decision: 'APPROVED' as const, signedBy: 'Someone else', signedOn: '2026-11-10' };
+    const report = { sha256: syntheticSha(3), decision: 'APPROVED' as const, signedBy: 'Someone else', signedOn: '2026-11-10', ...EVIDENCE };
     expect(codes(validateSeed(productionShaped({ validationReport: report }), ctx()))).toEqual([
       'validationReport.signedBy:REVIEWER_MISMATCH',
       'validationReport.signedOn:DATE_MISMATCH',
     ]);
     const unsigned = { ...report, signedBy: null, signedOn: null };
     expect(codes(validateSeed(productionShaped({ validationReport: unsigned }), ctx()))).toEqual(['validationReport.signedBy:REQUIRED', 'validationReport.signedOn:REQUIRED']);
+  });
+
+  it('a production report must name the physical Mushaf printing and where the paper sign-off is held (DEC-B78)', () => {
+    const base = { sha256: syntheticSha(3), decision: 'APPROVED' as const, signedBy: 'Reviewer (synthetic)', signedOn: '2026-11-09' };
+    expect(codes(validateSeed(productionShaped({ validationReport: base }), ctx()))).toEqual(['validationReport.mushafPrinting:REQUIRED', 'validationReport.signOffRef:REQUIRED']);
+    const blank = { ...base, mushafPrinting: '  ', signOffRef: null };
+    expect(codes(validateSeed(productionShaped({ validationReport: blank }), ctx()))).toEqual(['validationReport.mushafPrinting:REQUIRED', 'validationReport.signOffRef:REQUIRED']);
+    const long = { ...base, mushafPrinting: 'x'.repeat(301), signOffRef: 'ok' };
+    expect(codes(validateSeed(productionShaped({ validationReport: long }), ctx()))).toEqual(['validationReport.mushafPrinting:TOO_LONG']);
+    // Test data does not need them: it can never count as production verification anyway.
+    expect(validateSeed(syntheticSeedV2({ validationReport: base }), ctx())).toEqual([]);
   });
 
   it('bad source references are refused', () => {

@@ -4,3 +4,4 @@ export * from './sync.ts';
 export * from './roster.ts';
 export * from './calendar.ts';
 export * from './quran.ts';
+export * from './quran-reference.ts';

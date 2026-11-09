@@ -54,11 +54,18 @@ export interface MushafEditionView {
   /** A page/line layout has been imported for this madrasa. */
   hasLayout: boolean;
   /**
-   * The madrasa's active layout is a production import with an approving review signed by the named reviewer
-   * (FR-SAB-013, F06-AC20). False for test data and unsigned imports. Not the same as `verification`, which records the
-   * edition's own verification against the physical Mushaf (DEC-B71).
+   * The madrasa's active layout is a production import with an approving review signed by the named reviewer, its
+   * physical-verification evidence on file, and every source still licensed (FR-SAB-013, F06-AC20; DEC-B78, DEC-B79).
+   * False for test data (signed or not), unsigned imports, and withdrawn layouts. It records the human reviewer's
+   * sign-off; it is not an automated proof that the layout matches the printed Mushaf. Not the same as
+   * `verification`, the edition's own catalogue status (DEC-B71).
    */
   layoutVerified: boolean;
+  /**
+   * The active layout's source licence (or the publisher's clearance) was withdrawn: it is no longer distributed or
+   * used for Total Lines, and is not presented as approved (DEC-B79, plan P2). The data is kept for audit.
+   */
+  layoutWithdrawn: boolean;
 }
 
 export interface EditionsResponse {
@@ -162,6 +169,12 @@ export interface QuranImportView {
   /** The reviewer's approving decision from the signed validation report; null for test data without one. */
   reviewDecision: 'APPROVED' | 'APPROVED_WITH_FINDINGS' | null;
   validationReportSha256: string | null;
+  /** The physical Mushaf printing the reviewer compared against (DEC-B78); null for test data without one. */
+  mushafPrinting: string | null;
+  /** Where the paper sign-off (or its documented digital equivalent) is held (DEC-B78). */
+  signOffRef: string | null;
+  /** The signed validation report itself is stored with the import, its hash checked at import (DEC-B78). */
+  validationReportStored: boolean;
   /** The registered source files this import was built from, with each one's current licence status (FR-SAB-011). */
   sources: QuranImportSourceView[];
 }

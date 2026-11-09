@@ -23,8 +23,8 @@ import type {
 } from '@hifz/contracts';
 import {
   countLines,
+  evaluateRange,
   metadataFindings,
-  paraFor,
   validateAyahRange,
   validateParaBoundary,
   validateSurah,
@@ -41,6 +41,7 @@ import { withTenant } from '../../platform/tenant.ts';
 import { recordAudit } from '../audit/audit.ts';
 import type { Actor } from '../identity/auth-service.ts';
 import { requireRole } from '../roster/shared.ts';
+import { blockReason, loadImportStates, productionVerified } from './distribution.ts';
 
 /**
  * Stored records that carry a Quran range, for the review list (F06-AC19). F05 (Sabaq portions) and F08 (homework)
@@ -89,11 +90,14 @@ export class QuranMetadataService {
   private readonly db: Db;
   private readonly clock: Clock;
   private readonly rangeRecords: RangeRecordSource;
+  private readonly allowSynthetic: boolean;
 
-  constructor(db: Db, clock: Clock, rangeRecords: RangeRecordSource = noRangeRecordsYet) {
+  /** `allowSynthetic`: true only when NODE_ENV=test; test data is never used outside tests. */
+  constructor(db: Db, clock: Clock, rangeRecords: RangeRecordSource = noRangeRecordsYet, options: { allowSynthetic: boolean } = { allowSynthetic: false }) {
     this.db = db;
     this.clock = clock;
     this.rangeRecords = rangeRecords;
+    this.allowSynthetic = options.allowSynthetic;
   }
 
   // ---------- Loaders other modules use inside their own tenant transaction ----------
@@ -115,11 +119,21 @@ export class QuranMetadataService {
     return { edition: org.mushaf_edition, importId: layout?.import_id ?? null };
   }
 
-  /** Lines a single-Surah range covers on the madrasa's verified layout, or null (enter by hand; FR-SAB-008). */
-  async countLinesFor(db: Executor, organizationId: string, range: AyahRange): Promise<{ edition: string; totalLines: number | null; importId: string | null }> {
+  /**
+   * The active layout if it may be used and distributed now, else null: a layout whose source licence (or publisher
+   * clearance) was withdrawn is never used for Total Lines and never presented as approved (DEC-B79, plan P2). Its
+   * rows stay in the database for audit.
+   */
+  async usableLayout(db: Executor, organizationId: string): Promise<{ edition: string; importId: string | null; withdrawn: boolean }> {
     const { edition, importId } = await this.activeLayout(db, organizationId);
-    if (!importId) return { edition, totalLines: null, importId: null };
-    // Ayat lines only: Surah-heading and Bismillah lines never count (FR-SAB-012; DEC-B77).
+    if (!importId) return { edition, importId: null, withdrawn: false };
+    const state = (await loadImportStates(db, organizationId)).get(importId);
+    const reason = state ? blockReason(state, this.allowSynthetic) : 'LICENCE_WITHDRAWN';
+    return reason ? { edition, importId: null, withdrawn: reason === 'LICENCE_WITHDRAWN' } : { edition, importId, withdrawn: false };
+  }
+
+  /** The Ayat lines of a layout that may hold a single-Surah range (heading and Bismillah lines never count). */
+  private async layoutRowsFor(db: Executor, organizationId: string, importId: string, range: AyahRange): Promise<LayoutRow[]> {
     const rows = await db
       .selectFrom('mushaf_layout_lines')
       .select(['page', 'line', 'surah', 'line_type', 'ayah_start', 'ayah_end'])
@@ -130,7 +144,15 @@ export class QuranMetadataService {
       .where('ayah_end', '>=', range.ayahStart)
       .where('ayah_start', '<=', range.ayahEnd)
       .execute();
-    const lines: LayoutRow[] = rows.map((r) => ({ page: r.page, line: r.line, surah: r.surah, lineType: r.line_type, ayahStart: r.ayah_start, ayahEnd: r.ayah_end }));
+    return rows.map((r) => ({ page: r.page, line: r.line, surah: r.surah, lineType: r.line_type, ayahStart: r.ayah_start, ayahEnd: r.ayah_end }));
+  }
+
+  /** Lines a single-Surah range covers on the madrasa's usable layout, or null (enter by hand; FR-SAB-008). */
+  async countLinesFor(db: Executor, organizationId: string, range: AyahRange): Promise<{ edition: string; totalLines: number | null; importId: string | null }> {
+    const { edition, importId } = await this.usableLayout(db, organizationId);
+    if (!importId) return { edition, totalLines: null, importId: null };
+    // Ayat lines only: Surah-heading and Bismillah lines never count (FR-SAB-012; DEC-B77).
+    const lines = await this.layoutRowsFor(db, organizationId, importId, range);
     return { edition, totalLines: countLines(range, lines), importId };
   }
 
@@ -144,13 +166,21 @@ export class QuranMetadataService {
       const active = await tx
         .selectFrom('mushaf_layouts as m')
         .innerJoin('quran_imports as i', (j) => j.onRef('i.id', '=', 'm.import_id').onRef('i.organization_id', '=', 'm.organization_id'))
-        .select(['m.edition', 'i.synthetic', 'i.review_decision', 'i.validation_report_sha256'])
+        .select(['m.edition', 'm.import_id'])
         .where('m.organization_id', '=', actor.organizationId)
         .execute();
       const layouts = new Set(active.map((r) => r.edition));
-      // Verified for this madrasa only when its active layout is a production import with an approving, signed review
-      // (FR-SAB-013; F06-AC20). Test data and unsigned imports never count.
-      const verified = new Set(active.filter((r) => !r.synthetic && r.review_decision !== null && r.validation_report_sha256 !== null).map((r) => r.edition));
+      // Verified for this madrasa only when its active layout is a production import with an approving, signed review,
+      // its physical-verification evidence on file, and every source still licensed (FR-SAB-013; F06-AC20; DEC-B78).
+      // Test data (signed or not) and unsigned imports never count. A withdrawn layout is shown as withdrawn (DEC-B79).
+      const states = await loadImportStates(tx, actor.organizationId);
+      const verified = new Set<string>();
+      const withdrawn = new Set<string>();
+      for (const r of active) {
+        const state = states.get(r.import_id);
+        if (productionVerified(state)) verified.add(r.edition);
+        if (state && blockReason(state, this.allowSynthetic) === 'LICENCE_WITHDRAWN') withdrawn.add(r.edition);
+      }
       return {
         active: edition,
         editions: rows.map((r) => ({
@@ -163,6 +193,7 @@ export class QuranMetadataService {
           verification: r.verification,
           hasLayout: layouts.has(r.code),
           layoutVerified: verified.has(r.code),
+          layoutWithdrawn: withdrawn.has(r.code),
         })),
       };
     });
@@ -184,25 +215,19 @@ export class QuranMetadataService {
     });
   }
 
-  /** Total Lines pre-fill, derived Para, and range errors for a Sabaq range (FR-SAB-001, FR-SAB-008, F06-AC6). */
+  /**
+   * Total Lines pre-fill, derived Para, and range errors for a Sabaq range (FR-SAB-001, FR-SAB-008, F06-AC6). The
+   * answer comes from `evaluateRange`, the same function the device runs on its cached snapshot (F06-AC24).
+   */
   async lineCount(actor: Actor, query: LineCountQuery): Promise<LineCountResponse> {
     requireRole(actor, 'quran.view');
     return withTenant(this.db, actor.organizationId, async (tx) => {
       const range = { surah: query.surah, ayahStart: query.ayahStart, ayahEnd: query.ayahEnd };
       const surahs = await this.surahMeta(tx, actor.organizationId);
-      const issues = validateAyahRange(range, surahs);
-      const { edition, importId } = await this.activeLayout(tx, actor.organizationId);
-      if (issues.length) return { edition, totalLines: null, source: 'UNAVAILABLE', layoutImportId: importId, para: null, issues };
-      const counted = await this.countLinesFor(tx, actor.organizationId, range);
-      const para = paraFor({ surah: range.surah, ayah: range.ayahStart }, await this.paraBoundaries(tx, actor.organizationId));
-      return {
-        edition,
-        totalLines: counted.totalLines,
-        source: counted.totalLines === null ? 'UNAVAILABLE' : 'LAYOUT',
-        layoutImportId: counted.importId,
-        para,
-        issues: [],
-      };
+      const { edition, importId } = await this.usableLayout(tx, actor.organizationId);
+      const lines = importId && validateAyahRange(range, surahs).length === 0 ? await this.layoutRowsFor(tx, actor.organizationId, importId, range) : [];
+      const result = evaluateRange(range, { surahs, paras: await this.paraBoundaries(tx, actor.organizationId), lines, layoutImportId: importId });
+      return { edition, ...result };
     });
   }
 
@@ -345,6 +370,9 @@ export class QuranMetadataService {
           seedFormatVersion: r.seed_format_version,
           reviewDecision: r.review_decision,
           validationReportSha256: r.validation_report_sha256,
+          mushafPrinting: r.mushaf_printing,
+          signOffRef: r.signoff_ref,
+          validationReportStored: r.validation_report !== null && r.validation_report !== undefined,
           sources: links
             .filter((l) => l.import_id === r.id)
             .map((l) => ({

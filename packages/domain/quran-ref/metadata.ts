@@ -170,7 +170,17 @@ export interface SeedValidationReport {
   decision: ReviewDecision;
   signedBy: string | null;
   signedOn: string | null;
+  /**
+   * The exact printing/edition identifier of the physical Mushaf the reviewer compared against (verification kit
+   * Part A8). Required for production (DEC-B78). The system records it; it never verifies it.
+   */
+  mushafPrinting?: string | null;
+  /** Where the paper sign-off, or its documented digital equivalent, is held. Required for production (DEC-B78). */
+  signOffRef?: string | null;
 }
+
+/** The longest evidence reference or printing identifier accepted (matches the 0011 columns). */
+export const EVIDENCE_TEXT_MAX = 300;
 
 interface SeedBase {
   format: typeof SEED_FORMAT;
@@ -349,6 +359,12 @@ function validateV2Envelope(seed: QuranSeedV2, push: (path: string, code: string
   else if (report.signedBy !== seed.provenance.reviewedBy) push('validationReport.signedBy', 'REVIEWER_MISMATCH');
   if (typeof report.signedOn !== 'string' || !ISO_DATE.test(report.signedOn)) push('validationReport.signedOn', 'REQUIRED');
   else if (report.signedOn !== seed.provenance.approvedOn) push('validationReport.signedOn', 'DATE_MISMATCH');
+  // The physical-verification evidence a production import must preserve (DEC-B78, plan P5).
+  for (const field of ['mushafPrinting', 'signOffRef'] as const) {
+    const value = report[field];
+    if (blank(value)) push(`validationReport.${field}`, 'REQUIRED');
+    else if ((value as string).length > EVIDENCE_TEXT_MAX) push(`validationReport.${field}`, 'TOO_LONG');
+  }
 }
 
 function checkLine(

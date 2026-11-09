@@ -33,8 +33,10 @@ try {
     console.log(result.created ? `Registered ${result.id} (LICENSE_REVIEW_REQUIRED)` : `Already registered: ${result.id}`);
   } else if (command === 'licence') {
     if (!args[0]) throw new Error('A source id is required');
-    await registry.recordLicence(args[0], await readJson(args[1]));
+    const { revokedVersions } = await registry.recordLicence(args[0], await readJson(args[1]));
     console.log(`Licence record added to ${args[0]}`);
+    // DEC-B79: devices delete a revoked copy on their next successful online check, not before.
+    if (revokedVersions) console.log(`Snapshot versions revoked (removed from devices on their next successful connection): ${revokedVersions}`);
   } else {
     console.error('Usage: npm run quran:source -- list | register <file.json> | licence <sourceId> <file.json>');
     process.exitCode = 1;

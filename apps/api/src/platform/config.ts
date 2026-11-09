@@ -29,6 +29,11 @@ const Env = z.object({
    * until a dataset's accuracy and licence are approved and a reviewer is named; unset means new madrasas start empty.
    */
   QURAN_SEED_FILE: z.string().min(1).optional(),
+  /**
+   * The signed validation report that goes with QURAN_SEED_FILE (DEC-B78, plan P5). A production seed is refused
+   * without it; its SHA-256 must be the one the seed was signed with. Unset until a dataset is approved.
+   */
+  QURAN_SEED_REPORT_FILE: z.string().min(1).optional(),
 });
 
 export interface Config {
@@ -45,6 +50,8 @@ export interface Config {
   syncMinProtocolVersion: number;
   /** The approved Quran seed file, or undefined (no production seed yet; DEFERRED: DEC-B31). */
   quranSeedFile: string | undefined;
+  /** The signed validation report for the seed file (DEC-B78), or undefined. */
+  quranSeedReportFile: string | undefined;
 }
 
 export function loadConfig(source: NodeJS.ProcessEnv = process.env): Config {
@@ -77,5 +84,6 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): Config {
     trustProxyHops: env.TRUST_PROXY_HOPS,
     syncMinProtocolVersion: env.SYNC_MIN_PROTOCOL_VERSION,
     quranSeedFile: env.QURAN_SEED_FILE,
+    quranSeedReportFile: env.QURAN_SEED_REPORT_FILE,
   };
 }

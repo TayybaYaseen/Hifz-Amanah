@@ -43,7 +43,7 @@ describe('F06 · metadata reads and the empty state', () => {
     const editions = (await h.call('GET', '/quran/editions', teacher)).json();
     expect(editions.active).toBe('INDOPAK_16_LINE');
     expect(editions.editions).toEqual([
-      { code: 'INDOPAK_16_LINE', name: '16-line Indo-Pak Mushaf', linesPerPage: 16, publisher: null, printingId: null, pageCount: null, verification: 'UNVERIFIED', hasLayout: false, layoutVerified: false },
+      { code: 'INDOPAK_16_LINE', name: '16-line Indo-Pak Mushaf', linesPerPage: 16, publisher: null, printingId: null, pageCount: null, verification: 'UNVERIFIED', hasLayout: false, layoutVerified: false, layoutWithdrawn: false },
     ]);
   });
 
@@ -158,7 +158,7 @@ describe('F06 · review list (F06-AC19, DEC-B32)', () => {
       { kind: 'SABAQ_PORTION', id: '0190f5c0-0000-7000-8000-00000000000a', range: { surah: 5, ayahStart: 15, ayahEnd: 20 } },
       { kind: 'SABAQ_PORTION', id: '0190f5c0-0000-7000-8000-00000000000b', range: { surah: 5, ayahStart: 1, ayahEnd: 3 } },
     ];
-    const service = new QuranMetadataService(h.db, h.clock, async () => ranges);
+    const service = new QuranMetadataService(h.db, h.clock, async () => ranges, { allowSynthetic: true });
     const actor = { userId: await h.userId('admin.a'), organizationId: await orgId('ALIF'), role: 'ADMIN' as const, allClasses: false };
     const surahs = (await h.call('GET', '/quran/surahs', admin)).json().items;
     const s5 = surahs.find((s: { number: number }) => s.number === 5);

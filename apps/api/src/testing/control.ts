@@ -78,6 +78,7 @@ const NewWorkspaceInput = z.strictObject({
 
 const TABLES = [
   // F06 Quran reference tables (mushaf_editions is a global catalogue and is not reset).
+  'quran_reference_snapshots',
   'mushaf_layout_lines',
   'mushaf_layouts',
   'quran_paras',
@@ -221,12 +222,13 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
       // with this code. The loader refuses anything not marked synthetic-or-approved, and synthetic only in tests.
       // A whole synthetic seed is larger than the default 1 MB body limit (test-only route; real seeds load from a file).
       scope.post('/quran/seed', { bodyLimit: QURAN_BODY_LIMIT }, async (request, reply) => {
-        const input = z.strictObject({ organizationCode: z.string(), seed: z.unknown().optional() }).parse(request.body ?? {});
+        // `report`: the signed validation report that goes with a signed seed (DEC-B78); required for production seeds.
+        const input = z.strictObject({ organizationCode: z.string(), seed: z.unknown().optional(), report: z.unknown().optional() }).parse(request.body ?? {});
         const org = await deps.db.selectFrom('organizations').select('id').where('code', '=', input.organizationCode).executeTakeFirst();
         if (!org) throw new AppError('NOT_FOUND');
         try {
           const seed = input.seed === undefined ? syntheticSeed() : parseSeed(input.seed);
-          return await deps.quranSeeds.apply(org.id, seed);
+          return await deps.quranSeeds.apply(org.id, seed, null, { report: input.report });
         } catch (error) {
           if (error instanceof SeedRejectedError) return reply.status(400).send({ issues: error.issues });
           throw error;
@@ -310,8 +312,8 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
 
       scope.post('/quran/sources/:id/licence', async (request) => {
         const { id } = z.object({ id: z.string().regex(UUID) }).parse(request.params);
-        await quranSources.recordLicence(id, { recordedBy: 'E2E test', ...(request.body as object) });
-        return { ok: true };
+        const { revokedVersions } = await quranSources.recordLicence(id, { recordedBy: 'E2E test', ...(request.body as object) });
+        return { ok: true, revokedVersions };
       });
 
       scope.get('/roster/ids', async () => {

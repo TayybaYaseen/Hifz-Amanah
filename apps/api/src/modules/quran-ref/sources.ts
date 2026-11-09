@@ -14,6 +14,8 @@ import { z } from 'zod';
 import { LICENCE_STATUSES } from '@hifz/domain/quran-ref';
 import type { Clock } from '../../platform/clock.ts';
 import type { Db } from '../../platform/db.ts';
+import { enterTenant } from '../../platform/tenant.ts';
+import { revokeWithdrawnSnapshots } from './reference-service.ts';
 
 const SHA256 = /^[0-9a-f]{64}$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -136,25 +138,43 @@ export class QuranSourceRegistry {
     return { id, created: true };
   }
 
-  /** Appends a licence record; the latest one is the source's current status. */
-  async recordLicence(sourceId: string, raw: unknown): Promise<void> {
+  /**
+   * Appends a licence record; the latest one is the source's current status. In the same transaction, every
+   * recorded snapshot version that carried a source which no longer passes the licence gate is marked revoked in each
+   * madrasa, with an audit event (DEC-B79). Devices delete a revoked copy on their next successful online check; an
+   * offline device cannot be reached before that. Imported rows are kept for audit and legal review (plan P2).
+   * Returns the number of snapshot versions revoked.
+   */
+  async recordLicence(sourceId: string, raw: unknown): Promise<{ revokedVersions: number }> {
     const input = RecordLicenceInput.parse(raw);
     const source = await this.db.selectFrom('quran_sources').select('id').where('id', '=', sourceId).executeTakeFirst();
     if (!source) throw new Error(`Unknown source ${sourceId}`);
-    await this.db
-      .insertInto('quran_source_licences')
-      .values({
-        id: uuidv7(),
-        source_id: sourceId,
-        status: input.status,
-        licence_name: input.licenceName,
-        permission_ref: input.permissionRef,
-        publisher_clearance_ref: input.publisherClearanceRef,
-        attribution_text: input.attributionText,
-        recorded_at: this.clock.now(),
-        recorded_by: input.recordedBy,
-      })
-      .execute();
+    const now = this.clock.now();
+    return this.db.transaction().execute(async (tx) => {
+      await tx
+        .insertInto('quran_source_licences')
+        .values({
+          id: uuidv7(),
+          source_id: sourceId,
+          status: input.status,
+          licence_name: input.licenceName,
+          permission_ref: input.permissionRef,
+          publisher_clearance_ref: input.publisherClearanceRef,
+          attribution_text: input.attributionText,
+          recorded_at: now,
+          recorded_by: input.recordedBy,
+        })
+        .execute();
+      // Snapshot manifests are tenant data under forced row-level security: visit each madrasa as the tenant role
+      // (the role switch is transaction-local). The catalogue write above happened first, as the owner.
+      const organizations = await tx.selectFrom('organizations').select('id').orderBy('id').execute();
+      let revokedVersions = 0;
+      for (const org of organizations) {
+        await enterTenant(tx, org.id);
+        revokedVersions += (await revokeWithdrawnSnapshots(tx, org.id, now)).length;
+      }
+      return { revokedVersions };
+    });
   }
 
   /** Every registered source with its current licence record. */

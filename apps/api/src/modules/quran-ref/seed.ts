@@ -38,6 +38,7 @@ import type { Clock } from '../../platform/clock.ts';
 import type { Db, Tx } from '../../platform/db.ts';
 import { withTenant } from '../../platform/tenant.ts';
 import { recordAudit } from '../audit/audit.ts';
+import { reportSha256, seedSha256, type ValidationReport } from './converter/convert.ts';
 
 /** The file shape. Value checks (ranges, completeness, provenance) are validateSeed's; this checks the structure. */
 const ref = z.strictObject({ surah: z.number(), ayah: z.number() });
@@ -83,7 +84,15 @@ const SeedV2Schema = z.strictObject({
     .array(z.strictObject({ provider: z.string().max(40), resourceId: z.string().max(100).nullable(), fileSha256: z.string().max(64), role: z.enum(SOURCE_ROLES) }))
     .max(50),
   validationReport: z
-    .strictObject({ sha256: z.string().max(64), decision: z.enum(REVIEW_DECISIONS), signedBy: z.string().max(200).nullable(), signedOn: z.string().max(10).nullable() })
+    .strictObject({
+      sha256: z.string().max(64),
+      decision: z.enum(REVIEW_DECISIONS),
+      signedBy: z.string().max(200).nullable(),
+      signedOn: z.string().max(10).nullable(),
+      // 0011 · physical-verification evidence (DEC-B78); required for production by validateSeed.
+      mushafPrinting: z.string().max(400).nullable().optional(),
+      signOffRef: z.string().max(400).nullable().optional(),
+    })
     .nullable(),
   metadata: z.strictObject({ surahs: z.array(surahV2).max(200), paras }).nullable(),
   layouts: z
@@ -150,6 +159,51 @@ const LINE_BATCH = 500;
 /** A registered, cleared source an import was built from. */
 type LinkedSource = { id: string; role: SourceRole };
 
+/**
+ * The signed validation report that goes with a seed (DEC-B78, plan P5). A production seed must come with it: the
+ * loader checks that its canonical SHA-256 is the one the seed was signed with, that it validated this very seed, and
+ * that its review (reviewer, date, decision, printing, sign-off reference) is the one the seed carries. It is then
+ * stored with the import. The loader records human approval; it never judges the Mushaf comparison itself.
+ */
+export interface SeedEvidence {
+  report?: unknown;
+}
+
+/** The seed as the converter produced it, before the sign step added the review (what `report.seedSha256` hashes). */
+const unsignedOf = (seed: QuranSeedV2): QuranSeedV2 => ({
+  ...seed,
+  provenance: { ...seed.provenance, reviewedBy: null, approvedOn: null },
+  validationReport: null,
+});
+
+/** Issues with the evidence, or none. Synthetic seeds may come without a report; one that is given is still checked. */
+export function evidenceIssues(seed: QuranSeed, evidence: SeedEvidence): SeedIssue[] {
+  if (seed.formatVersion !== 2) return [];
+  const production = !seed.provenance.synthetic;
+  const signed = seed.validationReport;
+  if (evidence.report === undefined || evidence.report === null) return production ? [{ path: 'validationReport.report', code: 'REQUIRED' }] : [];
+  if (!signed) return [{ path: 'validationReport', code: 'REQUIRED' }];
+  const report = evidence.report as ValidationReport;
+  if (typeof report !== 'object' || report === null || typeof report.review !== 'object' || report.review === null) {
+    return [{ path: 'validationReport.report', code: 'INVALID' }];
+  }
+  if (reportSha256(report) !== signed.sha256) return [{ path: 'validationReport.report', code: 'HASH_MISMATCH' }];
+  const issues: SeedIssue[] = [];
+  if (report.seedSha256 !== seedSha256(unsignedOf(seed))) issues.push({ path: 'validationReport.report.seedSha256', code: 'SEED_MISMATCH' });
+  const r = report.review;
+  const pairs: [string, unknown, unknown][] = [
+    ['reviewer', r.reviewer, signed.signedBy],
+    ['signedOn', r.signedOn, signed.signedOn],
+    ['decision', r.decision, signed.decision],
+    ['mushafPrinting', r.mushafPrinting, signed.mushafPrinting ?? null],
+    ['signOffRef', r.signOffRef ?? null, signed.signOffRef ?? null],
+  ];
+  for (const [field, inReport, inSeed] of pairs) {
+    if (inReport !== inSeed) issues.push({ path: `validationReport.report.review.${field}`, code: 'REPORT_MISMATCH' });
+  }
+  return issues;
+}
+
 export class QuranSeedLoader {
   private readonly db: Db;
   private readonly clock: Clock;
@@ -162,12 +216,12 @@ export class QuranSeedLoader {
   }
 
   /** Applies a seed to one madrasa in its own tenant transaction. */
-  apply(organizationId: string, seed: QuranSeed, actorUserId: string | null = null): Promise<ApplyResult> {
-    return withTenant(this.db, organizationId, (tx) => this.applyInTx(tx, organizationId, seed, actorUserId));
+  apply(organizationId: string, seed: QuranSeed, actorUserId: string | null = null, evidence: SeedEvidence = {}): Promise<ApplyResult> {
+    return withTenant(this.db, organizationId, (tx) => this.applyInTx(tx, organizationId, seed, actorUserId, evidence));
   }
 
   /** Applies a seed inside an open tenant transaction (workspace creation uses this). */
-  async applyInTx(tx: Tx, organizationId: string, seed: QuranSeed, actorUserId: string | null): Promise<ApplyResult> {
+  async applyInTx(tx: Tx, organizationId: string, seed: QuranSeed, actorUserId: string | null, evidence: SeedEvidence = {}): Promise<ApplyResult> {
     const now = this.clock.now();
     const editions = (await tx.selectFrom('mushaf_editions').select(['code', 'lines_per_page', 'page_count']).execute()).map((e) => ({
       code: e.code,
@@ -181,13 +235,17 @@ export class QuranSeedLoader {
     if (issues.length) throw new SeedRejectedError(issues);
     // The licence gate (FR-SAB-011): every cited source registered and cleared, before anything is written.
     const sources = seed.formatVersion === 2 ? await this.resolveSources(tx, seed) : [];
+    // The physical-verification evidence (DEC-B78): the signed report itself, matching the seed.
+    const evidenceProblems = evidenceIssues(seed, evidence);
+    if (evidenceProblems.length) throw new SeedRejectedError(evidenceProblems);
+    const storedReport = seed.formatVersion === 2 && evidence.report != null ? JSON.stringify(evidence.report) : null;
     const checksum = seedChecksum(seed);
 
     const result: ApplyResult = { metadata: 'NONE', layouts: [], keptAdminEdits: { surahs: [], paras: [] } };
-    if (seed.metadata) result.metadata = await this.applyMetadata(tx, organizationId, seed, sources, checksum, actorUserId, now, result);
+    if (seed.metadata) result.metadata = await this.applyMetadata(tx, organizationId, seed, sources, checksum, actorUserId, now, result, storedReport);
     for (let i = 0; i < seed.layouts.length; i++) {
       const edition = seed.layouts[i]!.edition;
-      result.layouts.push({ edition, status: await this.applyLayout(tx, organizationId, seed, i, sources, checksum, actorUserId, now) });
+      result.layouts.push({ edition, status: await this.applyLayout(tx, organizationId, seed, i, sources, checksum, actorUserId, now, storedReport) });
     }
     return result;
   }
@@ -244,6 +302,7 @@ export class QuranSeedLoader {
     sources: LinkedSource[],
     actorUserId: string | null,
     now: Date,
+    storedReport: string | null,
   ): Promise<string> {
     const id = uuidv7();
     const p = seed.provenance;
@@ -270,6 +329,9 @@ export class QuranSeedLoader {
         seed_format_version: seed.formatVersion,
         review_decision: report && APPROVING_DECISIONS.includes(report.decision) ? (report.decision as 'APPROVED' | 'APPROVED_WITH_FINDINGS') : null,
         validation_report_sha256: report?.sha256 ?? null,
+        mushaf_printing: report?.mushafPrinting ?? null,
+        signoff_ref: report?.signOffRef ?? null,
+        validation_report: storedReport,
       })
       .execute();
     // The source files this import was built from: metadata sources for metadata; layout and word sources for a layout.
@@ -295,11 +357,12 @@ export class QuranSeedLoader {
     actorUserId: string | null,
     now: Date,
     result: ApplyResult,
+    storedReport: string | null,
   ): Promise<ApplyStatus> {
     const meta = seed.metadata!;
     const again = this.sameVersion(await this.findImport(tx, organizationId, 'METADATA', null, seed), checksum);
     if (again) return again;
-    const importId = await this.insertImport(tx, organizationId, seed, 'METADATA', null, checksum, { surahs: meta.surahs.length, paras: meta.paras.length }, sources, actorUserId, now);
+    const importId = await this.insertImport(tx, organizationId, seed, 'METADATA', null, checksum, { surahs: meta.surahs.length, paras: meta.paras.length }, sources, actorUserId, now, storedReport);
     // Format-2 display fields, copied from the source as given; format 1 leaves them untouched.
     const display = (s: SeedSurah) =>
       seed.formatVersion === 2 ? { revelation_place: s.revelationPlace ?? null, revelation_order: s.revelationOrder ?? null, bismillah_pre: s.bismillahPre ?? null } : {};
@@ -382,6 +445,7 @@ export class QuranSeedLoader {
     checksum: string,
     actorUserId: string | null,
     now: Date,
+    storedReport: string | null,
   ): Promise<ApplyStatus> {
     const layout = seed.layouts[layoutIndex]!;
     const again = this.sameVersion(await this.findImport(tx, organizationId, 'LAYOUT', layout.edition, seed), checksum);
@@ -390,7 +454,7 @@ export class QuranSeedLoader {
     const pages = new Set(lines.map((l) => l.page)).size;
     const byType = (t: string) => lines.filter((l) => l.lineType === t).length;
     const counts = { lines: lines.length, pages, ayahLines: byType('AYAH'), surahNameLines: byType('SURAH_NAME'), basmallahLines: byType('BASMALLAH') };
-    const importId = await this.insertImport(tx, organizationId, seed, 'LAYOUT', layout.edition, checksum, counts, sources, actorUserId, now);
+    const importId = await this.insertImport(tx, organizationId, seed, 'LAYOUT', layout.edition, checksum, counts, sources, actorUserId, now, storedReport);
     for (let i = 0; i < lines.length; i += LINE_BATCH) {
       const batch = lines.slice(i, i + LINE_BATCH).map((l) => ({
         organization_id: organizationId,

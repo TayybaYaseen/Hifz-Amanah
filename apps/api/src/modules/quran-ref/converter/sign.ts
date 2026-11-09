@@ -16,6 +16,11 @@ export const ReviewInput = z.strictObject({
   qualification: z.string().trim().min(1).max(200).nullable(),
   /** The printing identifier from kit Part A8. */
   mushafPrinting: z.string().trim().min(1).max(300),
+  /**
+   * Where the paper sign-off (kit Part F), or its documented digital equivalent, is held: a document-store key or a
+   * register reference the product owner keeps (DEC-B78). Required for an approval; this tool never invents one.
+   */
+  signOffRef: z.string().trim().min(1).max(300).nullable().default(null),
   decision: z.enum(['APPROVED', 'APPROVED_WITH_FINDINGS', 'REJECTED']),
   signedOn: z.string().regex(ISO_DATE),
   findings: z.array(z.strictObject({ part: z.string().min(1).max(40), description: z.string().min(1).max(2000), blocking: z.boolean() })).max(500),
@@ -48,12 +53,14 @@ export function signDataset(unsignedSeed: QuranSeedV2, report: ValidationReport,
   if (approving && report.checks.some((c) => c.result === 'FAIL')) reasons.push('CHECKS_FAILED: an approval cannot be given while a check failed');
   if (approving && review.findings.some((f) => f.blocking)) reasons.push('BLOCKING_FINDING: an approval cannot list a blocking finding');
   if (review.decision === 'APPROVED' && review.findings.length > 0) reasons.push('FINDINGS_LISTED: use APPROVED_WITH_FINDINGS when findings are listed');
+  if (approving && review.signOffRef === null) reasons.push('SIGN_OFF_REF_REQUIRED: an approval must say where the paper sign-off is held');
   if (reasons.length) throw new SignRefusedError(reasons);
 
   const signedReview: ReportReview = {
     reviewer: review.reviewer,
     qualification: review.qualification,
     mushafPrinting: review.mushafPrinting,
+    signOffRef: review.signOffRef,
     decision: review.decision,
     signedOn: review.signedOn,
     findings: review.findings,
@@ -64,7 +71,14 @@ export function signDataset(unsignedSeed: QuranSeedV2, report: ValidationReport,
   const seed: QuranSeedV2 = {
     ...unsignedSeed,
     provenance: { ...unsignedSeed.provenance, reviewedBy: review.reviewer, approvedOn: review.signedOn },
-    validationReport: { sha256: sha, decision: review.decision, signedBy: review.reviewer, signedOn: review.signedOn },
+    validationReport: {
+      sha256: sha,
+      decision: review.decision,
+      signedBy: review.reviewer,
+      signedOn: review.signedOn,
+      mushafPrinting: review.mushafPrinting,
+      signOffRef: review.signOffRef,
+    },
   };
 
   // The signed seed must satisfy the existing rules, except that a REJECTED decision is recorded and later refused.
@@ -72,7 +86,7 @@ export function signDataset(unsignedSeed: QuranSeedV2, report: ValidationReport,
     editions: [{ code: report.edition.code, linesPerPage: report.edition.linesPerPage, pageCount: report.edition.pageCount }],
     allowSynthetic: true,
     existingSurahs: [],
-  }).filter((i) => !(review.decision === 'REJECTED' && i.path === 'validationReport.decision'));
+  }).filter((i) => !(review.decision === 'REJECTED' && (i.path === 'validationReport.decision' || i.path === 'validationReport.signOffRef')));
   if (issues.length) throw new SignRefusedError(issues.map((i) => `${i.path}: ${i.code}`));
   return { seed, report: signedReport, reportSha256: sha };
 }
@@ -105,7 +119,7 @@ export function renderReportMarkdown(report: ValidationReport, sha: string | nul
   for (const m of mismatches) out.push(`- ${m.item}: ${m.sourceA} vs ${m.sourceB}`);
   out.push('', '## Reviewer sample (verification kit Part C)', '', report.reviewerSample.join(', ') || 'none');
   const r = report.review;
-  out.push('', '## Review', '', `- Decision: ${r.decision}`, `- Reviewer: ${r.reviewer ?? '—'} (${r.qualification ?? '—'})`, `- Printing: ${r.mushafPrinting ?? '—'}`, `- Signed on: ${r.signedOn ?? '—'}`);
+  out.push('', '## Review', '', `- Decision: ${r.decision}`, `- Reviewer: ${r.reviewer ?? '—'} (${r.qualification ?? '—'})`, `- Printing: ${r.mushafPrinting ?? '—'}`, `- Paper sign-off held at: ${r.signOffRef ?? '—'}`, `- Signed on: ${r.signedOn ?? '—'}`);
   for (const f of r.findings) out.push(`- Finding (${f.part}, ${f.blocking ? 'blocking' : 'not blocking'}): ${f.description}`);
   return `${out.join('\n')}\n`;
 }

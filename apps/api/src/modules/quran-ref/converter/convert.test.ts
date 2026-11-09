@@ -21,6 +21,7 @@ const review = (over: Record<string, unknown> = {}) => ({
   reviewer: 'Reviewer (synthetic)',
   qualification: 'Test only',
   mushafPrinting: 'Synthetic printing (test)',
+  signOffRef: 'Synthetic sign-off register entry (test)',
   decision: 'APPROVED',
   signedOn: '2026-11-09',
   findings: [],
@@ -240,7 +241,16 @@ describe('F06 · signing (verification kit Part F; FR-SAB-013)', () => {
   it("an approval is attached to the seed: reviewer, date, decision, and the signed report's hash", () => {
     const signed = signDataset(converted.seed!, converted.report, review());
     expect(signed.seed.provenance).toMatchObject({ reviewedBy: 'Reviewer (synthetic)', approvedOn: '2026-11-09' });
-    expect(signed.seed.validationReport).toEqual({ sha256: signed.reportSha256, decision: 'APPROVED', signedBy: 'Reviewer (synthetic)', signedOn: '2026-11-09' });
+    expect(signed.seed.validationReport).toEqual({
+      sha256: signed.reportSha256,
+      decision: 'APPROVED',
+      signedBy: 'Reviewer (synthetic)',
+      signedOn: '2026-11-09',
+      mushafPrinting: 'Synthetic printing (test)',
+      signOffRef: 'Synthetic sign-off register entry (test)',
+    });
+    // The evidence is inside the signed report too, so its hash covers it (DEC-B78).
+    expect(signed.report.review).toMatchObject({ mushafPrinting: 'Synthetic printing (test)', signOffRef: 'Synthetic sign-off register entry (test)' });
     expect(reportSha256(signed.report)).toBe(signed.reportSha256);
     expect(signed.report.gate.blockers).not.toContain('REVIEW_PENDING');
     expect(signed.report.gate.blockers).toContain('SYNTHETIC_DATA');
@@ -270,6 +280,9 @@ describe('F06 · signing (verification kit Part F; FR-SAB-013)', () => {
     const signed = signDataset(converted.seed!, converted.report, review());
     expect(() => signDataset(signed.seed, signed.report, review())).toThrow(/REPORT_ALREADY_SIGNED/);
     expect(() => signDataset(converted.seed!, converted.report, review({ mushafPrinting: '' }))).toThrow();
+    // An approval must say where the paper sign-off is held (DEC-B78); the tool never invents a reference.
+    expect(() => signDataset(converted.seed!, converted.report, review({ signOffRef: null }))).toThrow(/SIGN_OFF_REF_REQUIRED/);
+    expect(() => signDataset(converted.seed!, converted.report, review({ signOffRef: undefined }))).toThrow(/SIGN_OFF_REF_REQUIRED/);
     expect(() => signDataset(converted.seed!, converted.report, review({ signedOn: 'today' }))).toThrow();
     expect(() => signDataset(converted.seed!, converted.report, review({ decision: 'PENDING' }))).toThrow();
   });

@@ -318,6 +318,25 @@ export interface QuranImportsTable {
   seed_format_version: Generated<1 | 2>;
   review_decision: 'APPROVED' | 'APPROVED_WITH_FINDINGS' | null;
   validation_report_sha256: string | null;
+  /** 0011 · physical-verification evidence (DEC-B78): the printing compared, the paper sign-off, the signed report. */
+  mushaf_printing: ColumnType<string | null, string | null | undefined, string | null>;
+  signoff_ref: ColumnType<string | null, string | null | undefined, string | null>;
+  validation_report: ColumnType<unknown, string | null | undefined, string | null>;
+}
+
+/** 0011 · Every Quran reference snapshot version served to a madrasa (ADR-018 §3.4; DEC-B79). */
+export interface QuranReferenceSnapshotsTable {
+  organization_id: string;
+  reference_version: string;
+  snapshot_format_version: number;
+  bytes: number;
+  layout_import_id: string | null;
+  import_ids: string[];
+  source_ids: string[];
+  built_at: Timestamp;
+  revoked_at: ColumnType<Date | null, Date | null | undefined, Date | null>;
+  revoked_reason: ColumnType<'LICENCE_WITHDRAWN' | null, 'LICENCE_WITHDRAWN' | null | undefined, 'LICENCE_WITHDRAWN' | null>;
+  revoked_by_licence_id: ColumnType<string | null, string | null | undefined, string | null>;
 }
 
 /** 0010 · One downloaded source file (global; written only by the privileged `quran:source` step; FR-SAB-011). */
@@ -424,6 +443,7 @@ export interface Database {
   quran_sources: QuranSourcesTable;
   quran_source_licences: QuranSourceLicencesTable;
   quran_import_sources: QuranImportSourcesTable;
+  quran_reference_snapshots: QuranReferenceSnapshotsTable;
   quran_surahs: QuranSurahsTable;
   quran_paras: QuranParasTable;
   mushaf_layouts: MushafLayoutsTable;

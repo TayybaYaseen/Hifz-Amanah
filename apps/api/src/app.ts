@@ -1,5 +1,6 @@
 // Builds the API. Dependencies are passed in so tests and the E2E server can supply the clock,
 // mailer, and database.
+import { readFile } from 'node:fs/promises';
 import Fastify, { type FastifyInstance } from 'fastify';
 import type { Clock } from './platform/clock.ts';
 import type { Config } from './platform/config.ts';
@@ -18,6 +19,7 @@ import { AttendanceService } from './modules/calendar/attendance-service.ts';
 import { ExceptionService } from './modules/calendar/exception-service.ts';
 import { registerCalendarRoutes } from './modules/calendar/routes.ts';
 import { QuranMetadataService } from './modules/quran-ref/metadata-service.ts';
+import { QuranReferenceService } from './modules/quran-ref/reference-service.ts';
 import { registerQuranRoutes } from './modules/quran-ref/routes.ts';
 import { QuranSeedLoader, readSeedFile } from './modules/quran-ref/seed.ts';
 import { ScheduleService } from './modules/calendar/schedule-service.ts';
@@ -86,10 +88,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   // (DEFERRED: DEC-B31); with no file, new madrasas start with empty Quran metadata.
   const quranSeeds = new QuranSeedLoader(deps.db, deps.clock, { allowSynthetic: deps.config.env === 'test' });
   const approvedSeed = deps.config.quranSeedFile ? await readSeedFile(deps.config.quranSeedFile) : null;
+  // The signed report travels with the seed and is checked and stored at import (DEC-B78); a production seed without
+  // it is refused by the loader.
+  const seedReport = deps.config.quranSeedReportFile ? (JSON.parse(await readFile(deps.config.quranSeedReportFile, 'utf8')) as unknown) : undefined;
   const organization = new OrganizationService(
     deps.db,
     deps.clock,
-    approvedSeed ? async (tx, organizationId) => void (await quranSeeds.applyInTx(tx, organizationId, approvedSeed, null)) : null,
+    approvedSeed ? async (tx, organizationId) => void (await quranSeeds.applyInTx(tx, organizationId, approvedSeed, null, { report: seedReport })) : null,
   );
   registerOrganizationRoutes(app, {
     authenticate: (request) => auth.authenticate(bearer(request)),
@@ -114,7 +119,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   registerQuranRoutes(app, {
     authenticate: (request) => auth.authenticate(bearer(request)),
-    quran: new QuranMetadataService(deps.db, deps.clock),
+    quran: new QuranMetadataService(deps.db, deps.clock, undefined, { allowSynthetic: deps.config.env === 'test' }),
+    reference: new QuranReferenceService(deps.db, deps.clock, { allowSynthetic: deps.config.env === 'test' }),
   });
 
   if (deps.testSync && deps.config.env !== 'test') throw new Error('Test sync handlers are allowed only when NODE_ENV=test');

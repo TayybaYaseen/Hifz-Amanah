@@ -135,6 +135,8 @@ export interface ReportReview {
   reviewer: string | null;
   qualification: string | null;
   mushafPrinting: string | null;
+  /** Where the paper sign-off, or its documented digital equivalent, is held (DEC-B78). */
+  signOffRef: string | null;
   decision: 'PENDING' | 'APPROVED' | 'APPROVED_WITH_FINDINGS' | 'REJECTED';
   signedOn: string | null;
   findings: ReviewFinding[];
@@ -517,7 +519,7 @@ function finish(
     crossSource,
     pagesWithFewerLines,
     reviewerSample: reviewerSamplePages,
-    review: review ?? { reviewer: null, qualification: null, mushafPrinting: null, decision: 'PENDING', signedOn: null, findings: [] },
+    review: review ?? { reviewer: null, qualification: null, mushafPrinting: null, signOffRef: null, decision: 'PENDING', signedOn: null, findings: [] },
     gate: { importReady: false, blockers: [] },
   };
   report.gate = gateOf(report);
