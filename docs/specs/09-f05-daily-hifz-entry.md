@@ -1,6 +1,6 @@
 # F05 · Daily Hifz entry
 
-**Status:** draft
+**Status:** Approved
 **Brief:** [00-product-brief.md](../00-product-brief.md) · **Flow:** Daily Entry — individual student ([design.md §4.7](../design.md)); record detail and attempt history
 **Requirements:** FR-DAY-001…009, FR-SAB-001…004, FR-SAB-008…010, FR-QTY-010, FR-SBQ-001…004, FR-MNZ-001…004, FR-ATT-001…007, FR-QTY-007, FR-DAY-011
 **Stories:** US-018 – US-023 · **Depends on:** F03, F06, F07, F12
