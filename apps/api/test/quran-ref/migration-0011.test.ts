@@ -48,7 +48,8 @@ describe('F06 · migration 0011 upgrade path', () => {
     await importRow(SYNTHETIC_IMPORT, true, '1').execute(db);
     await importRow(PRODUCTION_IMPORT, false, '2').execute(db);
 
-    expect(await migrate(db)).toEqual(['0011_quran_reference_snapshots.sql']);
+    // 0011 is applied first; later migrations (0012 hifz, …) follow it.
+    expect((await migrate(db))[0]).toBe('0011_quran_reference_snapshots.sql');
     // Existing rows are kept unchanged (the evidence constraint is NOT VALID for them).
     const rows = await sql<{ id: string; mushaf_printing: string | null; validation_report: unknown }>`SELECT id, mushaf_printing, validation_report FROM quran_imports ORDER BY id`.execute(db);
     expect(rows.rows.map((r) => r.id)).toEqual([SYNTHETIC_IMPORT, PRODUCTION_IMPORT]);
