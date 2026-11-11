@@ -9,6 +9,7 @@ import { errorKeys } from '../../api/errors.ts';
 import { useSession } from '../../auth/SessionContext.tsx';
 import { AppScreen, AppText, Button, Card, Field, Notice } from '../../components/ui.tsx';
 import { colors, radius, space, touch } from '../../theme/tokens.ts';
+import { ReportModeControl } from './ReportModeControl.tsx';
 
 export function WorkspaceScreen() {
   const { t } = useTranslation();
@@ -132,7 +133,8 @@ export function WorkspaceScreen() {
       <AppText role="helper" color={colors.textSecondary}>
         {t('workspace.weekStartHelp')}
       </AppText>
-      {reportMode}
+      {/* F05 (US-019): its own endpoint and Save, with the conflict list (F05-AC8). Owner/Admin only (F05-AC9). */}
+      <ReportModeControl saved={settings.dailyReportMode} onSaved={(mode) => setSettings((s) => (s ? { ...s, dailyReportMode: mode } : s))} />
       <Button testID="workspace.save" label={t('common.save')} busyLabel={t('common.saving')} busy={busy} onPress={() => void save()} />
     </AppScreen>
   );

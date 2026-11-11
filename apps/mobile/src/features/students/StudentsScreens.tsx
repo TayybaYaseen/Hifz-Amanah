@@ -15,6 +15,7 @@ import { useSession } from '../../auth/SessionContext.tsx';
 import { AppScreen, AppText, Button, Card, Field, Notice } from '../../components/ui.tsx';
 import { colors } from '../../theme/tokens.ts';
 import { Chip, ChipRow, StatusLabel, rowStyle } from '../roster/Chip.tsx';
+import { StudentDailyRecords } from '../daily-entry/StudentDailyRecords.tsx';
 import { NO_FILTERS, parseOptionalDate, rosterFieldMessages, studentListPath, studentsEmptyState, type StatusFilter, type StudentFilters } from '../roster/roster.ts';
 
 const STATUS_FILTERS: StatusFilter[] = ['ACTIVE', 'INACTIVE', 'ALL'];
@@ -220,7 +221,12 @@ export function StudentFormScreen({ student, initialClassId, onSaved }: { studen
 }
 
 /** Student profile, Details tab: fields, enrollment history (F03-AC13), and actions. */
-export function StudentProfileScreen({ studentId, onEdit }: { studentId: string; onEdit: (student: StudentResponse) => void }) {
+export function StudentProfileScreen({ studentId, onEdit, dailyEntry = null }: {
+  studentId: string;
+  onEdit: (student: StudentResponse) => void;
+  /** F05: Teacher/Admin/Owner with a workspace record Daily Hifz and open daily records from the profile. */
+  dailyEntry?: { onRecordHifz: (classId: string) => void; onOpenRecord: (recordId: string) => void } | null;
+}) {
   const { t } = useTranslation();
   const { session } = useSession();
   const classes = useClasses('ACTIVE');
@@ -321,6 +327,10 @@ export function StudentProfileScreen({ studentId, onEdit }: { studentId: string;
           </AppText>
         ))}
       </Card>
+      {dailyEntry && student.currentClass && student.status === 'ACTIVE' ? (
+        <Button testID="studentProfile.recordHifz" label={t('students.recordHifz')} onPress={() => dailyEntry.onRecordHifz(student.currentClass!.id)} />
+      ) : null}
+      {dailyEntry ? <StudentDailyRecords studentId={student.id} onOpen={dailyEntry.onOpenRecord} /> : null}
       {student.canEdit ? <Button testID="studentProfile.edit" variant="secondary" label={t('students.edit')} disabled={busy} onPress={() => onEdit(student)} /> : null}
       {student.canManage ? (
         <>

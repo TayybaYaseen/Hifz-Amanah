@@ -22,6 +22,9 @@ import { TwoFactorScreen } from '../features/auth/TwoFactorScreen.tsx';
 import { RecoveryCodesScreen, TwoFactorSetupScreen } from '../features/auth/TwoFactorSetupScreen.tsx';
 import { HomeScreen } from '../features/home/HomeScreen.tsx';
 import { BulkEntryScreen } from '../features/attendance/BulkEntryScreen.tsx';
+import { AddAttemptScreen } from '../features/daily-entry/AddAttemptScreen.tsx';
+import { DailyEntryScreen } from '../features/daily-entry/DailyEntryScreen.tsx';
+import { DailyRecordScreen } from '../features/daily-entry/DailyRecordScreen.tsx';
 import { HolidaysScreen, LeaveApprovalsScreen, TimetableScreen } from '../features/attendance/CalendarScreens.tsx';
 import { ParaFormScreen, QuranMetadataScreen, QuranReviewScreen, SurahFormScreen } from '../features/quran/QuranScreens.tsx';
 import { QuranReferenceScreen } from '../features/quran/QuranReferenceScreen.tsx';
@@ -59,6 +62,10 @@ type AppStack = {
   StudentProfile: { studentId: string };
   // F04 calendar and attendance
   BulkEntry: undefined;
+  // F05 daily Hifz entry (Owner, Admin, Teacher; offline-first)
+  DailyEntry: { classId?: string; studentId?: string; date?: string; recordId?: string };
+  DailyRecord: { recordId: string; edited?: boolean };
+  AddAttempt: { recordId: string; portionId: string };
   LeaveApprovals: undefined;
   Holidays: undefined;
   Timetable: { klass: ClassResponse };
@@ -211,7 +218,7 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
   return (
     <App.Navigator screenOptions={screenOptions}>
       <App.Screen name="Home" options={{ title: t('common.appName') }}>
-        {({ navigation }) => <HomeScreen me={me} onMore={() => navigation.navigate('More')} onSyncQueue={() => navigation.navigate('SyncQueue')} onAttendance={() => navigation.navigate('BulkEntry')} />}
+        {({ navigation }) => <HomeScreen me={me} onMore={() => navigation.navigate('More')} onSyncQueue={() => navigation.navigate('SyncQueue')} onAttendance={() => navigation.navigate('BulkEntry')} onDailyEntry={() => navigation.navigate('DailyEntry', {})} />}
       </App.Screen>
       <App.Screen name="More" options={{ title: t('more.title') }}>
         {({ navigation }) => (
@@ -239,7 +246,35 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
       {OFFLINE_ROLES.includes(me.role) ? (
         <>
           <App.Screen name="BulkEntry" options={{ title: t('attendance.title') }}>
-            {() => <BulkEntryScreen me={me} />}
+            {({ navigation }) => <BulkEntryScreen me={me} onRecordHifz={(p) => navigation.navigate('DailyEntry', p)} />}
+          </App.Screen>
+          {/* F05 · Daily Entry, record detail, and Add attempt (US-018…023). */}
+          <App.Screen name="DailyEntry" options={({ route }) => ({ title: t(route.params?.recordId ? 'daily.editTitle' : 'daily.title') })}>
+            {({ navigation, route }) => (
+              <DailyEntryScreen
+                me={me}
+                params={route.params ?? {}}
+                onSaved={(recordId, edited) => navigation.replace('DailyRecord', { recordId, edited })}
+                onOpenRecord={(recordId) => navigation.replace('DailyRecord', { recordId })}
+                onSyncQueue={() => navigation.navigate('SyncQueue')}
+              />
+            )}
+          </App.Screen>
+          <App.Screen name="DailyRecord" options={{ title: t('dailyRecord.title') }}>
+            {({ navigation, route }) => (
+              <DailyRecordScreen
+                me={me}
+                recordId={route.params.recordId}
+                edited={route.params.edited ?? false}
+                onEdit={() => navigation.navigate('DailyEntry', { recordId: route.params.recordId })}
+                onAddAttempt={(portionId) => navigation.navigate('AddAttempt', { recordId: route.params.recordId, portionId })}
+                onSyncQueue={() => navigation.navigate('SyncQueue')}
+                onOpenRecord={(recordId) => navigation.push('DailyRecord', { recordId })}
+              />
+            )}
+          </App.Screen>
+          <App.Screen name="AddAttempt" options={{ title: t('dailyAttempt.title') }}>
+            {({ navigation, route }) => <AddAttemptScreen me={me} recordId={route.params.recordId} portionId={route.params.portionId} onSaved={() => navigation.goBack()} />}
           </App.Screen>
           <App.Screen name="SyncQueue" options={{ title: t('syncQueue.title') }}>
             {({ navigation }) => <SyncQueueScreen onReview={(conflictId) => navigation.navigate('ConflictReview', { conflictId })} />}
@@ -326,7 +361,18 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
           ) : null}
           <App.Screen name="StudentProfile" options={{ title: t('students.profileTitle') }}>
             {({ navigation, route }) => (
-              <StudentProfileScreen studentId={route.params.studentId} onEdit={(student) => navigation.navigate('StudentForm', { student, classId: null })} />
+              <StudentProfileScreen
+                studentId={route.params.studentId}
+                onEdit={(student) => navigation.navigate('StudentForm', { student, classId: null })}
+                dailyEntry={
+                  OFFLINE_ROLES.includes(me.role)
+                    ? {
+                        onRecordHifz: (classId) => navigation.navigate('DailyEntry', { classId, studentId: route.params.studentId }),
+                        onOpenRecord: (recordId) => navigation.navigate('DailyRecord', { recordId }),
+                      }
+                    : null
+                }
+              />
             )}
           </App.Screen>
         </>

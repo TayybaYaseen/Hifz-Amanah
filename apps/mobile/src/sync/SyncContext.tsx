@@ -18,11 +18,13 @@ import { Outbox, type OutboxItem } from './outbox.ts';
 import { secureRandomBytes } from './platform.ts';
 import { appRegistry, type EntityRegistry } from './registry.ts';
 import { registerAttendance } from '../features/attendance/local.ts';
+import { cacheReportMode, registerDailyEntry } from '../features/daily-entry/local.ts';
 import { httpSyncApi, type ConflictApi } from './transport.ts';
 import { holdForSignOut, lockWorkspace, quiesceForSignOut, readMeta, resumeHeld, setOrgTimeZone, signOutAction, type WorkspaceMeta } from './workspace.ts';
 
-// Offline-capable entities: F04 attendance (F05 daily records and F08 homework add theirs here).
+// Offline-capable entities: F04 attendance, F05 daily records/portions/attempts (F08 homework adds its own here).
 registerAttendance(appRegistry);
+registerDailyEntry(appRegistry);
 
 const TIMER_MS = 30_000;
 const EMPTY_COUNTS: Record<QueueState, number> = { PENDING: 0, SYNCING: 0, SYNCED: 0, FAILED: 0, ACTION_REQUIRED: 0 };
@@ -275,12 +277,17 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     };
   }, [workspace]);
 
-  // The madrasa timezone decides the 120-day cache window (F12-AC19); best effort, online only.
+  // The madrasa timezone decides the 120-day cache window (F12-AC19), and the daily-report mode is cached for
+  // offline Daily Entry (F05); best effort, online only.
   useEffect(() => {
     if (!workspace?.engine || state.kind !== 'signedIn') return;
     void session
       .authorized<OrganizationSettingsResponse>('/organization')
-      .then((org) => setOrgTimeZone(workspace.db, org.timezone))
+      .then(async (org) => {
+        await setOrgTimeZone(workspace.db, org.timezone);
+        // F05 (UI spec 8.8): Daily Entry uses the last known daily-report mode offline.
+        if (org.dailyReportMode) await cacheReportMode(workspace.db, org.dailyReportMode);
+      })
       .catch(() => undefined);
   }, [workspace, session, state.kind]);
 
