@@ -28,7 +28,7 @@ import { recordAudit } from '../audit/audit.ts';
 import type { Actor } from '../identity/auth-service.ts';
 import { rosterActor, todayFor } from '../roster/shared.ts';
 import type { AppliedChange, Prepared, SyncHandler, SyncRow, WriteMeta } from '../sync/handler.ts';
-import { dayFor, enrollmentsOf, noRecitedPortionsYet, type RecitedLookup } from './shared.ts';
+import { dayFor, enrollmentsOf, type RecitedLookup } from './shared.ts';
 
 type Row = Pick<
   AttendanceRecordsTable,
@@ -85,11 +85,11 @@ function leaveColumns(leaveStatus: LeaveStatus, meta: WriteMeta) {
 
 export interface AttendanceSyncDeps {
   clock: Clock;
-  recited?: RecitedLookup;
+  recited: RecitedLookup;
 }
 
 export function attendanceSyncHandler(deps: AttendanceSyncDeps): SyncHandler {
-  const recited = deps.recited ?? noRecitedPortionsYet;
+  const recited = deps.recited;
 
   /** Validates a mark for a student, class, and date in the caller's scope. */
   async function check(

@@ -265,6 +265,64 @@ npm run quran:convert -- sign <dir> <review.json>
 - **The gate in the report is advisory.** The seed loader enforces the licence and review gates again at import.
   Synthetic manifests are accepted only with `NODE_ENV=test`.
 
+## Daily Hifz routes (F05)
+
+Contract: [`packages/contracts/src/hifz.ts`](../../packages/contracts/src/hifz.ts); rules in `packages/domain/hifz`;
+code in [`src/modules/hifz`](src/modules/hifz); tables in `migrations/0012_hifz.sql` (`daily_records`,
+`lesson_portions`, `portion_attempts`, `attempt_mistakes`; RLS forced, no DELETE for any role). Plan:
+[F05-plan](../../docs/handover/F05-plan.md).
+
+**Writes are sync operations** (`POST /sync/push`), one op per row, each validated and committed on its own:
+
+| Entity | CREATE fields | UPDATE fields (a correction, audited) |
+|---|---|---|
+| `daily_record` | `studentId, classId, reportDate, sessionLabel, clientSavedAt?` | `sessionLabel` |
+| `lesson_portion` | `dailyRecordId, section, position, isExtra, paraNumber, range, assigned, totalLines, totalLinesSource` (Sabaq `assigned` may be left out: it defaults to Total Lines) | `position`, `isExtra`, the group `paraNumber, range, totalLines, totalLinesSource, assigned` (whole), `removed: true` |
+| `portion_attempt` | `lessonPortionId, attemptNo, attemptedAt, status, completed, quality, noMistakes, mistakes[], remarks` | `attemptedAt`, `remarks`, the group `status, completed, quality, noMistakes, mistakes` (whole) |
+
+Server rules (a refusal is `REJECTED VALIDATION` with `fields`, or `REJECTED NOT_FOUND`):
+- **Scope:** the record's class must be in the caller's `daily.write` scope (Owner/Admin, assigned Teacher, or the
+  "all classes" flag); otherwise, and for another madrasa's ids, `NOT_FOUND`. A portion's and an attempt's scope keys
+  are their record's. An unknown class id is `classId: INVALID`.
+- **Record:** `reportDate: FUTURE` after today in the madrasa's timezone (F05-AC17); `reportDate: HOLIDAY | CLOSURE |
+  NO_CLASS | UNSCHEDULED` on a day the class does not meet; `studentId: NOT_ENROLLED` (a new entry needs an active
+  student in an active class on that date; a correction only that the student was in the class then).
+- **Report mode (F05-AC6, AC7):** `SINGLE`: `reportDate: DUPLICATE_RECORD` with `reportDate.existingId: <id>`,
+  `sessionLabel: SESSION_LABEL_NOT_ALLOWED`. `MULTI_SESSION`: `sessionLabel: SESSION_LABEL_REQUIRED |
+  SESSION_LABEL_TOO_LONG` (`sessionLabel.max: 40`) | `DUPLICATE_SESSION` (case-insensitive, with
+  `sessionLabel.existingId`). Labels are trimmed.
+- **Attendance (FR-DAY-011, F05-AC18):** a new portion or attempt needs the student Present, Late, or Half day on the
+  date: `attendance: ATTENDANCE_CHANGE_TO_LATE` (Absent, Leave) or `attendance: ATTENDANCE_REQUIRED` (unmarked).
+- **Sabaq:** checked against the madrasa's active Quran metadata, never guessed: `range: METADATA_UNAVAILABLE` with
+  none loaded, `range: CROSSES_SURAH | END_BEFORE_START | PARA_UNKNOWN`, `surah`/`ayahStart`/`ayahEnd: UNKNOWN |
+  OUT_OF_RANGE` (with `.max`). The server derives `paraNumber` (a client value is `paraNumber:
+  SABAQ_PARA_NOT_ACCEPTED`; on UPDATE send `paraNumber: null`), sets `lineCountEdition` to the madrasa's edition, and
+  sets `totalLinesSource` (`LAYOUT` when Total Lines equals the usable layout's count, else `MANUAL`). A Para unit is
+  `unit: UNIT_NOT_ALLOWED`, never converted (FR-SAB-010).
+- **Quantities:** the domain codes `unit: REQUIRED | UNIT_NOT_ALLOWED`, `assigned: REQUIRED | NOT_POSITIVE |
+  NOT_A_PRESET | ABOVE_TOTAL` (`assigned.max`), `completed: UNIT_MISMATCH | ABOVE_ASSIGNED | NOT_A_PRESET`; a
+  fractional LINES/AYAT/PAGES amount is refused by the schema (`completed.denominator: INVALID`). A portion correction that would no longer fit a recorded attempt is
+  `assigned: ABOVE_ASSIGNED | UNIT_MISMATCH`.
+- **Attempts:** `attemptNo: ATTEMPT_NO_TAKEN` (append-only; earlier attempts never change, F05-AC15),
+  `lessonPortionId: PORTION_REMOVED`, `quality: QUALITY_NOT_ALLOWED` on ABSENT/NOT_ASSIGNED/PENDING,
+  `mistakes: NO_MISTAKES_CONFLICT`, `remarks: TOO_LONG` (500). NOT_REMEMBERED without `completed` stores 0, COMPLETED
+  without `completed` stores the assigned quantity; otherwise a missing `completed` stays null.
+- **Corrections** go through F12 conflict detection: two edits of a coupled group from the same base version become a
+  conflict, never last-write-wins. A removed portion keeps its row and attempts and takes no further edit
+  (`removed: PORTION_REMOVED`). No edit lock (FR-DAY-009).
+- **Audit** in the same transaction: `DAILY_RECORD_CREATED/UPDATED`, `LESSON_PORTION_CREATED/UPDATED/REMOVED`,
+  `PORTION_ATTEMPT_CREATED/CORRECTED`, `DAILY_REPORT_MODE_CHANGED`. Remarks appear by field name only.
+
+| Route | Body / query | Result |
+|---|---|---|
+| `GET /hifz/daily-records` | `?date=` or `?from=&to=` (≤ 62 days), optional `studentId`, `classId`, `cursor`, `limit` (1–100, default 25) | `200 { items: DailyRecordView[], nextCursor }`, newest date first; a Teacher sees assigned classes only (`404` for an unassigned `classId`). Owner, Admin, Teacher; Student/Parent `403` |
+| `GET /hifz/daily-records/:id` | — | `200 DailyRecordDetail`: the record, `attendance { status, portionsAllowed }`, portions in Sabaq/Sabqi/Manzil and position order (removed ones flagged) with their attempts oldest first and `progress` (latest attempt; assigned counted once), and `sectionSummary` (per-unit totals). `404` out of scope |
+| `PUT /organization/daily-report-mode` | `{ mode: SINGLE \| MULTI_SESSION }` | `200 { mode }`, audited. Owner/Admin only (`403` otherwise, F05-AC9). Switching to `SINGLE` while a student has two records on a date: `409 MODE_CONFLICTS` with `error.conflicts: [{ studentId, studentName, reportDate, sessionLabels }]` (F05-AC8) |
+
+The madrasa's mode is also in `GET /organization` (`dailyReportMode`). F05 supplies the F04 lookups (recited portions
+for the Bulk Entry sheet's `recited` and the Absent-note rule; daily records in `/calendar/exceptions/impact`) and the
+F06 review list's Sabaq ranges (`kind: SABAQ_PORTION`).
+
 ## Sync routes (F12)
 
 Protocol v1, decisions in [ADR-015](../../docs/adr/ADR-015-sync-protocol-idempotency-conflicts.md); shapes in
@@ -294,9 +352,10 @@ session with `401 SESSION_EXPIRED`.
   change if its `op_id` is NULL, it came from another user or device, its `seq` is NULL, or its `seq` is greater than
   the incoming op's `seq`. So this device's own earlier edits are excluded, but an older edit arriving after a newer
   one becomes a conflict instead of overwriting it (NFR-OFF-006).
-- **No entity is synced in production yet.** Each feature registers a `SyncHandler`
-  ([`src/modules/sync/handler.ts`](src/modules/sync/handler.ts)) for its entities: attendance (F04), daily records,
-  portions, attempts (F05), mistakes and notes (F07), homework (F08). Until then they are `ENTITY_NOT_SUPPORTED`.
+- **Entities:** each feature registers a `SyncHandler` ([`src/modules/sync/handler.ts`](src/modules/sync/handler.ts))
+  for its entities: attendance (F04) and daily records, portions, attempts (F05) are registered; mistakes and notes
+  (F07) and homework (F08) are `ENTITY_NOT_SUPPORTED` until then. A child entity's `keysForCreate` may load its
+  parent's scope keys in the op's transaction (F05).
 - **Test-only `sync_probe` entity:** its table is applied by the integration-test harness from
   `test/support/migrations/9001_sync_probe.sql` and its handler is passed in as `testSync` (`NODE_ENV=test`). It is
   not in `migrations/` and is not registered by `npm run api:e2e-server`.
@@ -339,7 +398,7 @@ F06 adds:
 ## Not yet built
 
 - F06: the production Quran seed and 16-line layout (blocked on the dataset, licence, edition, and reviewer; SRS §17.3);
-  syncing Quran metadata to devices for offline Daily Entry (arrives with F05); the review list's record source (F05/F08);
+  syncing Quran metadata to devices for offline Daily Entry (arrives with F05); the review list's homework ranges (F08);
   an operator CLI that applies an approved seed to existing madaris.
 
 - The per-IP throttle (F17-AC13) and the F17 audit query API arrive with F17.

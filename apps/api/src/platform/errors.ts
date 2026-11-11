@@ -31,6 +31,8 @@ const STATUS: Record<ErrorCode, number> = {
   // Calendar (F04).
   RECORDS_EXIST: 409,
   LEAVE_NOT_AWAITING: 409,
+  // Daily Hifz entry (F05).
+  MODE_CONFLICTS: 409,
 };
 
 const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
@@ -59,23 +61,34 @@ const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
   CONFLICT_CLOSED: 'This conflict was already resolved',
   RECORDS_EXIST: 'Records already exist for this date. Confirm to continue',
   LEAVE_NOT_AWAITING: 'This leave is no longer waiting for a decision',
+  MODE_CONFLICTS: 'Some students have more than one record on a date. Resolve them before switching to one report per day',
 };
 
 export class AppError extends Error {
   readonly code: ErrorCode;
   readonly fields: Record<string, string> | undefined;
+  /** MODE_CONFLICTS only: the conflict list returned with the error (F05-AC8). */
+  readonly conflicts: unknown[] | undefined;
 
-  constructor(code: ErrorCode, fields?: Record<string, string>) {
+  constructor(code: ErrorCode, fields?: Record<string, string>, conflicts?: unknown[]) {
     super(DEFAULT_MESSAGE[code]);
     this.code = code;
     this.fields = fields;
+    this.conflicts = conflicts;
   }
 }
 
 export const fieldError = (field: string, issue: string): AppError => new AppError('VALIDATION', { [field]: issue });
 
 export function body(error: AppError): ApiError {
-  return { error: { code: error.code, message: error.message, ...(error.fields ? { fields: error.fields } : {}) } };
+  return {
+    error: {
+      code: error.code,
+      message: error.message,
+      ...(error.fields ? { fields: error.fields } : {}),
+      ...(error.conflicts ? { conflicts: error.conflicts } : {}),
+    },
+  };
 }
 
 /** Parses input with a shared Zod schema; failures become a VALIDATION error naming the fields. */
