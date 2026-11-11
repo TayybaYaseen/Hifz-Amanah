@@ -1,0 +1,80 @@
+# Subflow (F05): add one Sabqi or Manzil portion on Daily Entry and fill it.
+# Usage: runFlow { file: ../../support/maestro/daily-revision-portion.yaml,
+#        env: { SECTION: sabqi | manzil, N: 2, PARA: "4", UNIT: COMPLETE, STATUS: PARTIAL, COMPLETED: HALF } }
+# UNIT is a Para preset (RUBU, HALF, SALASAH, COMPLETE). COMPLETED is a Para preset or empty (not recorded).
+# PARA empty keeps the default (Sabqi defaults to the Sabaq Para, F05-AC12). "No mistakes" is chosen.
+appId: com.hifzamanah.app
+---
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: "daily.${SECTION}.add"
+    direction: DOWN
+    speed: 10
+# The new card takes the button's place on screen. A tap lost during a re-render (seen offline) is retried once;
+# the retry runs only when the card did not appear, so it never adds a second portion.
+- tapOn:
+    id: "daily.${SECTION}.add"
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      notVisible:
+        id: "daily.${SECTION}.portion.${N}.title"
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: "daily.${SECTION}.add"
+          direction: DOWN
+          speed: 10
+      - tapOn:
+          id: "daily.${SECTION}.add"
+      - waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: "daily.${SECTION}.portion.${N}.para"
+    direction: DOWN
+    speed: 10
+- runFlow:
+    when:
+      true: ${typeof PARA !== 'undefined' && PARA !== ''}
+    commands:
+      - tapOn:
+          id: "daily.${SECTION}.portion.${N}.para"
+      - eraseText: 2
+      - inputText: ${PARA}
+      - pressKey: Enter
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: "daily.${SECTION}.portion.${N}.unit.${UNIT}"
+    direction: DOWN
+    speed: 10
+- tapOn:
+    id: "daily.${SECTION}.portion.${N}.unit.${UNIT}"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: "daily.${SECTION}.portion.${N}.status.${STATUS}"
+    direction: DOWN
+    speed: 10
+- tapOn:
+    id: "daily.${SECTION}.portion.${N}.status.${STATUS}"
+- runFlow:
+    when:
+      true: ${typeof COMPLETED !== 'undefined' && COMPLETED !== ''}
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: "daily.${SECTION}.portion.${N}.completed.${COMPLETED}"
+          direction: UP
+          speed: 10
+      - tapOn:
+          id: "daily.${SECTION}.portion.${N}.completed.${COMPLETED}"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: "daily.${SECTION}.portion.${N}.mistakes.none"
+    direction: DOWN
+    speed: 10
+- tapOn:
+    id: "daily.${SECTION}.portion.${N}.mistakes.none"

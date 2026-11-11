@@ -123,7 +123,7 @@ Nothing specific to this story in the source documents.
 **Mobile (Maestro):**
 
 - [e2e/mobile/f05-daily-entry/sections-and-portions.yaml](../../e2e/mobile/f05-daily-entry/sections-and-portions.yaml) — F05 daily entry — Sabaq, two Sabqi, three Manzil with separate outcomes
-- [e2e/mobile/f05-daily-entry/validation-and-edits.yaml](../../e2e/mobile/f05-daily-entry/validation-and-edits.yaml) — F05 daily entry — portion errors, edit notice, Absent, Not Remembered default
+- [e2e/mobile/f05-daily-entry/validation-and-edits.yaml](../../e2e/mobile/f05-daily-entry/validation-and-edits.yaml) — F05 daily entry — portion errors, Absent, Not Remembered default and correction
 
 **Unit (Vitest):**
 

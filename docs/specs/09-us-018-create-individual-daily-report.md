@@ -148,7 +148,8 @@ And in these edge cases (see above):
 - [e2e/mobile/f05-daily-entry/attempts.yaml](../../e2e/mobile/f05-daily-entry/attempts.yaml) — F05 attempts — second attempt keeps the first; history; late sync keeps the date
 - [e2e/mobile/f05-daily-entry/date-and-attendance-rules.yaml](../../e2e/mobile/f05-daily-entry/date-and-attendance-rules.yaml) — F05 no future dates; no portions while Absent or on Leave
 - [e2e/mobile/f05-daily-entry/sections-and-portions.yaml](../../e2e/mobile/f05-daily-entry/sections-and-portions.yaml) — F05 daily entry — Sabaq, two Sabqi, three Manzil with separate outcomes
-- [e2e/mobile/f05-daily-entry/validation-and-edits.yaml](../../e2e/mobile/f05-daily-entry/validation-and-edits.yaml) — F05 daily entry — portion errors, edit notice, Absent, Not Remembered default
+- [e2e/mobile/f05-daily-entry/validation-and-edits.yaml](../../e2e/mobile/f05-daily-entry/validation-and-edits.yaml) — F05 daily entry — portion errors, Absent, Not Remembered default and correction
+- [e2e/mobile/f05-daily-entry/edit-homework-notice.yaml](../../e2e/mobile/f05-daily-entry/edit-homework-notice.yaml) — F05 daily entry — editing a record keeps confirmed homework and updates the draft (pending until F08)
 
 **Unit (Vitest):**
 

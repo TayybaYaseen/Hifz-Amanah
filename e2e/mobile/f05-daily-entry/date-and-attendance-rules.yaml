@@ -1,13 +1,87 @@
 # F05 · Daily Hifz entry — mobile E2E (docs/specs/09-f05-daily-hifz-entry.md; decision review 2026-10-30, SRS §17)
 # Covers: F05-AC17, F05-AC18
+# SYNTHETIC DATA ONLY: seeded personas and the synthetic Quran fixture.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F05 no future dates; no portions while Absent or on Leave
 tags:
-  - pending
   - F05
   - US-018
 ---
-- launchApp:
-    clearState: true
-# 1. Given the date tomorrow in the madrasa timezone, when a Teacher tries to create a daily record for it, then it is refused. A record for an earlier date is accepted. (F05-AC17)
-# 2. Given a student marked Absent or on Leave for the date, when the Teacher tries to add a portion in Daily Entry, then it is refused, and the app offers "Change to Late". (F05-AC18)
+- runFlow: ../../support/maestro/reset.yaml
+- runScript:
+    file: ../../support/maestro/control.js
+    env:
+      ACTION: quranSeed
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- tapOn: { id: "nav.dailyEntry" }
+- extendedWaitUntil:
+    visible: { id: "daily.class.Hifz A1" }
+    timeout: 30000
+# 1. Tomorrow cannot be chosen: Next day is disabled on today (the server also refuses it, API E2E F05-AC17).    (F05-AC17)
+- assertVisible: { id: "daily.nextDay", enabled: false }
+- assertNotVisible: { id: "daily.future" }
+# 2. A record for an earlier date (yesterday) is accepted.                                                     (F05-AC17)
+- tapOn: { id: "daily.prevDay" }
+- assertVisible: { id: "daily.today" }
+- tapOn: { id: "daily.class.Hifz A1" }
+- tapOn: { id: "daily.student.EXT-A-001" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.attendance.PRESENT" }, direction: DOWN, speed: 10 }
+- tapOn: { id: "daily.attendance.PRESENT" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabqi.add" }, direction: DOWN, speed: 10 }
+- tapOn: { id: "daily.sabqi.add" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabqi.portion.1.para" }, direction: DOWN, speed: 10 }
+- tapOn: { id: "daily.sabqi.portion.1.para" }
+- eraseText: 2
+- inputText: "1"
+- pressKey: Enter
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabqi.portion.1.unit.COMPLETE" }, direction: DOWN, speed: 10 }
+- tapOn: { id: "daily.sabqi.portion.1.unit.COMPLETE" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabqi.portion.1.status.COMPLETED" }, direction: DOWN, speed: 10 }
+- tapOn: { id: "daily.sabqi.portion.1.status.COMPLETED" }
+- waitForAnimationToEnd
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- scrollUntilVisible: { element: { id: "daily.save" }, direction: DOWN, speed: 10, visibilityPercentage: 50 }
+- tapOn: { id: "daily.save" }
+- extendedWaitUntil:
+    visible: { id: "record.screen" }
+    timeout: 30000
+- extendedWaitUntil:
+    visible: { id: "record.sync.SYNCED" }
+    timeout: 60000
+# 3. S2 marked Absent today: no section cards; the app offers "Change to Late".                                  (F05-AC18)
+- runFlow: ../../support/maestro/back-home.yaml
+- tapOn: { id: "nav.dailyEntry" }
+- extendedWaitUntil:
+    visible: { id: "daily.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "daily.class.Hifz A1" }
+- tapOn: { id: "daily.student.EXT-A-002" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.attendance.ABSENT" }, direction: DOWN, speed: 10 }
+- tapOn: { id: "daily.attendance.ABSENT" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.attendance.changeToLate" }, direction: DOWN, speed: 10 }
+- assertVisible: { id: "daily.attendance.blocked" }
+- assertNotVisible: { id: "daily.sabaq.add" }
+- assertNotVisible: { id: "daily.sabqi.add" }
+- assertNotVisible: { id: "daily.manzil.add" }
+# 4. On Leave: the same.                                                                                         (F05-AC18)
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.attendance.LEAVE" }, direction: UP, speed: 10 }
+- tapOn: { id: "daily.attendance.LEAVE" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.attendance.changeToLate" }, direction: DOWN, speed: 10 }
+- assertVisible: { id: "daily.attendance.blocked" }
+- assertNotVisible: { id: "daily.sabqi.add" }
+# 5. Change to Late → the section cards appear and portions can be added.                                       (F05-AC18)
+- tapOn: { id: "daily.attendance.changeToLate" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabqi.add" }, direction: DOWN, speed: 10 }
+- assertNotVisible: { id: "daily.attendance.blocked" }

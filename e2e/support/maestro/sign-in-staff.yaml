@@ -29,5 +29,31 @@ appId: com.hifzamanah.app
 - hideKeyboard
 - tapOn:
     id: "twoFactor.submit"
-- assertVisible:
-    id: "home.screen"
+# Owner/Admin must set an app-lock PIN on a new device (NFR-OFF-011): enter and confirm a synthetic test PIN, and
+# skip the fingerprint offer if the emulator has one. Already set up → straight to Home.
+- extendedWaitUntil:
+    visible:
+      id: "appLock.setup.screen|home.screen"
+    timeout: 30000
+- runFlow:
+    when:
+      visible:
+        id: "appLock.setup.pin"
+    commands:
+      - inputText: "246810"
+      - extendedWaitUntil:
+          visible:
+            id: "appLock.setup.pin"
+          timeout: 5000
+      - inputText: "246810"
+- runFlow:
+    when:
+      visible:
+        id: "appLock.biometric.skip"
+    commands:
+      - tapOn:
+          id: "appLock.biometric.skip"
+- extendedWaitUntil:
+    visible:
+      id: "home.screen"
+    timeout: 30000

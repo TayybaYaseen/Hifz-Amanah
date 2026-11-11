@@ -1,22 +1,213 @@
 # F05 · Daily Hifz entry — mobile E2E (docs/specs/09-us-020-record-sabaq.md; design.md §4.7, §5.3)
 # Covers: F05-AC20, F05-AC21, F05-AC22
+# SYNTHETIC DATA ONLY: the madrasa gets the synthetic Quran fixture (20 Ayat per Surah; a test layout of 2 Ayat per line
+# for Surahs 1–3), which matches no real Mushaf. Surah numbers stand in for the Surah names in the spec.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F05 daily entry — Sabaq by Surah/Ayat range and lines
 tags:
-  - pending
   - F05
   - US-020
 ---
-- launchApp:
-    clearState: true
-# 1. Sign in as teacher.a1 → Daily Entry → today, class A1, student S1, Present.
-# 2. Sabaq · Add portion: no unit picker and no Rubu / Half / Salasah / Complete; the quantity shows "lines".   (F05-AC20)
-# 3. Sabqi · Add portion and Manzil · Add portion: Rubu, Half, Salasah, and Complete are all offered.           (F05-AC20)
-# 4. Sabaq: choose Al-Baqarah, Ayat 1 to 10 → Para 1 shown read-only; Total Lines pre-filled "From Mushaf layout";
-#    Assigned Lines equals Total Lines. Change Total Lines to 10 → the "From Mushaf layout" hint disappears.     (F05-AC21)
-# 5. Change the range to Ayat 10 to 1 → error "ending Ayat must not be before the starting Ayat".              (F05-AC21)
-# 6. Choose Al-Fatihah 5 to Al-Baqarah 3 → error "the range must stay within one Surah".                       (F05-AC21)
-# 7. Back to Al-Baqarah 1–10, Total 10, Assigned 10; Completed 7 → Remaining Lines shows 3.                    (F05-AC22)
-# 8. Completed 11 → error "completed lines cannot be more than assigned lines"; Assigned 12 → error
-#    "assigned lines cannot be more than total lines".                                                         (F05-AC22)
-# 9. Clear Completed; status Not Remembered; save → record shows 0 completed and 10 remaining lines.            (F05-AC22)
+- runFlow: ../../support/maestro/reset.yaml
+- runScript:
+    file: ../../support/maestro/control.js
+    env:
+      ACTION: quranSeed
+# 1. Sign in as teacher-a1 → Daily Entry → today, class A1, student S1, Present.
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- tapOn: { id: "nav.dailyEntry" }
+- extendedWaitUntil:
+    visible: { id: "daily.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "daily.class.Hifz A1" }
+- tapOn: { id: "daily.student.EXT-A-001" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.attendance.PRESENT" }, direction: DOWN, speed: 10 }
+- tapOn: { id: "daily.attendance.PRESENT" }
+# 2. Sabaq · Add portion: no unit picker and no Para presets; the quantity is in lines.                         (F05-AC20)
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.add" }, direction: DOWN, speed: 10 }
+- tapOn: { id: "daily.sabaq.add" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.unitLabel" }, direction: DOWN, speed: 10 }
+- assertNotVisible: { id: "daily.sabaq.portion.1.unit.RUBU" }
+- assertNotVisible: { id: "daily.sabaq.portion.1.unit.HALF" }
+- assertNotVisible: { id: "daily.sabaq.portion.1.unit.SALASAH" }
+- assertNotVisible: { id: "daily.sabaq.portion.1.unit.COMPLETE" }
+# 3. Sabqi · Add portion and Manzil · Add portion: Rubu, Half, Salasah, and Complete are offered.               (F05-AC20)
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabqi.add" }, direction: DOWN, speed: 10 }
+- tapOn: { id: "daily.sabqi.add" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabqi.portion.1.unit.PAGES" }, direction: DOWN, speed: 10 }
+- assertVisible: { id: "daily.sabqi.portion.1.unit.RUBU" }
+- assertVisible: { id: "daily.sabqi.portion.1.unit.HALF" }
+- assertVisible: { id: "daily.sabqi.portion.1.unit.SALASAH" }
+- assertVisible: { id: "daily.sabqi.portion.1.unit.COMPLETE" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabqi.portion.1.remove" }, direction: DOWN, speed: 10 }
+- tapOn: { id: "daily.sabqi.portion.1.remove" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.manzil.add" }, direction: DOWN, speed: 10 }
+- tapOn: { id: "daily.manzil.add" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.manzil.portion.1.unit.PAGES" }, direction: DOWN, speed: 10 }
+- assertVisible: { id: "daily.manzil.portion.1.unit.RUBU" }
+- assertVisible: { id: "daily.manzil.portion.1.unit.HALF" }
+- assertVisible: { id: "daily.manzil.portion.1.unit.SALASAH" }
+- assertVisible: { id: "daily.manzil.portion.1.unit.COMPLETE" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.manzil.portion.1.remove" }, direction: DOWN, speed: 10 }
+- tapOn: { id: "daily.manzil.portion.1.remove" }
+# 4. Sabaq: Surah 2, Ayat 1 to 10 → Para shown read-only; Total Lines pre-filled "From Mushaf layout"; then a
+#    hand-entered Total Lines of 10 replaces the layout hint.                                                  (F05-AC21)
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.surah" }, direction: UP, speed: 10 }
+- tapOn: { id: "daily.sabaq.portion.1.surah" }
+- inputText: "2"
+- tapOn: { id: "daily.sabaq.portion.1.ayahStart" }
+- inputText: "1"
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.ayahEnd" }, direction: DOWN, speed: 10 }
+- tapOn: { id: "daily.sabaq.portion.1.ayahEnd" }
+- inputText: "10"
+- pressKey: Enter
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.linesSource.LAYOUT" }, direction: DOWN, speed: 10 }
+- assertVisible: { id: "daily.sabaq.portion.1.para" }
+- tapOn: { id: "daily.sabaq.portion.1.totalLines" }
+- eraseText: 6
+- inputText: "10"
+- pressKey: Enter
+- assertNotVisible: { id: "daily.sabaq.portion.1.linesSource.LAYOUT" }
+- assertVisible: { id: "daily.sabaq.portion.1.linesSource.MANUAL" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.assigned" }, direction: DOWN, speed: 10 }
+- assertVisible: { id: "daily.sabaq.portion.1.assigned", text: "10" }
+# 5. Ayat 10 to 1 → the ending Ayat must not be before the starting Ayat.                                       (F05-AC21)
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.ayahStart" }, direction: UP, speed: 10 }
+- tapOn: { id: "daily.sabaq.portion.1.ayahStart" }
+- eraseText: 4
+- inputText: "10"
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.ayahEnd" }, direction: DOWN, speed: 10 }
+- tapOn: { id: "daily.sabaq.portion.1.ayahEnd" }
+- eraseText: 4
+- inputText: "1"
+- pressKey: Enter
+- waitForAnimationToEnd
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- scrollUntilVisible: { element: { id: "daily.save" }, direction: DOWN, speed: 10, visibilityPercentage: 50 }
+- tapOn: { id: "daily.save" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.ayahEnd.error" }, direction: UP, speed: 10 }
+# 6. Surah 1 Ayah 5 to Surah 2 Ayah 3 → the range must stay within one Surah.                                    (F05-AC21)
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.surah" }, direction: UP, speed: 10 }
+- tapOn: { id: "daily.sabaq.portion.1.surah" }
+- eraseText: 3
+- inputText: "1"
+- tapOn: { id: "daily.sabaq.portion.1.ayahStart" }
+- eraseText: 4
+- inputText: "5"
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.surahEnd" }, direction: DOWN, speed: 10 }
+- tapOn: { id: "daily.sabaq.portion.1.surahEnd" }
+- inputText: "2"
+- tapOn: { id: "daily.sabaq.portion.1.ayahEnd" }
+- eraseText: 4
+- inputText: "3"
+- pressKey: Enter
+- waitForAnimationToEnd
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- scrollUntilVisible: { element: { id: "daily.save" }, direction: DOWN, speed: 10, visibilityPercentage: 50 }
+- tapOn: { id: "daily.save" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.surahEnd.error" }, direction: UP, speed: 10 }
+# 7. Back to Surah 2, Ayat 1–10, Total 10, Assigned 10; Completed 7 → Remaining 3 lines.                        (F05-AC22)
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.surah" }, direction: UP, speed: 10 }
+- tapOn: { id: "daily.sabaq.portion.1.surah" }
+- eraseText: 3
+- inputText: "2"
+- tapOn: { id: "daily.sabaq.portion.1.ayahStart" }
+- eraseText: 4
+- inputText: "1"
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.surahEnd" }, direction: DOWN, speed: 10 }
+- tapOn: { id: "daily.sabaq.portion.1.surahEnd" }
+- eraseText: 3
+- tapOn: { id: "daily.sabaq.portion.1.ayahEnd" }
+- eraseText: 4
+- inputText: "10"
+- pressKey: Enter
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.totalLines" }, direction: DOWN, speed: 10 }
+- tapOn: { id: "daily.sabaq.portion.1.totalLines" }
+- eraseText: 6
+- inputText: "10"
+- tapOn: { id: "daily.sabaq.portion.1.assigned" }
+- eraseText: 6
+- inputText: "10"
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.completed" }, direction: DOWN, speed: 10 }
+- tapOn: { id: "daily.sabaq.portion.1.completed" }
+- inputText: "7"
+- pressKey: Enter
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.remaining" }, direction: DOWN, speed: 10 }
+- assertVisible: { id: "daily.sabaq.portion.1.remaining", text: ".*3.*" }
+# 8. Completed 11 → more than assigned; Assigned 12 → more than total.                                          (F05-AC22)
+- tapOn: { id: "daily.sabaq.portion.1.completed" }
+- eraseText: 6
+- inputText: "11"
+- pressKey: Enter
+- waitForAnimationToEnd
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- scrollUntilVisible: { element: { id: "daily.save" }, direction: DOWN, speed: 10, visibilityPercentage: 50 }
+- tapOn: { id: "daily.save" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.completed.error" }, direction: UP, speed: 10 }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.assigned" }, direction: UP, speed: 10 }
+- tapOn: { id: "daily.sabaq.portion.1.assigned" }
+- eraseText: 6
+- inputText: "12"
+- pressKey: Enter
+- waitForAnimationToEnd
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- scrollUntilVisible: { element: { id: "daily.save" }, direction: DOWN, speed: 10, visibilityPercentage: 50 }
+- tapOn: { id: "daily.save" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.assigned.error" }, direction: UP, speed: 10 }
+# 9. Assigned 10, Completed cleared, Not Remembered → saved record shows 0 completed and 10 remaining lines.     (F05-AC22)
+- tapOn: { id: "daily.sabaq.portion.1.assigned" }
+- eraseText: 6
+- inputText: "10"
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.completed" }, direction: DOWN, speed: 10 }
+- tapOn: { id: "daily.sabaq.portion.1.completed" }
+- eraseText: 6
+- pressKey: Enter
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.status.NOT_REMEMBERED" }, direction: DOWN, speed: 10 }
+- tapOn: { id: "daily.sabaq.portion.1.status.NOT_REMEMBERED" }
+- assertVisible: { id: "daily.sabaq.portion.1.notRememberedDefault" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabaq.portion.1.mistakes.none" }, direction: DOWN, speed: 10 }
+- tapOn: { id: "daily.sabaq.portion.1.mistakes.none" }
+- waitForAnimationToEnd
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- scrollUntilVisible: { element: { id: "daily.save" }, direction: DOWN, speed: 10, visibilityPercentage: 50 }
+- tapOn: { id: "daily.save" }
+- extendedWaitUntil:
+    visible: { id: "record.screen" }
+    timeout: 30000
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "record.sabaq.portion.1.remaining" }, direction: DOWN, speed: 10 }
+- assertVisible: { id: "record.sabaq.portion.1.status.NOT_REMEMBERED" }
+- assertVisible: { id: "record.sabaq.portion.1.completed", text: ".*0.*" }
+- assertVisible: { id: "record.sabaq.portion.1.remaining", text: ".*10.*" }
