@@ -1797,6 +1797,7 @@ This is the central register of every decision that was open anywhere in the rep
 | DEC-B83 | Offline flow host before F05 exists *(2026-11-09, P4)* | Reusable F06 range-selection components and services; an isolated F06 host screen until F05 Daily Entry exists; F05-dependent criteria stay pending | Approved | PO 2026-11-09 | No duplicated or redesigned F05 workflow | FR-SAB-001, FR-SAB-009, FR-SAB-014 | US-025 | F06-AC24 |
 | DEC-B84 | Physical-verification evidence on production imports *(2026-11-09, P5)* | Migration 0011 preserves the printing identifier, reviewer, approval date, decision, signed-report hash, the stored signed report, and the paper sign-off reference; production verification is refused without them | Approved | PO 2026-11-09 | The system records human approval with its evidence | FR-SAB-013 | US-024, US-026 | F06-AC20, F06-AC27 |
 | DEC-B85 | Database access layer *(2026-11-12, ADR-019)* | Server: Kysely over `pg` with plain SQL migrations. Mobile: `expo-sqlite` behind a small typed SQL driver, no ORM (replaces "Drizzle" in the DEC-B51 stack) | Approved | PO 2026-11-12 | Records what was built from F01 and F12 onward | NFR-MNT-002, NFR-OFF-002 | — | — |
+| DEC-B86 | Mistake note length *(2026-11-12, F07)* | A mistake note is at most 200 characters (trimmed; an empty note is no note) | Approved | PO 2026-11-12 | Makes "short note" (FR-ATT-012) testable | FR-ATT-012 | US-028 | F07-AC15 |
 
 ### 17.3 Open items after this review
 
