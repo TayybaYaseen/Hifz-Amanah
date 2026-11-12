@@ -42,7 +42,11 @@ tags:
 - extendedWaitUntil:
     visible: { id: "workspace.readOnly" }
     timeout: 15000
+# The current mode is shown read-only; no mode chips and no Save are offered to a Teacher.
+- assertVisible: { id: "workspace.reportModeValue" }
 - assertNotVisible: { id: "workspace.reportMode" }
+- assertNotVisible: { id: "workspace.reportMode.SINGLE" }
+- assertNotVisible: { id: "workspace.reportMode.MULTI_SESSION" }
 - assertNotVisible: { id: "workspace.reportMode.save" }
 - runFlow: ../../support/maestro/back-home.yaml
 - runFlow: ../../support/maestro/sign-out.yaml
@@ -79,6 +83,7 @@ tags:
     file: ../../support/maestro/set-report-mode.yaml
     env: { MODE: SINGLE }
 - waitForAnimationToEnd
-- scrollUntilVisible: { element: { id: "workspace.reportMode.conflicts" }, direction: DOWN, speed: 10 }
+- scrollUntilVisible: { element: { id: "workspace.reportMode.conflicts" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "workspace.reportMode.conflicts" }, direction: UP, timeout: 60000, centerElement: true }
 - assertVisible: { id: "workspace.reportMode.conflict.0", text: ".*Test Student One.*" }
 - assertNotVisible: { id: "workspace.reportMode.saved" }

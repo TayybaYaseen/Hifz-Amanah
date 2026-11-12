@@ -12,7 +12,16 @@ appId: com.hifzamanah.app
     element:
       id: "workspace.reportMode.${MODE}"
     direction: DOWN
-    speed: 10
+    centerElement: true
+    timeout: 60000
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: "workspace.reportMode.${MODE}"
+    direction: UP
+    timeout: 60000
+    centerElement: true
+- waitForAnimationToEnd
 - tapOn:
     id: "workspace.reportMode.${MODE}"
 - waitForAnimationToEnd
@@ -20,7 +29,16 @@ appId: com.hifzamanah.app
     element:
       id: "workspace.reportMode.save"
     direction: DOWN
-    speed: 10
+    centerElement: true
+    timeout: 60000
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: "workspace.reportMode.save"
+    direction: UP
+    timeout: 60000
+    centerElement: true
+- waitForAnimationToEnd
 - tapOn:
     id: "workspace.reportMode.save"
 - extendedWaitUntil:

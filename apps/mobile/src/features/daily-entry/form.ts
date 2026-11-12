@@ -484,11 +484,16 @@ export function assignedQuantity(form: PortionForm, index: ReferenceIndex | null
  */
 export function remainingFor(form: PortionForm, index: ReferenceIndex | null): Quantity | null {
   const assigned = assignedQuantity(form, index);
-  if (!assigned || form.perf.status === null) return null;
+  if (!assigned) return null;
   const v = portionValues(form, 1, index);
-  const n = normalizeAttempt({ status: form.perf.status, assigned, completed: v.attempt.completed, quality: null });
-  if (!n.completed || n.completed.unit !== assigned.unit) return null;
-  return remaining(assigned, n.completed);
+  // Remaining is assigned − completed and shows as soon as both are known (F05-AC22, design.md §4.7). The status only
+  // adds its default for an empty completed value (Not Remembered → 0, FR-QTY-007); with no status, none is assumed.
+  const completed =
+    form.perf.status === null
+      ? v.attempt.completed
+      : normalizeAttempt({ status: form.perf.status, assigned, completed: v.attempt.completed, quality: null }).completed;
+  if (!completed || completed.unit !== assigned.unit) return null;
+  return remaining(assigned, completed);
 }
 
 /** Quality is not entered for ABSENT, NOT_ASSIGNED, or PENDING (FR-ATT-007, F05-AC5). */

@@ -76,7 +76,8 @@ export function WorkspaceScreen() {
     );
   }
 
-  const reportMode = <AppText testID="workspace.reportMode">{`${t('workspace.reportMode')}: ${t(`reportMode.${settings.dailyReportMode}`)}`}</AppText>;
+  // Read-only value for roles that cannot edit settings (F05-AC9); distinct from the editable control's testIDs.
+  const reportMode = <AppText testID="workspace.reportModeValue">{`${t('workspace.reportMode')}: ${t(`reportMode.${settings.dailyReportMode}`)}`}</AppText>;
 
   if (!settings.canEdit) {
     return (

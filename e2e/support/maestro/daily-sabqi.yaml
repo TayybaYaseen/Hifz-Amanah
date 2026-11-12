@@ -20,7 +20,16 @@ appId: com.hifzamanah.app
     element:
       id: "daily.attendance.PRESENT"
     direction: DOWN
-    speed: 10
+    centerElement: true
+    timeout: 60000
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: "daily.attendance.PRESENT"
+    direction: UP
+    timeout: 60000
+    centerElement: true
+- waitForAnimationToEnd
 - tapOn:
     id: "daily.attendance.PRESENT"
 - runFlow:
@@ -35,7 +44,14 @@ appId: com.hifzamanah.app
           element:
             id: "daily.save"
           direction: DOWN
-          speed: 10
+          timeout: 20000
+          visibilityPercentage: 50
+          optional: true
+      - scrollUntilVisible:
+          element:
+            id: "daily.save"
+          direction: UP
+          timeout: 60000
           visibilityPercentage: 50
       - tapOn:
           id: "daily.save"
@@ -43,7 +59,15 @@ appId: com.hifzamanah.app
           element:
             id: "daily.session.error"
           direction: UP
-          speed: 10
+          centerElement: true
+          timeout: 60000
+          optional: true
+      - scrollUntilVisible:
+          element:
+            id: "daily.session.error"
+          direction: DOWN
+          timeout: 60000
+          centerElement: true
 - runFlow:
     when:
       true: ${typeof SESSION !== 'undefined' && SESSION !== ''}
@@ -52,7 +76,16 @@ appId: com.hifzamanah.app
           element:
             id: "daily.session"
           direction: UP
-          speed: 10
+          centerElement: true
+          timeout: 60000
+          optional: true
+      - scrollUntilVisible:
+          element:
+            id: "daily.session"
+          direction: DOWN
+          timeout: 60000
+          centerElement: true
+      - waitForAnimationToEnd
       - tapOn:
           id: "daily.session"
       - inputText: ${SESSION}
@@ -63,7 +96,14 @@ appId: com.hifzamanah.app
     element:
       id: "daily.save"
     direction: DOWN
-    speed: 10
+    timeout: 20000
+    visibilityPercentage: 50
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: "daily.save"
+    direction: UP
+    timeout: 60000
     visibilityPercentage: 50
 - tapOn:
     id: "daily.save"

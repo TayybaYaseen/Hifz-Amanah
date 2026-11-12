@@ -10,9 +10,18 @@ appId: com.hifzamanah.app
     element:
       id: "daily.${SECTION}.add"
     direction: DOWN
-    speed: 10
+    centerElement: true
+    timeout: 60000
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: "daily.${SECTION}.add"
+    direction: UP
+    timeout: 60000
+    centerElement: true
 # The new card takes the button's place on screen. A tap lost during a re-render (seen offline) is retried once;
 # the retry runs only when the card did not appear, so it never adds a second portion.
+- waitForAnimationToEnd
 - tapOn:
     id: "daily.${SECTION}.add"
 - waitForAnimationToEnd
@@ -25,7 +34,16 @@ appId: com.hifzamanah.app
           element:
             id: "daily.${SECTION}.add"
           direction: DOWN
-          speed: 10
+          centerElement: true
+          timeout: 60000
+          optional: true
+      - scrollUntilVisible:
+          element:
+            id: "daily.${SECTION}.add"
+          direction: UP
+          timeout: 60000
+          centerElement: true
+      - waitForAnimationToEnd
       - tapOn:
           id: "daily.${SECTION}.add"
       - waitForAnimationToEnd
@@ -33,7 +51,15 @@ appId: com.hifzamanah.app
     element:
       id: "daily.${SECTION}.portion.${N}.para"
     direction: DOWN
-    speed: 10
+    centerElement: true
+    timeout: 60000
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: "daily.${SECTION}.portion.${N}.para"
+    direction: UP
+    timeout: 60000
+    centerElement: true
 - runFlow:
     when:
       true: ${typeof PARA !== 'undefined' && PARA !== ''}
@@ -48,7 +74,16 @@ appId: com.hifzamanah.app
     element:
       id: "daily.${SECTION}.portion.${N}.unit.${UNIT}"
     direction: DOWN
-    speed: 10
+    centerElement: true
+    timeout: 60000
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: "daily.${SECTION}.portion.${N}.unit.${UNIT}"
+    direction: UP
+    timeout: 60000
+    centerElement: true
+- waitForAnimationToEnd
 - tapOn:
     id: "daily.${SECTION}.portion.${N}.unit.${UNIT}"
 - waitForAnimationToEnd
@@ -56,7 +91,16 @@ appId: com.hifzamanah.app
     element:
       id: "daily.${SECTION}.portion.${N}.status.${STATUS}"
     direction: DOWN
-    speed: 10
+    centerElement: true
+    timeout: 60000
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: "daily.${SECTION}.portion.${N}.status.${STATUS}"
+    direction: UP
+    timeout: 60000
+    centerElement: true
+- waitForAnimationToEnd
 - tapOn:
     id: "daily.${SECTION}.portion.${N}.status.${STATUS}"
 - runFlow:
@@ -67,7 +111,16 @@ appId: com.hifzamanah.app
           element:
             id: "daily.${SECTION}.portion.${N}.completed.${COMPLETED}"
           direction: UP
-          speed: 10
+          centerElement: true
+          timeout: 60000
+          optional: true
+      - scrollUntilVisible:
+          element:
+            id: "daily.${SECTION}.portion.${N}.completed.${COMPLETED}"
+          direction: DOWN
+          timeout: 60000
+          centerElement: true
+      - waitForAnimationToEnd
       - tapOn:
           id: "daily.${SECTION}.portion.${N}.completed.${COMPLETED}"
 - waitForAnimationToEnd
@@ -75,6 +128,15 @@ appId: com.hifzamanah.app
     element:
       id: "daily.${SECTION}.portion.${N}.mistakes.none"
     direction: DOWN
-    speed: 10
+    centerElement: true
+    timeout: 60000
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: "daily.${SECTION}.portion.${N}.mistakes.none"
+    direction: UP
+    timeout: 60000
+    centerElement: true
+- waitForAnimationToEnd
 - tapOn:
     id: "daily.${SECTION}.portion.${N}.mistakes.none"

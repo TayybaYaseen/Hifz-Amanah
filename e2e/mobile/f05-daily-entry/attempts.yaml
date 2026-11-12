@@ -28,36 +28,49 @@ tags:
 - tapOn: { id: "daily.class.Hifz A1" }
 - tapOn: { id: "daily.student.EXT-A-001" }
 - waitForAnimationToEnd
-- scrollUntilVisible: { element: { id: "daily.attendance.PRESENT" }, direction: DOWN, speed: 10 }
+- scrollUntilVisible: { element: { id: "daily.attendance.PRESENT" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "daily.attendance.PRESENT" }, direction: UP, timeout: 60000, centerElement: true }
+- waitForAnimationToEnd
 - tapOn: { id: "daily.attendance.PRESENT" }
 - runFlow:
     file: ../../support/maestro/daily-revision-portion.yaml
     env: { SECTION: sabqi, N: "1", PARA: "4", UNIT: COMPLETE, STATUS: PARTIAL, COMPLETED: HALF }
 - waitForAnimationToEnd
 - runFlow: ../../support/maestro/dismiss-dev-warning.yaml
-- scrollUntilVisible: { element: { id: "daily.save" }, direction: DOWN, speed: 10, visibilityPercentage: 50 }
+- scrollUntilVisible: { element: { id: "daily.save" }, direction: DOWN, timeout: 60000, visibilityPercentage: 50, optional: true }
+- scrollUntilVisible: { element: { id: "daily.save" }, direction: UP, timeout: 60000, visibilityPercentage: 50 }
 - tapOn: { id: "daily.save" }
 - extendedWaitUntil:
     visible: { id: "record.screen" }
     timeout: 30000
 # 2. Add attempt → Completed, quality 1 · Excellent, no mistakes → save.                                        (F05-AC15)
 - waitForAnimationToEnd
-- scrollUntilVisible: { element: { id: "record.sabqi.portion.1.addAttempt" }, direction: DOWN, speed: 10 }
+- scrollUntilVisible: { element: { id: "record.sabqi.portion.1.addAttempt" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "record.sabqi.portion.1.addAttempt" }, direction: UP, timeout: 60000, centerElement: true }
+- waitForAnimationToEnd
 - tapOn: { id: "record.sabqi.portion.1.addAttempt" }
 - extendedWaitUntil:
     visible: { id: "attempt.title" }
     timeout: 15000
 - waitForAnimationToEnd
-- scrollUntilVisible: { element: { id: "attempt.status.COMPLETED" }, direction: DOWN, speed: 10 }
+- scrollUntilVisible: { element: { id: "attempt.status.COMPLETED" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "attempt.status.COMPLETED" }, direction: UP, timeout: 60000, centerElement: true }
+- waitForAnimationToEnd
 - tapOn: { id: "attempt.status.COMPLETED" }
 - waitForAnimationToEnd
-- scrollUntilVisible: { element: { id: "attempt.mistakes.none" }, direction: DOWN, speed: 10 }
+- scrollUntilVisible: { element: { id: "attempt.mistakes.none" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "attempt.mistakes.none" }, direction: UP, timeout: 60000, centerElement: true }
+- waitForAnimationToEnd
 - tapOn: { id: "attempt.mistakes.none" }
 - waitForAnimationToEnd
-- scrollUntilVisible: { element: { id: "attempt.quality.1" }, direction: DOWN, speed: 10 }
+- scrollUntilVisible: { element: { id: "attempt.quality.1" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "attempt.quality.1" }, direction: UP, timeout: 60000, centerElement: true }
+- waitForAnimationToEnd
 - tapOn: { id: "attempt.quality.1" }
 - waitForAnimationToEnd
-- scrollUntilVisible: { element: { id: "attempt.save" }, direction: DOWN, speed: 10 }
+- scrollUntilVisible: { element: { id: "attempt.save" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "attempt.save" }, direction: UP, timeout: 60000, centerElement: true }
+- waitForAnimationToEnd
 - tapOn: { id: "attempt.save" }
 - extendedWaitUntil:
     visible: { id: "record.screen" }
@@ -65,20 +78,25 @@ tags:
 # 3. History: two attempts, each with its own time, recorder, quantity, status, mistakes, and quality;
 #    the latest is labelled current, and the first is unchanged.                                                (F05-AC15)
 - waitForAnimationToEnd
-- scrollUntilVisible: { element: { id: "record.sabqi.portion.1.status.COMPLETED" }, direction: DOWN, speed: 10 }
+- scrollUntilVisible: { element: { id: "record.sabqi.portion.1.status.COMPLETED" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "record.sabqi.portion.1.status.COMPLETED" }, direction: UP, timeout: 60000, centerElement: true }
 - assertVisible: { id: "record.sabqi.portion.1.attemptCount", text: ".*2.*" }
 - waitForAnimationToEnd
-- scrollUntilVisible: { element: { id: "record.sabqi.portion.1.history" }, direction: DOWN, speed: 10 }
+- scrollUntilVisible: { element: { id: "record.sabqi.portion.1.history" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "record.sabqi.portion.1.history" }, direction: UP, timeout: 60000, centerElement: true }
+- waitForAnimationToEnd
 - tapOn: { id: "record.sabqi.portion.1.history" }
 - waitForAnimationToEnd
-- scrollUntilVisible: { element: { id: "record.sabqi.portion.1.attempt.1.quality" }, direction: DOWN, speed: 10 }
+- scrollUntilVisible: { element: { id: "record.sabqi.portion.1.attempt.1.quality" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "record.sabqi.portion.1.attempt.1.quality" }, direction: UP, timeout: 60000, centerElement: true }
 - assertVisible: { id: "record.sabqi.portion.1.attempt.1.status.PARTIAL" }
 - assertVisible: { id: "record.sabqi.portion.1.attempt.1.time" }
 - assertVisible: { id: "record.sabqi.portion.1.attempt.1.recorder" }
 - assertVisible: { id: "record.sabqi.portion.1.attempt.1.completed", text: ".*1/2.*" }
 - assertNotVisible: { id: "record.sabqi.portion.1.attempt.1.current" }
 - waitForAnimationToEnd
-- scrollUntilVisible: { element: { id: "record.sabqi.portion.1.attempt.2.quality" }, direction: DOWN, speed: 10 }
+- scrollUntilVisible: { element: { id: "record.sabqi.portion.1.attempt.2.quality" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "record.sabqi.portion.1.attempt.2.quality" }, direction: UP, timeout: 60000, centerElement: true }
 - assertVisible: { id: "record.sabqi.portion.1.attempt.2.status.COMPLETED" }
 - assertVisible: { id: "record.sabqi.portion.1.attempt.2.current" }
 - assertVisible: { id: "record.sabqi.portion.1.attempt.2.time" }
@@ -96,7 +114,8 @@ tags:
     env:
       ACTION: clock
       ADVANCE_MS: "86400000"
-- runFlow: ../../support/maestro/go-online.yaml
+# On the record screen the record's own sync state is the check (the Home sync banner is not on this screen).
+- setAirplaneMode: disabled
 - extendedWaitUntil:
     visible: { id: "record.sync.SYNCED" }
     timeout: 90000

@@ -117,6 +117,14 @@ describe('F05 · Daily Entry form', () => {
     expect(remainingFor(lines, index)).toEqual({ unit: 'LINES', numerator: 6, denominator: 1 });
   });
 
+  it('F05-AC22 (US-020) Remaining Lines shows as soon as assigned and completed are entered, before a status is chosen', () => {
+    const form = sabaq({ totalLines: '10', linesTouched: true, assignedLines: '10', assignedTouched: true, perf: { ...newPortion('x', 'SABAQ').perf, completedText: '7' } });
+    expect(form.perf.status).toBeNull();
+    expect(remainingFor(form, index)).toEqual({ unit: 'LINES', numerator: 3, denominator: 1 });
+    // No status and no completed value: nothing is assumed (missing is not zero, FR-QTY-008).
+    expect(remainingFor({ ...form, perf: { ...form.perf, completedText: '' } }, index)).toBeNull();
+  });
+
   it('F05-AC5 (US-018) quality is blocked and cleared for Absent, Not Assigned, and Pending; mistakes stay', () => {
     for (const s of ['ABSENT', 'NOT_ASSIGNED', 'PENDING'] as const) expect(qualityBlocked(s)).toBe(true);
     expect(qualityBlocked('NOT_REMEMBERED')).toBe(false);

@@ -13,7 +13,6 @@ appId: com.hifzamanah.app
 - tapOn:
     id: "signin.password"
 - inputText: ${PASSWORD || 'E2e-Test-Pass-1'}
-- hideKeyboard
 - tapOn:
     id: "signin.submit"
 - assertVisible:
@@ -26,7 +25,6 @@ appId: com.hifzamanah.app
 - tapOn:
     id: "twoFactor.code"
 - inputText: ${output.totp}
-- hideKeyboard
 - tapOn:
     id: "twoFactor.submit"
 # Owner/Admin must set an app-lock PIN on a new device (NFR-OFF-011): enter and confirm a synthetic test PIN, and
@@ -35,16 +33,20 @@ appId: com.hifzamanah.app
     visible:
       id: "appLock.setup.screen|home.screen"
     timeout: 30000
+# The PIN boxes front a hidden input that is not reported as visible, so the step keys on the field label
+# (English locale in E2E). The fingerprint offer reuses appLock.setup.screen, so its Skip button rules it out.
 - runFlow:
     when:
       visible:
-        id: "appLock.setup.pin"
+        text: "Enter a 6-digit PIN"
+      notVisible:
+        id: "appLock.biometric.skip"
     commands:
       - inputText: "246810"
       - extendedWaitUntil:
           visible:
-            id: "appLock.setup.pin"
-          timeout: 5000
+            text: "Enter the same PIN again"
+          timeout: 10000
       - inputText: "246810"
 - runFlow:
     when:
