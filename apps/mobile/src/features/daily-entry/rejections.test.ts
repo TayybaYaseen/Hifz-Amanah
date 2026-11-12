@@ -16,6 +16,7 @@ const record: LocalRecord = {
   classId: id(3),
   reportDate: '2026-11-09',
   sessionLabel: null,
+  overallLabel: null,
   recordedBy: null,
   recordedByName: null,
   clientSavedAt: null,

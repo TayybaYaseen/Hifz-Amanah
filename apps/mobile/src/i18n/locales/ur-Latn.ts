@@ -1,4 +1,5 @@
 // Roman Urdu (Latin script, LTR). Wording awaits glossary approval (DEC-B39).
+import { qualityLabelCatalogue } from '@hifz/domain/quality';
 import type { Messages } from './en.ts';
 
 export const urLatn: Messages = {
@@ -801,19 +802,25 @@ export const urLatn: Messages = {
   },
   quality: {
     label: "Meyaar",
-    name: {
-      "1": "Mumtaz",
-      "2": "Achha",
-      "3": "Ausat",
-      "4": "Mazeed mehnat ki zaroorat",
-      "5": "Kamzor",
-    },
+    // The approved scale (SRS FR-ATT-009), one source for app, PDF, Excel, and charts.
+    name: qualityLabelCatalogue("ur-Latn"),
     option: "{score} · {label}",
     notAssessed: "Jaanch nahin hui",
     notRecorded: "Darj nahin",
     lowerIsBetter: "1 sab se behtar, 5 sab se kamzor.",
     notForStatus: "Is haisiyat ke liye meyaar darj nahin hota.",
     value: "Meyaar: {value}",
+  },
+  // F07 · Overall performance label (US-032): separate from the 1–5 quality; never derived from it.
+  overall: {
+    title: "Majmooi karkardagi",
+    help: "Poore din ke liye aik intikhab. Yeh har hisse ke 1–5 meyaar se alag hai.",
+    none: "Muntakhib nahin",
+    EXCELLENT: "Mumtaz",
+    GOOD: "Achha",
+    AVERAGE: "Ausat",
+    NEEDS_IMPROVEMENT: "Mazeed mehnat ki zaroorat",
+    value: "Majmooi karkardagi: {label}",
   },
   mistakes: {
     title: "Ghaltiyan",
@@ -827,6 +834,10 @@ export const urLatn: Messages = {
     severity: "Shiddat",
     repeated: "Dohrai gayi",
     remove: "Ghalti hatayein",
+    note: "Note (ikhtiyari)",
+    noteShared: "Talib-e-ilm aur waldain ko nazar aaye ga",
+    noteVisibility: "Note kis ko nazar aaye",
+    shareNote: "Note talib-e-ilm aur waldain ko dikhayein",
     categories: {
       HARKAAT: "Harkaat",
       TAJWEED: "Tajweed",
@@ -1001,6 +1012,7 @@ export const urLatn: Messages = {
       },
       mistakes: {
         TOO_MANY: "ek koshish mein zyada se zyada {max} ghaltiyan",
+        TOO_LONG: "ghalti ka note zyada se zyada {max} huroof ka ho",
       },
       remarks: {
         TOO_LONG: "tabsira bohat lamba hai (zyada se zyada {max} huroof)",

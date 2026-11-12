@@ -5,7 +5,8 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { MISTAKE_CATEGORIES, MISTAKE_SEVERITIES, PORTION_STATUSES, REMARKS_MAX, QUALITY_MAX, QUALITY_MIN } from '@hifz/domain/hifz';
+import { MISTAKE_CATEGORIES, MISTAKE_NOTE_MAX, MISTAKE_SEVERITIES, PORTION_STATUSES, REMARKS_MAX } from '@hifz/domain/hifz';
+import { QUALITY_SCORES } from '@hifz/domain/quality';
 import type { ReferenceIndex } from '@hifz/domain/quran-ref';
 import type { Quantity } from '@hifz/domain/quantity';
 import { AppText, Button, Card, Field, QuranText, isolate } from '../../components/ui.tsx';
@@ -18,6 +19,7 @@ import {
   UNIT_CHOICES,
   amountParts,
   applyUnit,
+  newMistake,
   qualityBlocked,
   remainingFor,
   sabaqDerived,
@@ -33,7 +35,6 @@ type T = ReturnType<typeof useTranslation>['t'];
 /** Errors already rendered as text, by slot (`unit`, `status`, `mistake.1`…). */
 export type SlotErrors = Partial<Record<string, string>>;
 
-const QUALITY_SCORES = Array.from({ length: QUALITY_MAX - QUALITY_MIN + 1 }, (_, i) => QUALITY_MIN + i);
 
 function ErrorText({ text, testID }: { text: string | undefined; testID: string }) {
   if (!text) return null;
@@ -171,6 +172,26 @@ export function PerformanceBlock({ form, onChange, prefix, index, errors }: { fo
                 {/* Repeated is a separate flag, never a severity (FR-ATT-010). */}
                 <Chip testID={`${prefix}.mistake.${n}.repeated`} role="checkbox" label={t('mistakes.repeated')} selected={m.repeated} onPress={() => set({ repeated: !m.repeated })} />
               </ChipRow>
+              {/* Optional short note (F07, FR-ATT-012): private to staff unless the Teacher shares it. */}
+              <Field
+                testID={`${prefix}.mistake.${n}.note`}
+                label={t('mistakes.note')}
+                helper={m.noteVisibility === 'SHARED' ? `👪 ${t('mistakes.noteShared')}` : `🔒 ${t('daily.privateToStaff')}`}
+                value={m.note}
+                onChangeText={(text) => set({ note: text })}
+                autoCapitalize="sentences"
+                maxLength={MISTAKE_NOTE_MAX}
+              />
+              <ChipRow label={t('mistakes.noteVisibility')}>
+                <Chip
+                  testID={`${prefix}.mistake.${n}.noteShared`}
+                  role="checkbox"
+                  label={t('mistakes.shareNote')}
+                  selected={m.noteVisibility === 'SHARED'}
+                  disabled={m.note.trim() === ''}
+                  onPress={() => set({ noteVisibility: m.noteVisibility === 'SHARED' ? 'INTERNAL' : 'SHARED' })}
+                />
+              </ChipRow>
               <ErrorText text={errors[`mistake.${n}`]} testID={`${prefix}.mistake.${n}.error`} />
               <Button testID={`${prefix}.mistake.${n}.remove`} variant="tertiary" label={t('mistakes.remove')} onPress={() => setPerf({ mistakes: perf.mistakes.filter((_, j) => j !== i) })} />
             </View>
@@ -180,7 +201,7 @@ export function PerformanceBlock({ form, onChange, prefix, index, errors }: { fo
           testID={`${prefix}.mistakes.add`}
           variant="secondary"
           label={t('mistakes.add')}
-          onPress={() => setPerf({ noMistakes: false, mistakes: [...perf.mistakes, { key: `${form.key}-m${Date.now()}-${perf.mistakes.length}`, category: null, severity: null, repeated: false }] })}
+          onPress={() => setPerf({ noMistakes: false, mistakes: [...perf.mistakes, newMistake(`${form.key}-m${Date.now()}-${perf.mistakes.length}`)] })}
         />
         <ErrorText text={errors.mistakes} testID={`${prefix}.mistakes.error`} />
       </View>

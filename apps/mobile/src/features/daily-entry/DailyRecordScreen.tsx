@@ -109,7 +109,15 @@ export function DailyRecordScreen({ me, recordId, edited, onEdit, onAddAttempt, 
   const mistakesText = (a: LocalAttempt) => {
     const count = mistakeCount(a);
     const head = count === null ? t('mistakes.notRecorded') : count === 0 ? t('mistakes.noneChosen') : t('mistakes.count', { count: isolate(String(count)) });
-    const items = a.mistakes.map((m) => [t(`mistakes.categories.${m.category}`), t(`mistakes.severities.${m.severity}`), ...(m.repeated ? [t('mistakes.repeated')] : [])].join(' · '));
+    // Staff screen: a note shows with its visibility (🔒 staff only, the default; 👪 shared), F07-AC15.
+    const items = a.mistakes.map((m) =>
+      [
+        t(`mistakes.categories.${m.category}`),
+        t(`mistakes.severities.${m.severity}`),
+        ...(m.repeated ? [t('mistakes.repeated')] : []),
+        ...(m.note ? [`${m.noteVisibility === 'SHARED' ? '👪' : '🔒'} ${isolate(m.note)}`] : []),
+      ].join(' · '),
+    );
     return [head, ...items].join('\n');
   };
 
@@ -219,6 +227,8 @@ export function DailyRecordScreen({ me, recordId, edited, onEdit, onAddAttempt, 
         {/* The Teacher's chosen date, never the save or sync time (F05-AC1, AC2). */}
         <AppText testID="record.date">{t('dailyRecord.date', { date: isolate(record.reportDate) })}</AppText>
         {record.sessionLabel ? <AppText testID="record.session">{t('dailyRecord.session', { label: isolate(record.sessionLabel) })}</AppText> : null}
+        {/* F07 · The record's overall performance label, captioned apart from quality (US-032). */}
+        <AppText testID="record.overall">{t('overall.value', { label: record.overallLabel ? t(`overall.${record.overallLabel}`) : t('overall.none') })}</AppText>
         <AppText role="helper" color={colors.textSecondary} testID="record.recordedBy">{t('dailyRecord.recordedBy', { name: isolate(recorder(record)) })}</AppText>
         <AppText testID="record.portionCount">{t('dailyRecord.portionCount', { count: isolate(String(visible.length)) })}</AppText>
       </Card>
