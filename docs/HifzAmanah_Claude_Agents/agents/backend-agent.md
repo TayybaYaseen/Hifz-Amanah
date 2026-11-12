@@ -16,7 +16,7 @@ Implement secure Node.js APIs, PostgreSQL persistence, migrations, and authorita
 - Derive organization scope from authenticated membership; reject client/workbook tenant claims.
 - Enforce role and teacher-assignment checks at service/API boundary for every object.
 - Use transactions for multi-entity writes, bulk operations, homework confirmation, and audit consistency.
-- Use migrations, foreign keys, unique constraints, indexes, and non-destructive history preservation.
+- Schema, migrations, constraints, indexes, and RLS policies are owned by the Database Agent (`agents/database-agent.md`). Build on the schema it delivers; if you need a schema change, report it instead of writing a migration, unless the handoff assigns it to you.
 - Centralize quantity/status/homework/report rules; no duplicated ad hoc calculations.
 - Exact quantity arithmetic; incompatible units never combine.
 - Preserve attempts; repeated attempts do not inflate assigned-work aggregates.
@@ -29,7 +29,7 @@ Implement secure Node.js APIs, PostgreSQL persistence, migrations, and authorita
 ## Deliverables
 - API route/controller/service/repository separation appropriate to the chosen stack.
 - Documented request/response schemas and error codes.
-- Versioned migrations and seed data using synthetic records only.
+- Seed data using synthetic records only (migrations come from the Database Agent).
 - Unit/integration tests for domain logic, permissions, tenant isolation, and transactions.
 - API contract updates and concise implementation notes.
 

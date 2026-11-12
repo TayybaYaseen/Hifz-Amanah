@@ -79,7 +79,7 @@ flowchart LR
 |---|---|---|
 | Framework | React Native + Expo (development builds, not Expo Go, for native modules) | Decided (RN/Expo); build mode Approved |
 | Language | TypeScript (strict) | Approved |
-| Local DB | `expo-sqlite` + a typed query layer (e.g. Drizzle ORM for SQLite) with versioned local migrations | Approved |
+| Local DB | `expo-sqlite` behind a small typed SQL driver (`apps/mobile/src/local-db/driver.ts`), no ORM, with versioned append-only local migrations ([ADR-019](adr/ADR-019-database-access-layer.md), DEC-B85) | Approved |
 | Server state | TanStack Query for online-only reads (Student/Parent views, AI, authoritative reports) | Approved |
 | Navigation | React Navigation with role-specific navigators (`TeacherNavigator`, `AdminNavigator`, `StudentNavigator`, `GuardianNavigator`) | From `design.md` §9 |
 | i18n | i18next + ICU message format; locales `en`, `ur`, `ur-Latn` (Roman Urdu) | Approved |
@@ -98,7 +98,7 @@ flowchart LR
 | Runtime | Node.js LTS, TypeScript | Decided (Node.js) |
 | HTTP framework | Fastify (schema-first, fast, good plugin model) | Approved |
 | Validation / contracts | Zod schemas shared with the app through `packages/contracts` | Approved |
-| DB access | Drizzle ORM or Kysely over `pg`, with SQL migrations in version control | Approved (the one chosen at scaffolding is recorded in an ADR; versioned migrations Decided, NFR-MNT-002) |
+| DB access | Kysely over `pg`, with plain SQL migrations in version control ([ADR-019](adr/ADR-019-database-access-layer.md), DEC-B85) | Approved (versioned migrations Decided, NFR-MNT-002) |
 | Job queue | `pg-boss` (Postgres-backed, so no extra Redis service in MVP) | Approved |
 | Password hashing | Argon2id | Approved |
 | API style | REST + JSON for resources; dedicated `/sync/push` and `/sync/pull` endpoints for offline sync | Approved |
@@ -769,6 +769,7 @@ App (online, Teacher/Admin) → POST /analytics/{studentId}/ai-recommendation
 | ADR-016 | Row-level security pattern: `hifz_tenant` role, `SET LOCAL ROLE` + `app.current_org_id` per transaction, `FORCE` RLS ([docs/adr/ADR-016](adr/ADR-016-postgres-row-level-security-pattern.md); implements ADR-006) | Accepted 2026-11-08 (F12 decision Q9) |
 | ADR-017 | Quran reference data: extend `quran-ref` (source catalogue + licence gate, line-level 16-line layout with line types and word positions, optional divisions), offline snapshot cache on devices, import validation and reviewer sign-off ([docs/adr/ADR-017](adr/ADR-017-quran-reference-data-model.md)) | Accepted 2026-11-09 (SRS DEC-B72); §8 delivery waits on OD-QR-7 |
 | ADR-018 | Quran reference snapshot (`GET /quran/reference/version|snapshot`, content-addressed version, SHA-256, ETag) and disposable `ref_*` SQLite cache on staff devices; full atomic replace; no F12 protocol change; licence withdrawal revokes snapshot versions, removed from devices on next connection ([docs/adr/ADR-018](adr/ADR-018-quran-reference-snapshot-offline-cache.md)) | **Accepted and implemented 2026-11-09** (DEC-B75, DEC-B79, DEC-B80…B84); server migration 0011, workspace migration 5 |
+| ADR-019 | Database access layer as built: Kysely over `pg` with plain SQL migrations on the server (an approved option); a small typed SQL driver over `expo-sqlite` with append-only local migrations on mobile, no Drizzle ([docs/adr/ADR-019](adr/ADR-019-database-access-layer.md)) | Accepted 2026-11-12 (SRS DEC-B85) |
 
 ### 19.1 Implementation gates (closed 2026-10-30)
 

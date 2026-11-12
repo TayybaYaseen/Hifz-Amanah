@@ -1,6 +1,6 @@
 # F07 · Mistakes and quality
 
-**Status:** draft
+**Status:** Approved 
 **Brief:** [00-product-brief.md](../00-product-brief.md) · **Flow:** Portion card performance area and overall performance label ([design.md §4.7, §5.4](../design.md))
 **Requirements:** FR-ATT-008/009/010, FR-RPT-004, FR-AI-004, FR-ATT-011/012
 **Stories:** US-028 – US-032 · **Depends on:** F05

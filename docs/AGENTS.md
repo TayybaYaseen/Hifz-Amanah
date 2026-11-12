@@ -29,8 +29,8 @@ Always cite requirement IDs (e.g. `FR-HW-012`, `US-037`) in PR descriptions, ADR
 
 | Layer | Decided | Approved 2026-10-30 (SRS §17 DEC-B51; changes need a new ADR) |
 |---|---|---|
-| Mobile | React Native + Expo, Android , SQLite on device | TypeScript strict, expo-sqlite + Drizzle, React Navigation, TanStack Query, i18next |
-| API | Node.js, PostgreSQL, HTTPS | TypeScript, Fastify, Zod, Drizzle/Kysely, pg-boss, Argon2id |
+| Mobile | React Native + Expo, Android , SQLite on device | TypeScript strict, expo-sqlite behind a small SQL driver (no ORM; ADR-019), React Navigation, TanStack Query, i18next |
+| API | Node.js, PostgreSQL, HTTPS | TypeScript, Fastify, Zod, Kysely (ADR-019), pg-boss, Argon2id |
 | Files | — | exceljs (Excel), Playwright/Chromium (PDF), AWS S3 |
 | Platform | — | AWS Mumbai, Amazon SES (OTP email), Expo Push Service, auth built into the API with TOTP 2FA for Owner/Admin |
 | Tests | — | Vitest, fast-check, Testcontainers, Maestro |
