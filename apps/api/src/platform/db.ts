@@ -284,6 +284,7 @@ export interface AttendanceRecordsTable {
 // ---------- F05 · Daily Hifz entry (0012_hifz.sql). Row-level security applies: query through withTenant(). ----------
 
 type QuantityUnitColumn = 'PARA' | 'LINES' | 'AYAT' | 'PAGES';
+type OverallLabelColumn = 'EXCELLENT' | 'GOOD' | 'AVERAGE' | 'NEEDS_IMPROVEMENT';
 
 export interface DailyRecordsTable {
   id: string;
@@ -293,6 +294,8 @@ export interface DailyRecordsTable {
   /** The Teacher's calendar date (F05-AC1); never changed by save or sync time. */
   report_date: string;
   session_label: string | null;
+  /** F07 (0013): the optional overall performance label; never derived from quality. */
+  overall_label: ColumnType<OverallLabelColumn | null, OverallLabelColumn | null | undefined>;
   recorded_by: string;
   client_saved_at: Timestamp | null;
   server_received_at: Timestamp;
@@ -359,6 +362,9 @@ export interface AttemptMistakesTable {
   category: 'HARKAAT' | 'TAJWEED' | 'LAFZI' | 'AYAT_BHOOLNA' | 'TARTEEB' | 'WAQF_IBTIDA';
   severity: 'MINOR' | 'MAJOR';
   repeated: boolean;
+  /** F07 (0013): optional short note; internal staff text unless note_visibility is SHARED. Never logged. */
+  note: ColumnType<string | null, string | null | undefined>;
+  note_visibility: ColumnType<'INTERNAL' | 'SHARED', 'INTERNAL' | 'SHARED' | undefined>;
   created_at: Timestamp;
   superseded_at: Timestamp | null;
 }

@@ -12,9 +12,11 @@
 //   completed, quality, noMistakes, mistakes) conflicts as a unit; never last-write-wins. A corrected mistake list
 //   replaces the old rows by detaching them (superseded_at), never deleting them.
 // - Remarks are internal staff text: never logged, audited by field name only, never sent to a Student or Parent.
+// - F07: each mistake may carry a short note (≤ 200 characters after trimming, DEC-B86), INTERNAL by default or SHARED
+//   (FR-ATT-012). Notes are free text, so `mistakes` is audited by field name only (counts appear in the summary).
 import { v7 as uuidv7 } from 'uuid';
 import { z } from 'zod';
-import { PortionAttemptCreateFields, PortionAttemptUpdateFields, type MistakeValue } from '@hifz/contracts';
+import { PortionAttemptCreateFields, PortionAttemptUpdateFields, type MistakeInput, type MistakeValue } from '@hifz/contracts';
 import {
   PORTION_ATTEMPT_FIELDS,
   REMARKS_MAX,
@@ -25,6 +27,7 @@ import {
   type PortionDraft,
   type PortionStatus,
 } from '@hifz/domain/hifz';
+import { cleanNote } from '@hifz/domain/mistakes';
 import { valuesEqual } from '@hifz/domain/sync';
 import type { Quantity } from '@hifz/domain/quantity';
 import type { PortionAttemptsTable, Tx } from '../../platform/db.ts';
@@ -104,7 +107,7 @@ export async function currentMistakes(tx: Tx, organizationId: string, attemptIds
   if (attemptIds.length === 0) return out;
   const rows = await tx
     .selectFrom('attempt_mistakes')
-    .select(['attempt_id', 'category', 'severity', 'repeated'])
+    .select(['attempt_id', 'category', 'severity', 'repeated', 'note', 'note_visibility'])
     .where('organization_id', '=', organizationId)
     .where('attempt_id', 'in', [...attemptIds])
     .where('superseded_at', 'is', null)
@@ -113,7 +116,7 @@ export async function currentMistakes(tx: Tx, organizationId: string, attemptIds
     .execute();
   for (const r of rows) {
     const list = out.get(r.attempt_id) ?? [];
-    list.push({ category: r.category, severity: r.severity, repeated: r.repeated });
+    list.push({ category: r.category, severity: r.severity, repeated: r.repeated, note: r.note, noteVisibility: r.note_visibility });
     out.set(r.attempt_id, list);
   }
   return out;
@@ -121,7 +124,7 @@ export async function currentMistakes(tx: Tx, organizationId: string, attemptIds
 
 async function writeMistakes(tx: Tx, organizationId: string, attemptId: string, mistakes: readonly MistakeValue[], meta: WriteMeta): Promise<void> {
   if (mistakes.length === 0) return;
-  // Ids are generated here: mistakes are not offline-creatable on their own (F07 may add the separate entity).
+  // Ids are generated here: mistakes are not offline-creatable on their own; F07 keeps them inside the attempt.
   await tx
     .insertInto('attempt_mistakes')
     .values(
@@ -133,6 +136,8 @@ async function writeMistakes(tx: Tx, organizationId: string, attemptId: string, 
         category: m.category,
         severity: m.severity,
         repeated: m.repeated,
+        note: m.note,
+        note_visibility: m.noteVisibility,
         created_at: meta.at,
         superseded_at: null,
       })),
@@ -140,7 +145,9 @@ async function writeMistakes(tx: Tx, organizationId: string, attemptId: string, 
     .execute();
 }
 
-const mistakesOf = (list: readonly MistakeValue[]): MistakeValue[] => list.map((m) => ({ category: m.category, severity: m.severity, repeated: m.repeated }));
+/** The stored form, keys in a fixed order (exact conflict comparison): the note trimmed, a blank note none (DEC-B86). */
+const mistakesOf = (list: readonly MistakeInput[]): MistakeValue[] =>
+  list.map((m) => ({ category: m.category, severity: m.severity, repeated: m.repeated, note: cleanNote(m.note), noteVisibility: m.noteVisibility ?? 'INTERNAL' }));
 
 export function portionAttemptSyncHandler(): SyncHandler {
   const refuse = (issues: Issues): Prepared => ({ ok: false, issues });
@@ -178,8 +185,8 @@ export function portionAttemptSyncHandler(): SyncHandler {
     createSchema: z.strictObject(PortionAttemptCreateFields.shape),
     updateSchema: z.strictObject(PortionAttemptUpdateFields.shape),
     fieldSpec: PORTION_ATTEMPT_FIELDS,
-    // Remarks are internal text and never appear by value; every other field may.
-    auditValueFields: ['attemptNo', 'attemptedAt', 'status', 'completed', 'quality', 'noMistakes', 'mistakes'],
+    // Remarks and mistakes (which carry notes, F07) are internal text and never appear by value; the rest may.
+    auditValueFields: ['attemptNo', 'attemptedAt', 'status', 'completed', 'quality', 'noMistakes'],
     tables: [],
     async keysForCreate(fields, { tx, organizationId }) {
       const ctx = typeof fields.lessonPortionId === 'string' ? await loadPortionContext(tx, organizationId, fields.lessonPortionId) : null;
