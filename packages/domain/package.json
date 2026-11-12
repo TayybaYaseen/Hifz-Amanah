@@ -9,6 +9,8 @@
     "./sync": "./sync/index.ts",
     "./quantity": "./quantity/index.ts",
     "./hifz": "./hifz/index.ts",
+    "./quality": "./quality/index.ts",
+    "./mistakes": "./mistakes/index.ts",
     "./quran-ref": "./quran-ref/index.ts",
     "./quran-ref/synthetic-fixture": "./quran-ref/synthetic-fixture.ts"
   }

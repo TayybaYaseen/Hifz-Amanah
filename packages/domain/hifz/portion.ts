@@ -23,6 +23,7 @@ import {
 import { canCheckOffline } from '../quran-ref/snapshot.ts';
 import {
   MISTAKES_MAX,
+  MISTAKE_NOTE_MAX,
   REMARKS_MAX,
   normalizeAttempt,
   type MistakeEntry,
@@ -291,6 +292,8 @@ export function validateAttemptFields(portion: PortionDraft, attempt: AttemptDra
     const mistakes = attempt.mistakes ?? [];
     if (attempt.noMistakes && mistakes.length > 0) issues.push({ field: 'mistakes', code: 'NO_MISTAKES_CONFLICT' });
     if (mistakes.length > MISTAKES_MAX) issues.push({ field: 'mistakes', code: 'TOO_MANY', max: MISTAKES_MAX });
+    // A mistake note is short (F07, DEC-B86); the stored note is trimmed.
+    if (mistakes.some((m) => typeof m.note === 'string' && m.note.trim().length > MISTAKE_NOTE_MAX)) issues.push({ field: 'mistakes', code: 'TOO_LONG', max: MISTAKE_NOTE_MAX });
     if (attempt.remarks && attempt.remarks.length > REMARKS_MAX) issues.push({ field: 'remarks', code: 'TOO_LONG', max: REMARKS_MAX });
   }
   return sortIssues(portion.section, portion.position, issues);

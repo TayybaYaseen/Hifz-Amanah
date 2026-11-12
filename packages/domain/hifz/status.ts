@@ -94,7 +94,7 @@ export function normalizeAttempt(input: AttemptOutcome): NormalizedAttempt {
   return { status: input.status, completed, quality: input.quality, issues, completedDefaulted };
 }
 
-// ---------- Mistakes (shape only; categories' meaning, notes, and aggregation are F07) ----------
+// ---------- Mistakes (shape; notes, visibility, and counts are @hifz/domain/mistakes, F07) ----------
 
 export const MISTAKE_CATEGORIES = ['HARKAAT', 'TAJWEED', 'LAFZI', 'AYAT_BHOOLNA', 'TARTEEB', 'WAQF_IBTIDA'] as const;
 export type MistakeCategory = (typeof MISTAKE_CATEGORIES)[number];
@@ -107,7 +107,14 @@ export interface MistakeEntry {
   category: MistakeCategory;
   severity: MistakeSeverity;
   repeated: boolean;
+  /** Optional short note (F07, FR-ATT-012; at most MISTAKE_NOTE_MAX). Internal staff text unless SHARED. */
+  note?: string | null;
+  /** INTERNAL (default, staff only) or SHARED (also shown to the Student and Parent). */
+  noteVisibility?: 'INTERNAL' | 'SHARED';
 }
+
+/** Longest mistake note, in characters (DEC-B86, FR-ATT-012). */
+export const MISTAKE_NOTE_MAX = 200;
 
 /**
  * The attempt's mistake count (FR-ATT-011): the number of mistakes when any are listed, 0 only when "No mistakes" was
