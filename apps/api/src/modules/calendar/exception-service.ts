@@ -14,7 +14,7 @@ import { recordAudit } from '../audit/audit.ts';
 import type { Actor } from '../identity/auth-service.ts';
 import { lockOrganization } from '../sync/change-log.ts';
 import { requireRole, requiredText, rosterActor, uniqueViolation } from '../roster/shared.ts';
-import { noDailyRecordsYet, type DailyRecordCounter } from './shared.ts';
+import type { DailyRecordCounter } from './shared.ts';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -23,7 +23,7 @@ export class ExceptionService {
   private readonly clock: Clock;
   private readonly dailyRecords: DailyRecordCounter;
 
-  constructor(db: Db, clock: Clock, dailyRecords: DailyRecordCounter = noDailyRecordsYet) {
+  constructor(db: Db, clock: Clock, dailyRecords: DailyRecordCounter) {
     this.db = db;
     this.clock = clock;
     this.dailyRecords = dailyRecords;

@@ -343,7 +343,8 @@ describe('F12 · push: a met dependency needs its record (review N8)', () => {
 describe('F12 · push: dependencies, validation, scope (continued)', () => {
   it('F12 unit: an entity with no registered handler is REJECTED ENTITY_NOT_SUPPORTED', async () => {
     const teacher = await s.h.signIn('teacher.a1');
-    const daily = op({ entity: 'daily_record', fields: {} });
+    // daily_record gained a handler in F05; attempt_mistake stays reserved (F07).
+    const daily = op({ entity: 'attempt_mistake', fields: {} });
     expect(await pushOk(s.h, teacher, [daily])).toEqual([{ opId: daily.opId, status: 'REJECTED', code: 'ENTITY_NOT_SUPPORTED' }]);
     const command = op({ opType: 'COMMAND', command: 'CONFIRM_HOMEWORK', baseVersion: 1, fields: {} });
     expect((await pushOk(s.h, teacher, [command]))[0]).toMatchObject({ status: 'REJECTED', code: 'VALIDATION', fields: { opType: 'NOT_SUPPORTED' } });

@@ -7,12 +7,15 @@ export class ApiFailure extends Error {
   readonly code: ErrorCode | 'NETWORK';
   readonly status: number;
   readonly fields: Record<string, string>;
+  /** The whole `error` object of the response, for codes that carry more than fields (F05 MODE_CONFLICTS). */
+  readonly details: Readonly<Record<string, unknown>> | null;
 
-  constructor(code: ErrorCode | 'NETWORK', status: number, fields: Record<string, string> = {}) {
+  constructor(code: ErrorCode | 'NETWORK', status: number, fields: Record<string, string> = {}, details: Readonly<Record<string, unknown>> | null = null) {
     super(code);
     this.code = code;
     this.status = status;
     this.fields = fields;
+    this.details = details;
   }
 }
 
@@ -55,7 +58,7 @@ export async function request<T>(baseUrl: string, fetchFn: Fetch, path: string, 
   }
   if (!response.ok) {
     const error = (payload as ApiError | null)?.error;
-    throw new ApiFailure(error?.code ?? 'INTERNAL', response.status, error?.fields ?? {});
+    throw new ApiFailure(error?.code ?? 'INTERNAL', response.status, error?.fields ?? {}, (error as unknown as Record<string, unknown> | undefined) ?? null);
   }
   return payload as T;
 }

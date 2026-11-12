@@ -281,6 +281,88 @@ export interface AttendanceRecordsTable {
   row_version: ColumnType<string, number | undefined, number>;
 }
 
+// ---------- F05 · Daily Hifz entry (0012_hifz.sql). Row-level security applies: query through withTenant(). ----------
+
+type QuantityUnitColumn = 'PARA' | 'LINES' | 'AYAT' | 'PAGES';
+
+export interface DailyRecordsTable {
+  id: string;
+  organization_id: string;
+  student_id: string;
+  class_id: string;
+  /** The Teacher's calendar date (F05-AC1); never changed by save or sync time. */
+  report_date: string;
+  session_label: string | null;
+  recorded_by: string;
+  client_saved_at: Timestamp | null;
+  server_received_at: Timestamp;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+  updated_by: string;
+  row_version: ColumnType<string, number | undefined, number>;
+}
+
+export interface LessonPortionsTable {
+  id: string;
+  organization_id: string;
+  daily_record_id: string;
+  section: 'SABAQ' | 'SABQI' | 'MANZIL';
+  position: number;
+  para_number: number | null;
+  surah_start: number | null;
+  ayah_start: number | null;
+  surah_end: number | null;
+  ayah_end: number | null;
+  is_extra: boolean;
+  assigned_unit: QuantityUnitColumn;
+  assigned_num: number;
+  assigned_den: number;
+  total_lines: number | null;
+  total_lines_source: 'LAYOUT' | 'MANUAL' | null;
+  line_count_edition: string | null;
+  removed_at: Timestamp | null;
+  removed_by: string | null;
+  created_by: string;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+  updated_by: string;
+  row_version: ColumnType<string, number | undefined, number>;
+}
+
+export interface PortionAttemptsTable {
+  id: string;
+  organization_id: string;
+  lesson_portion_id: string;
+  attempt_no: number;
+  attempted_at: Timestamp;
+  recorded_by: string;
+  status: 'COMPLETED' | 'PARTIAL' | 'NOT_REMEMBERED' | 'ABSENT' | 'NOT_ASSIGNED' | 'PENDING';
+  completed_unit: QuantityUnitColumn | null;
+  completed_num: number | null;
+  completed_den: number | null;
+  quality: number | null;
+  no_mistakes: boolean;
+  /** Internal staff text: never logged, audited by value, or sent to a Student or Parent. */
+  remarks: string | null;
+  remarks_visibility: Generated<'INTERNAL'>;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+  updated_by: string;
+  row_version: ColumnType<string, number | undefined, number>;
+}
+
+export interface AttemptMistakesTable {
+  id: string;
+  organization_id: string;
+  attempt_id: string;
+  position: number;
+  category: 'HARKAAT' | 'TAJWEED' | 'LAFZI' | 'AYAT_BHOOLNA' | 'TARTEEB' | 'WAQF_IBTIDA';
+  severity: 'MINOR' | 'MAJOR';
+  repeated: boolean;
+  created_at: Timestamp;
+  superseded_at: Timestamp | null;
+}
+
 // ---------- F06 · Quran reference (0009_quran_ref.sql) ----------
 
 export interface MushafEditionsTable {
@@ -438,6 +520,10 @@ export interface MushafLayoutLinesTable {
 }
 
 export interface Database {
+  daily_records: DailyRecordsTable;
+  lesson_portions: LessonPortionsTable;
+  portion_attempts: PortionAttemptsTable;
+  attempt_mistakes: AttemptMistakesTable;
   mushaf_editions: MushafEditionsTable;
   quran_imports: QuranImportsTable;
   quran_sources: QuranSourcesTable;

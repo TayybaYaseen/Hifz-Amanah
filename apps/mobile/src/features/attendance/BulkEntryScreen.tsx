@@ -68,7 +68,7 @@ const STATUS_KEY: Record<AttendanceStatus, string> = {
   ABSENT: 'attendance.statuses.ABSENT',
 };
 
-export function BulkEntryScreen({ me }: { me: MeResponse }) {
+export function BulkEntryScreen({ me, onRecordHifz }: { me: MeResponse; onRecordHifz?: (params: { classId: string; studentId: string; date: string }) => void }) {
   const { t } = useTranslation();
   const { session } = useSession();
   const sync = useSync();
@@ -334,6 +334,10 @@ export function BulkEntryScreen({ me }: { me: MeResponse }) {
                   <AppText role="helper" color={colors.danger} testID={`bulk.row.${name}.error`}>
                     {`⚠ ${error}`}
                   </AppText>
+                ) : null}
+                {/* F05: Hifz is recorded in the student's Daily Entry, never here (F04-AC6). */}
+                {onRecordHifz && classId ? (
+                  <Button testID={`bulk.row.${name}.recordHifz`} variant="tertiary" label={t('attendance.recordHifz')} onPress={() => onRecordHifz({ classId, studentId: row.studentId, date })} />
                 ) : null}
               </Card>
             );

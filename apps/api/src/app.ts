@@ -19,6 +19,12 @@ import { AttendanceService } from './modules/calendar/attendance-service.ts';
 import { ExceptionService } from './modules/calendar/exception-service.ts';
 import { registerCalendarRoutes } from './modules/calendar/routes.ts';
 import { QuranMetadataService } from './modules/quran-ref/metadata-service.ts';
+import { dailyRecordSyncHandler } from './modules/hifz/daily-record-sync.ts';
+import { DailyRecordService } from './modules/hifz/daily-record-service.ts';
+import { lessonPortionSyncHandler } from './modules/hifz/lesson-portion-sync.ts';
+import { portionAttemptSyncHandler } from './modules/hifz/portion-attempt-sync.ts';
+import { registerHifzRoutes } from './modules/hifz/routes.ts';
+import { countDailyRecords, recitedPortions, sabaqRanges } from './modules/hifz/shared.ts';
 import { QuranReferenceService } from './modules/quran-ref/reference-service.ts';
 import { registerQuranRoutes } from './modules/quran-ref/routes.ts';
 import { QuranSeedLoader, readSeedFile } from './modules/quran-ref/seed.ts';
@@ -110,22 +116,35 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
 
   // ---------- Calendar and attendance (F04) ----------
+  // F05 supplies the daily-record lookups: recited portions (FR-DAY-010, F04-AC19) and records on a date (F04-AC20).
   registerCalendarRoutes(app, {
     authenticate: (request) => auth.authenticate(bearer(request)),
     schedules: new ScheduleService(deps.db, deps.clock),
-    exceptions: new ExceptionService(deps.db, deps.clock),
-    attendance: new AttendanceService(deps.db, deps.clock),
+    exceptions: new ExceptionService(deps.db, deps.clock, countDailyRecords),
+    attendance: new AttendanceService(deps.db, deps.clock, recitedPortions),
   });
 
+  // Sabaq portions are the records with a Quran range on the FR-SAB-007 review list (F05).
+  const quranMetadata = new QuranMetadataService(deps.db, deps.clock, sabaqRanges, { allowSynthetic: deps.config.env === 'test' });
   registerQuranRoutes(app, {
     authenticate: (request) => auth.authenticate(bearer(request)),
-    quran: new QuranMetadataService(deps.db, deps.clock, undefined, { allowSynthetic: deps.config.env === 'test' }),
+    quran: quranMetadata,
     reference: new QuranReferenceService(deps.db, deps.clock, { allowSynthetic: deps.config.env === 'test' }),
   });
 
   if (deps.testSync && deps.config.env !== 'test') throw new Error('Test sync handlers are allowed only when NODE_ENV=test');
-  // Production entity handlers: attendance (F04). F05/F07/F08 register theirs here; tests may add sync_probe.
-  const syncRegistry = new SyncRegistry([attendanceSyncHandler({ clock: deps.clock }), ...(deps.testSync?.handlers ?? [])]);
+  // ---------- Daily Hifz entry (F05) ----------
+  registerHifzRoutes(app, { authenticate: (request) => auth.authenticate(bearer(request)), records: new DailyRecordService(deps.db, deps.clock) });
+
+  // Production entity handlers: attendance (F04), daily records, portions, attempts (F05). F07/F08 register theirs
+  // here; tests may add sync_probe.
+  const syncRegistry = new SyncRegistry([
+    attendanceSyncHandler({ clock: deps.clock, recited: recitedPortions }),
+    dailyRecordSyncHandler({ clock: deps.clock }),
+    lessonPortionSyncHandler({ quran: quranMetadata }),
+    portionAttemptSyncHandler(),
+    ...(deps.testSync?.handlers ?? []),
+  ]);
   const syncScopes = deps.testSync?.scopes ?? rosterScope(deps.db, deps.clock);
   const syncControl = new SyncControl(deps.config.syncMinProtocolVersion);
   const syncDeps = { db: deps.db, clock: deps.clock, registry: syncRegistry, scopes: syncScopes };

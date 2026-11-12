@@ -205,3 +205,60 @@ export async function saveMark(outbox: Outbox, input: MarkToSave, ctx: { classId
   );
   return id;
 }
+
+/**
+ * The same write as {@link saveMark}, inside the caller's transaction: F05 Daily Entry saves an attendance change
+ * together with the daily record, its portions, and their attempts in ONE transaction (F05 UI spec §2.3, F12-AC1).
+ * Returns the record ID and the queued op ID (portions depend on it, so the server sees the attendance first).
+ */
+export async function writeMarkInTx(
+  tx: SqlExecutor,
+  outbox: Outbox,
+  input: MarkToSave,
+  ctx: { classId: string; date: string; role: MarkingRole },
+): Promise<{ id: string; opId: string }> {
+  const mark = normalizeMark(input.mark);
+  const leaveStatus = leaveStatusAfter(mark, ctx.role, input.existing);
+  if (input.existing) {
+    const id = input.existing.id;
+    await tx.run('UPDATE attendance_records SET status = ?, leave_status = ?, leave_reason = ?, absent_note = ? WHERE id = ?', [
+      mark.status,
+      leaveStatus,
+      mark.leaveReason,
+      mark.absentNote,
+      id,
+    ]);
+    const { opId } = await outbox.enqueueUpdate(tx, {
+      entity: 'attendance_record',
+      entityId: id,
+      fields: { status: mark.status, leaveReason: mark.leaveReason, absentNote: mark.absentNote },
+      label: input.label,
+    });
+    return { id, opId };
+  }
+  const id = outbox.newEntityId();
+  await tx.run(
+    `INSERT INTO attendance_records (id, row_version, student_id, class_id, report_date, status, leave_status, leave_reason, absent_note)
+     VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, input.studentId, ctx.classId, ctx.date, mark.status, leaveStatus, mark.leaveReason, mark.absentNote],
+  );
+  const { opId } = await outbox.enqueue(tx, {
+    entity: 'attendance_record',
+    entityId: id,
+    opType: 'CREATE',
+    baseVersion: null,
+    fields: { studentId: input.studentId, classId: ctx.classId, reportDate: ctx.date, ...mark },
+    label: input.label,
+  });
+  return { id, opId };
+}
+
+/** The student's mark on a date, whatever the class (Daily Entry reads it before showing the sections). */
+export async function readStudentMark(db: SqlExecutor, studentId: string, date: string): Promise<LocalMark | null> {
+  const row = await db.get<Row>(
+    `SELECT id, row_version, student_id, status, leave_status, leave_reason, absent_note FROM attendance_records
+     WHERE student_id = ? AND report_date = ? ORDER BY (row_version IS NULL) DESC, id LIMIT 1`,
+    [studentId, date],
+  );
+  return row ? toMark(row) : null;
+}

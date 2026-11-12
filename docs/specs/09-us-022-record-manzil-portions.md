@@ -6,7 +6,7 @@
 | **User story** | US-022 |
 | **Feature** | [F05 · Daily Hifz entry](09-f05-daily-hifz-entry.md) |
 | **Epic** | EPIC 5 — Daily Hifz Entry ([user-stories.md](../user-stories.md)) |
-| **Status** | draft |
+| **Status** | Approved |
 | **Priority** | Not specified in the source documents (SRS, user-stories.md, feature specs). None is assigned here. |
 | **Split from** | `docs/specs/F05-daily-hifz-entry.md` on 2026-10-30 |
 
@@ -123,7 +123,7 @@ Nothing specific to this story in the source documents.
 **Mobile (Maestro):**
 
 - [e2e/mobile/f05-daily-entry/sections-and-portions.yaml](../../e2e/mobile/f05-daily-entry/sections-and-portions.yaml) — F05 daily entry — Sabaq, two Sabqi, three Manzil with separate outcomes
-- [e2e/mobile/f05-daily-entry/validation-and-edits.yaml](../../e2e/mobile/f05-daily-entry/validation-and-edits.yaml) — F05 daily entry — portion errors, edit notice, Absent, Not Remembered default
+- [e2e/mobile/f05-daily-entry/validation-and-edits.yaml](../../e2e/mobile/f05-daily-entry/validation-and-edits.yaml) — F05 daily entry — portion errors, Absent, Not Remembered default and correction
 
 **Unit (Vitest):**
 

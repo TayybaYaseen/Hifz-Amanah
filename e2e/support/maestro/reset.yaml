@@ -1,6 +1,8 @@
 # Subflow: reset the test environment to the seeded personas, then start the app fresh.
 appId: com.hifzamanah.app
 ---
+# A flow that failed while offline leaves airplane mode on, and the next app start could not reach Metro or the API.
+- setAirplaneMode: disabled
 - runScript:
     file: control.js
     env:

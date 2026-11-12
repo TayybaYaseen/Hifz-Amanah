@@ -6,7 +6,7 @@
 | **User story** | US-023 |
 | **Feature** | [F05 · Daily Hifz entry](09-f05-daily-hifz-entry.md) |
 | **Epic** | EPIC 5 — Daily Hifz Entry ([user-stories.md](../user-stories.md)) |
-| **Status** | draft |
+| **Status** | Approved |
 | **Priority** | Not specified in the source documents (SRS, user-stories.md, feature specs). None is assigned here. |
 | **Split from** | `docs/specs/F05-daily-hifz-entry.md` on 2026-10-30 |
 
@@ -129,6 +129,7 @@ Nothing specific to this story in the source documents.
 **Mobile (Maestro):**
 
 - [e2e/mobile/f05-daily-entry/attempts.yaml](../../e2e/mobile/f05-daily-entry/attempts.yaml) — F05 attempts — second attempt keeps the first; history; late sync keeps the date
+- [e2e/mobile/f05-daily-entry/attempts-weekly-report.yaml](../../e2e/mobile/f05-daily-entry/attempts-weekly-report.yaml) — F05 attempts — the weekly report uses the latest attempt and counts the assigned quantity once (pending until F09)
 
 **Unit (Vitest):**
 

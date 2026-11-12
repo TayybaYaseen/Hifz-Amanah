@@ -63,8 +63,13 @@ export interface SyncHandler {
   readonly auditValueFields: readonly string[];
   /** Tables the test-control reset truncates with the sync tables (test builds only). */
   readonly tables: readonly string[];
-  /** Scope keys of a row about to be created, from its validated fields. */
-  keysForCreate(fields: Record<string, unknown>): ScopeKeys;
+  /**
+   * Scope keys of a row about to be created, from its validated fields. A child entity whose keys live on its
+   * parent (F05: a lesson portion's student and class are its daily record's) loads them in the op's transaction;
+   * a parent the caller's organization does not have gives null keys, which only a whole-madrasa scope passes, and
+   * prepareCreate then refuses it as NOT_FOUND.
+   */
+  keysForCreate(fields: Record<string, unknown>, ctx: { tx: Tx; organizationId: string }): ScopeKeys | Promise<ScopeKeys>;
   /** One row of the organization, or null. With `forUpdate` the row is locked for the transaction. */
   load(tx: Tx, organizationId: string, id: string, options: { forUpdate: boolean }): Promise<SyncRow | null>;
   loadMany(tx: Tx, organizationId: string, ids: readonly string[]): Promise<SyncRow[]>;

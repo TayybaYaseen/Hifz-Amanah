@@ -26,7 +26,7 @@ import { recordAudit } from '../audit/audit.ts';
 import type { Actor } from '../identity/auth-service.ts';
 import { requireAccess, requireRole, rosterActor, todayFor } from '../roster/shared.ts';
 import { appendChange, lockOrganization } from '../sync/change-log.ts';
-import { activeExceptions, dayFor, enrollmentsOf, noRecitedPortionsYet, scheduleVersions, type RecitedLookup } from './shared.ts';
+import { activeExceptions, dayFor, enrollmentsOf, scheduleVersions, type RecitedLookup } from './shared.ts';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -78,7 +78,7 @@ export class AttendanceService {
   private readonly clock: Clock;
   private readonly recited: RecitedLookup;
 
-  constructor(db: Db, clock: Clock, recited: RecitedLookup = noRecitedPortionsYet) {
+  constructor(db: Db, clock: Clock, recited: RecitedLookup) {
     this.db = db;
     this.clock = clock;
     this.recited = recited;

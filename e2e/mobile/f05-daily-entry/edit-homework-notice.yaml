@@ -1,0 +1,15 @@
+# F05 · Daily Hifz entry — mobile E2E (docs/specs/09-us-018-create-individual-daily-report.md; design.md §5.11)
+# Covers: F05-AC4
+# Pending until F08 (homework): confirmed homework and draft suggestions do not exist yet (docs/handover/F05-plan.md §1).
+# The notice itself is checked in validation-and-edits.yaml.
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
+name: F05 daily entry — editing a record keeps confirmed homework and updates the draft
+tags:
+  - pending
+  - F05
+  - US-018
+---
+- launchApp:
+    clearState: true
+# 1. With a confirmed homework from this record (test control), edit a portion →
+#    notice "Confirmed homework was not changed"; the draft suggestion updates.                        (F05-AC4)

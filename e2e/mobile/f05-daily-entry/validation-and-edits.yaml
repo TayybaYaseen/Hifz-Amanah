@@ -1,19 +1,174 @@
 # F05 · Daily Hifz entry — mobile E2E (docs/specs/09-f05-daily-hifz-entry.md; design.md §4.7, §5.11)
-# Covers: F05-AC3, F05-AC4, F05-AC5, F05-AC14
+# Covers: F05-AC3, F05-AC5, F05-AC14
+# The confirmed-homework step of F05-AC4 waits for F08: see edit-homework-notice.yaml (pending).
+# SYNTHETIC DATA ONLY: seeded personas and the synthetic Quran fixture.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
-name: F05 daily entry — portion errors, edit notice, Absent, Not Remembered default
+name: F05 daily entry — portion errors, Absent, Not Remembered default and correction
 tags:
-  - pending
   - F05
   - US-018
   - US-022
 ---
-- launchApp:
-    clearState: true
-# 1. Sign in as teacher.a1 → Daily Entry S1; add Sabqi · Portion 2 without a unit; save.
-# 2. Error "Sabqi · Portion 2: unit is required"; every entered value is still there.                  (F05-AC3)
-# 3. Manzil Para 10 Not Remembered, assigned Half, no completed → saved; remaining shows 1/2 Para.     (F05-AC14)
-# 4. Correct completed to Rubu → remaining 1/4 Para.                                                   (F05-AC14)
-# 5. With a confirmed homework from this record (test control), edit a portion →
-#    notice "Confirmed homework was not changed"; the draft suggestion updates.                        (F05-AC4)
-# 6. Daily Entry S2 marked Absent → no portion shows as failed; no quality control is enabled.        (F05-AC5)
+- runFlow: ../../support/maestro/reset.yaml
+- runScript:
+    file: ../../support/maestro/control.js
+    env:
+      ACTION: quranSeed
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- tapOn: { id: "nav.dailyEntry" }
+- extendedWaitUntil:
+    visible: { id: "daily.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "daily.class.Hifz A1" }
+- tapOn: { id: "daily.student.EXT-A-001" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.attendance.PRESENT" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "daily.attendance.PRESENT" }, direction: UP, timeout: 60000, centerElement: true }
+- waitForAnimationToEnd
+- tapOn: { id: "daily.attendance.PRESENT" }
+# 1. Sabqi · Portion 1 complete; Sabqi · Portion 2 with Para 4, a status and remarks, but no unit; save.
+- runFlow:
+    file: ../../support/maestro/daily-revision-portion.yaml
+    env: { SECTION: sabqi, N: "1", PARA: "1", UNIT: COMPLETE, STATUS: COMPLETED, COMPLETED: "" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabqi.add" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "daily.sabqi.add" }, direction: UP, timeout: 60000, centerElement: true }
+- waitForAnimationToEnd
+- tapOn: { id: "daily.sabqi.add" }
+- waitForAnimationToEnd
+# A tap that only stopped the scroll is retried once, and only when the new card did not appear.
+- runFlow:
+    when: { notVisible: { id: "daily.sabqi.portion.2.title" } }
+    commands:
+      - tapOn: { id: "daily.sabqi.add" }
+      - waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabqi.portion.2.para" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "daily.sabqi.portion.2.para" }, direction: UP, timeout: 60000, centerElement: true }
+- waitForAnimationToEnd
+- tapOn: { id: "daily.sabqi.portion.2.para" }
+- eraseText: 2
+- inputText: "4"
+- pressKey: Enter
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabqi.portion.2.status.PARTIAL" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "daily.sabqi.portion.2.status.PARTIAL" }, direction: UP, timeout: 60000, centerElement: true }
+- waitForAnimationToEnd
+- tapOn: { id: "daily.sabqi.portion.2.status.PARTIAL" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabqi.portion.2.remarks" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "daily.sabqi.portion.2.remarks" }, direction: UP, timeout: 60000, centerElement: true }
+- waitForAnimationToEnd
+- tapOn: { id: "daily.sabqi.portion.2.remarks" }
+- inputText: "Kept remark"
+- waitForAnimationToEnd
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- scrollUntilVisible: { element: { id: "daily.save" }, direction: DOWN, timeout: 60000, visibilityPercentage: 50, optional: true }
+- scrollUntilVisible: { element: { id: "daily.save" }, direction: UP, timeout: 60000, visibilityPercentage: 50 }
+- tapOn: { id: "daily.save" }
+# 2. The error names the section, the portion number, and the field; every entered value is kept.               (F05-AC3)
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.errorSummary.0", text: ".*Sabqi.*2.*unit is required.*" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "daily.errorSummary.0", text: ".*Sabqi.*2.*unit is required.*" }, direction: UP, timeout: 60000, centerElement: true }
+- assertNotVisible: { id: "record.screen" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabqi.portion.2.unit.error" }, direction: UP, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "daily.sabqi.portion.2.unit.error" }, direction: DOWN, timeout: 60000, centerElement: true }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabqi.portion.2.para" }, direction: UP, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "daily.sabqi.portion.2.para" }, direction: DOWN, timeout: 60000, centerElement: true }
+- assertVisible: { id: "daily.sabqi.portion.2.para", text: "4" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabqi.portion.2.remarks" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "daily.sabqi.portion.2.remarks" }, direction: UP, timeout: 60000, centerElement: true }
+- assertVisible: { id: "daily.sabqi.portion.2.remarks", text: "Kept remark" }
+- scrollUntilVisible: { element: { id: "daily.sabqi.portion.2.statusChip.PARTIAL" }, direction: UP, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "daily.sabqi.portion.2.statusChip.PARTIAL" }, direction: DOWN, timeout: 60000, centerElement: true }
+- assertVisible: { id: "daily.sabqi.portion.2.statusChip.PARTIAL" }
+# 3. Remove that portion; Manzil Para 10, assigned Half, Not Remembered, no completed → saved with 0 completed
+#    and the full Half Para remaining.                                                                          (F05-AC14)
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.sabqi.portion.2.remove" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "daily.sabqi.portion.2.remove" }, direction: UP, timeout: 60000, centerElement: true }
+- waitForAnimationToEnd
+- tapOn: { id: "daily.sabqi.portion.2.remove" }
+- runFlow:
+    file: ../../support/maestro/daily-revision-portion.yaml
+    env: { SECTION: manzil, N: "1", PARA: "10", UNIT: HALF, STATUS: NOT_REMEMBERED, COMPLETED: "" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.manzil.portion.1.notRememberedDefault" }, direction: UP, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "daily.manzil.portion.1.notRememberedDefault" }, direction: DOWN, timeout: 60000, centerElement: true }
+- waitForAnimationToEnd
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- scrollUntilVisible: { element: { id: "daily.save" }, direction: DOWN, timeout: 60000, visibilityPercentage: 50, optional: true }
+- scrollUntilVisible: { element: { id: "daily.save" }, direction: UP, timeout: 60000, visibilityPercentage: 50 }
+- tapOn: { id: "daily.save" }
+- extendedWaitUntil:
+    visible: { id: "record.screen" }
+    timeout: 30000
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "record.manzil.portion.1.remaining" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "record.manzil.portion.1.remaining" }, direction: UP, timeout: 60000, centerElement: true }
+- assertVisible: { id: "record.manzil.portion.1.status.NOT_REMEMBERED" }
+- assertVisible: { id: "record.manzil.portion.1.completed", text: ".*0.*" }
+- assertVisible: { id: "record.manzil.portion.1.remaining", text: ".*1/2.*" }
+# 4. The Teacher corrects it: Partial with a Rubu completed → remaining 1/4 Para.                                (F05-AC14)
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "record.edit" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "record.edit" }, direction: UP, timeout: 60000, centerElement: true }
+- waitForAnimationToEnd
+- tapOn: { id: "record.edit" }
+- extendedWaitUntil:
+    visible: { id: "daily.editHelp" }
+    timeout: 15000
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.manzil.portion.1.status.PARTIAL" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "daily.manzil.portion.1.status.PARTIAL" }, direction: UP, timeout: 60000, centerElement: true }
+- waitForAnimationToEnd
+- tapOn: { id: "daily.manzil.portion.1.status.PARTIAL" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.manzil.portion.1.completed.RUBU" }, direction: UP, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "daily.manzil.portion.1.completed.RUBU" }, direction: DOWN, timeout: 60000, centerElement: true }
+- waitForAnimationToEnd
+- tapOn: { id: "daily.manzil.portion.1.completed.RUBU" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.manzil.portion.1.remaining" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "daily.manzil.portion.1.remaining" }, direction: UP, timeout: 60000, centerElement: true }
+- assertVisible: { id: "daily.manzil.portion.1.remaining", text: ".*1/4.*" }
+- waitForAnimationToEnd
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- scrollUntilVisible: { element: { id: "daily.save" }, direction: DOWN, timeout: 60000, visibilityPercentage: 50, optional: true }
+- scrollUntilVisible: { element: { id: "daily.save" }, direction: UP, timeout: 60000, visibilityPercentage: 50 }
+- tapOn: { id: "daily.save" }
+- extendedWaitUntil:
+    visible: { id: "record.screen" }
+    timeout: 30000
+- assertVisible: { id: "record.homeworkNotice" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "record.manzil.portion.1.remaining" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "record.manzil.portion.1.remaining" }, direction: UP, timeout: 60000, centerElement: true }
+- assertVisible: { id: "record.manzil.portion.1.remaining", text: ".*1/4.*" }
+# 5. S2 marked Absent: attendance only; no portion, no failure, and no quality control.                          (F05-AC5)
+- runFlow: ../../support/maestro/back-home.yaml
+- tapOn: { id: "nav.dailyEntry" }
+- extendedWaitUntil:
+    visible: { id: "daily.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "daily.class.Hifz A1" }
+- tapOn: { id: "daily.student.EXT-A-002" }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "daily.attendance.ABSENT" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "daily.attendance.ABSENT" }, direction: UP, timeout: 60000, centerElement: true }
+- waitForAnimationToEnd
+- tapOn: { id: "daily.attendance.ABSENT" }
+- waitForAnimationToEnd
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- scrollUntilVisible: { element: { id: "daily.save" }, direction: DOWN, timeout: 60000, visibilityPercentage: 50, optional: true }
+- scrollUntilVisible: { element: { id: "daily.save" }, direction: UP, timeout: 60000, visibilityPercentage: 50 }
+- assertNotVisible: { id: "daily.sabaq.add" }
+- assertNotVisible: { id: "daily.sabqi.portion.1.quality.1" }
+- assertNotVisible: { id: "daily.sabqi.portion.1.status.NOT_REMEMBERED" }
+- tapOn: { id: "daily.save" }
+- assertNotVisible: { id: "daily.saveError" }
+- assertNotVisible: { id: "record.screen" }

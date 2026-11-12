@@ -10,6 +10,7 @@
 import { PROTOCOL_VERSION } from '@hifz/contracts';
 import { attendanceMigration } from '../features/attendance/local.ts';
 import { quranReferenceMigration } from '../features/quran/referenceCache.ts';
+import { dailyEntryMigration } from '../features/daily-entry/local.ts';
 import type { SqlDriver, SqlExecutor } from './driver.ts';
 
 export interface Migration {
@@ -143,6 +144,8 @@ export const WORKSPACE_MIGRATIONS: readonly Migration[] = [
   attendanceMigration(4),
   // F06: the Quran reference cache (ref_*), disposable and referenced by nothing (ADR-018 §4.1).
   quranReferenceMigration(5),
+  // F05: daily_records, lesson_portions, portion_attempts (three sync entities) and the cached daily-report mode.
+  dailyEntryMigration(6),
 ];
 
 /** The device index: which workspace databases exist on this phone, and the device ID. */

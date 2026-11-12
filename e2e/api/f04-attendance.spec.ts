@@ -1,8 +1,8 @@
 // F04 · Calendar and attendance — API E2E (docs/specs/08-f04-calendar-attendance.md)
 // Screen journeys: e2e/mobile/f04-attendance/.
 // Seeded fixtures: A1 (teacher.a1; S1, S2), A2 (teacher.a2; S3); every class meets Monday–Saturday.
-// Attendance writes go through POST /sync/push (FR-SYNC). F04-AC19 needs recited portions (F05) and stays test.fixme;
-// its attendance part is covered by apps/api/test/calendar/calendar.test.ts.
+// Attendance writes go through POST /sync/push (FR-SYNC). F04-AC19 records recited portions through the F05 sync
+// entities (daily_record, lesson_portion, portion_attempt); see e2e/api/f05-daily-entry.spec.ts.
 import { randomBytes } from 'node:crypto';
 import type { APIRequestContext } from '@playwright/test';
 import { expect, test, type TestControl } from './support/fixtures';
@@ -325,9 +325,65 @@ test.describe('F04 · Calendar and attendance', { tag: '@F04' }, () => {
     expect(rowOf(s, ids, 'S2').days[day]).toBe('HALF_DAY');
   });
 
-  test.fixme('F04-AC19 (US-015) Absent for a student who recited needs a note; portions unchanged', async () => {
-    // Waits for daily records (F05): until then no student has recited portions (the sheet's `recited` is false).
+  test('F04-AC19 (US-015) Absent for a student who recited needs a note; portions unchanged', async ({ as, control }) => {
     // Given a student who already has recited portions saved for the date, when the Teacher marks them Absent in Bulk Entry, then the row suggests "Mark Late instead". If the Teacher keeps Absent, the row cannot save until an internal note with the reason is entered, and the recited portions are unchanged.
+    const ids = await control.rosterIds();
+    const teacher = await as('teacher.a1');
+    const day = classDay(1);
+    const op = (entity: string, fields: Record<string, unknown>) => ({
+      opId: uuidv7(),
+      seq: ++seq,
+      entity,
+      entityId: uuidv7(),
+      opType: 'CREATE',
+      baseVersion: null,
+      fields,
+      dependsOn: [],
+      clientSavedAt: new Date().toISOString(),
+    });
+    const present = createOp(ids, { student: 'S1', status: 'PRESENT', date: day });
+    const record = op('daily_record', { studentId: ids.students.S1, classId: ids.classes.A1, reportDate: day, sessionLabel: null });
+    const portion = op('lesson_portion', {
+      dailyRecordId: record.entityId,
+      section: 'SABQI',
+      position: 1,
+      isExtra: false,
+      paraNumber: 3,
+      range: null,
+      assigned: { unit: 'PARA', numerator: 1, denominator: 2 },
+      totalLines: null,
+      totalLinesSource: null,
+    });
+    const attempt = op('portion_attempt', {
+      lessonPortionId: portion.entityId,
+      attemptNo: 1,
+      attemptedAt: new Date().toISOString(),
+      status: 'COMPLETED',
+      completed: null,
+      quality: 2,
+      noMistakes: true,
+      mistakes: [],
+      remarks: null,
+    });
+    const saved = await push(teacher, [present, record, portion, attempt]);
+    expect(saved.map((r) => r.status)).toEqual(['APPLIED', 'APPLIED', 'APPLIED', 'APPLIED']);
+    // The Bulk Entry sheet knows S1 recited, so the app suggests "Mark Late instead" for an Absent mark.
+    const sheet = await (await teacher.get(`/attendance/sheet?classId=${ids.classes.A1}&date=${day}`)).json();
+    const recited = (key: StudentKey) => (sheet.students as Array<{ id: string; recited: boolean }>).find((s) => s.id === ids.students[key])!.recited;
+    expect([recited('S1'), recited('S2')]).toEqual([true, false]);
+
+    const [noNote] = await push(teacher, [updateOp(saved[0]!.entityId!, 1, 'ABSENT')]);
+    expect(noNote).toMatchObject({ status: 'REJECTED', code: 'VALIDATION', fields: { absentNote: 'REQUIRED' } });
+    const withNote = { ...updateOp(saved[0]!.entityId!, 1, 'ABSENT'), fields: { status: 'ABSENT', leaveReason: null, absentNote: 'Synthetic: left after Sabqi' } };
+    const [kept] = await push(teacher, [withNote]);
+    expect(kept).toMatchObject({ status: 'APPLIED', rowVersion: 2 });
+    expect(await sheetRecord(teacher, ids, 'S1', day)).toMatchObject({ status: 'ABSENT' });
+
+    // The recited portion and its attempt are unchanged.
+    const detail = await (await teacher.get(`/hifz/daily-records/${record.entityId}`)).json();
+    expect(detail.portions).toHaveLength(1);
+    expect(detail.portions[0]).toMatchObject({ id: portion.entityId, removed: false, rowVersion: 1 });
+    expect(detail.portions[0].attempts).toEqual([expect.objectContaining({ id: attempt.entityId, status: 'COMPLETED', quality: 2, rowVersion: 1 })]);
   });
 
   test('F04-AC20 (US-014) a holiday declared on a recorded date excludes its records and refuses new ones', async ({ as, control }) => {

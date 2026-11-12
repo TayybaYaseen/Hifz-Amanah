@@ -209,7 +209,7 @@ export class SyncService {
   private async create(tx: Tx, actor: Actor, op: SyncOp, handler: SyncHandler, scope: SyncScope): Promise<OpResult> {
     const parsed = handler.createSchema.safeParse(op.fields);
     if (!parsed.success) return rejected(op.opId, 'VALIDATION', issueFields(parsed.error));
-    const keys = handler.keysForCreate(parsed.data);
+    const keys = await handler.keysForCreate(parsed.data, { tx, organizationId: actor.organizationId });
     if (!inScope(scope, keys)) return rejected(op.opId, 'NOT_FOUND');
     const prepared = handler.prepareCreate ? await handler.prepareCreate(tx, actor, parsed.data) : { ok: true as const, fields: parsed.data };
     if (!prepared.ok) return 'notFound' in prepared ? rejected(op.opId, 'NOT_FOUND') : rejected(op.opId, 'VALIDATION', prepared.issues);

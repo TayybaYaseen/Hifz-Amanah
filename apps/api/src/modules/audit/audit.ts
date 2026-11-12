@@ -53,7 +53,16 @@ export type AuditAction =
   | 'QURAN_SEED_APPLIED'
   | 'QURAN_LAYOUT_APPLIED'
   /** F06 · a licence withdrawal revoked a snapshot version that carried the source (DEC-B79). */
-  | 'QURAN_REFERENCE_REVOKED';
+  | 'QURAN_REFERENCE_REVOKED'
+  // F05 · Daily Hifz entry
+  | 'DAILY_RECORD_CREATED'
+  | 'DAILY_RECORD_UPDATED'
+  | 'LESSON_PORTION_CREATED'
+  | 'LESSON_PORTION_UPDATED'
+  | 'LESSON_PORTION_REMOVED'
+  | 'PORTION_ATTEMPT_CREATED'
+  | 'PORTION_ATTEMPT_CORRECTED'
+  | 'DAILY_REPORT_MODE_CHANGED';
 
 export interface AuditEvent {
   organizationId: string | null;
@@ -63,7 +72,10 @@ export interface AuditEvent {
     | 'QURAN_SURAH'
     | 'QURAN_PARA'
     | 'QURAN_IMPORT'
-    | 'QURAN_SOURCE';
+    | 'QURAN_SOURCE'
+    | 'DAILY_RECORD'
+    | 'LESSON_PORTION'
+    | 'PORTION_ATTEMPT';
   targetId: string | null;
   summary?: Record<string, unknown>;
   at: Date;

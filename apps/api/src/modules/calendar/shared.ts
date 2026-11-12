@@ -68,17 +68,13 @@ export async function enrollmentsOf(db: Executor, organizationId: string, studen
 }
 
 /**
- * Whether the student has recited portions saved for the date (FR-DAY-010, F04-AC19). Daily records arrive with F05,
- * which replaces this lookup; until then no student has recited portions, so the rule never triggers on the server.
+ * Whether the student has recited portions saved for the date (FR-DAY-010, F04-AC19): supplied by F05
+ * (hifz/shared.ts `recitedPortions`: a non-removed portion with at least one attempt on that student and date).
  */
 export type RecitedLookup = (db: Executor, organizationId: string, studentId: string, date: string) => Promise<boolean>;
 
-export const noRecitedPortionsYet: RecitedLookup = async () => false;
-
-/** Daily Hifz records on a date (F05). 0 until daily records exist (F04-AC20 counts attendance records today). */
+/** Daily Hifz records on a date (F04-AC20): supplied by F05 (hifz/shared.ts `countDailyRecords`). */
 export type DailyRecordCounter = (db: Executor, organizationId: string, date: string, classId: string | null) => Promise<number>;
-
-export const noDailyRecordsYet: DailyRecordCounter = async () => 0;
 
 /** "HH:MM:SS" from Postgres → "HH:MM". */
 export const hhmm = (value: string | null): string | null => (value === null ? null : value.slice(0, 5));

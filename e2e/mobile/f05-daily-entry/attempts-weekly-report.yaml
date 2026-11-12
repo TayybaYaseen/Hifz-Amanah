@@ -1,0 +1,15 @@
+# F05 · Daily Hifz entry — mobile E2E (docs/specs/09-us-023-record-repeated-attempts.md; design.md §13 US-023)
+# Covers: F05-AC16
+# Pending until F09 (weekly reports): the weekly report screen does not exist yet (docs/handover/F05-plan.md §1).
+# The API E2E checks F05-AC16 on the record's derived progress.
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
+name: F05 attempts — the weekly report uses the latest attempt and counts the assigned quantity once
+tags:
+  - pending
+  - F05
+  - US-023
+---
+- launchApp:
+    clearState: true
+# 1. Sign in as teacher-a1 → S1 record → Sabqi Para 4 (Partial) → Add attempt → Completed → save.
+# 2. Weekly report: Para 4 Completed; assigned quantity counted once.                                 (F05-AC16)

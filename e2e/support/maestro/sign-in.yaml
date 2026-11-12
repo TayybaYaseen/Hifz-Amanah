@@ -18,5 +18,17 @@ appId: com.hifzamanah.app
 - hideKeyboard
 - tapOn:
     id: "signin.submit"
+# A Teacher's first sign-in on a device offers the optional app lock (NFR-OFF-011); flows skip it.
+- extendedWaitUntil:
+    visible:
+      id: "appLock.setup.screen|home.screen"
+    timeout: 30000
+- runFlow:
+    when:
+      visible:
+        id: "appLock.setup.skip"
+    commands:
+      - tapOn:
+          id: "appLock.setup.skip"
 - assertVisible:
     id: "home.screen"

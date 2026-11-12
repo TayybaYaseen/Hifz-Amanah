@@ -48,8 +48,11 @@ export function probeRegistry(retentionDays?: number): EntityRegistry {
 
 export const testRandomBytes = (n: number) => new Uint8Array(randomBytes(n));
 
+/** Fixed start of the fake clock. The fake server reports this same time, so tests never depend on the real date. */
+export const FAKE_NOW_MS = Date.parse('2026-11-08T06:00:00.000Z');
+
 export class FakeClock {
-  now = Date.parse('2026-11-08T06:00:00.000Z');
+  now = FAKE_NOW_MS;
   readonly read = () => this.now;
   advance(ms: number) {
     this.now += ms;
@@ -81,13 +84,15 @@ type PullHandler = (q: { cursor: string | null; limit: number }) => PullResponse
 
 /** A scripted fake server. By default every op is APPLIED (row version 1) and pulls are empty. */
 export class FakeTransport implements SyncTransport {
+  /** The server time the fake reports: fixed, not the real clock, so retention tests stay deterministic. */
+  serverTime = new Date(FAKE_NOW_MS).toISOString();
   pushes: PushRequest[] = [];
   pulls: Array<{ cursor: string | null; limit: number }> = [];
   onPush: PushHandler = (req) => ({
     results: req.ops.map((op) => ({ opId: op.opId, status: 'APPLIED' as const, rowVersion: 1, entityId: op.entityId })),
-    serverTime: new Date().toISOString(),
+    serverTime: this.serverTime,
   });
-  onPull: PullHandler = ({ cursor }) => ({ changes: [], cursor: cursor ?? 'c0', hasMore: false, scopeReset: false, serverTime: new Date().toISOString() });
+  onPull: PullHandler = ({ cursor }) => ({ changes: [], cursor: cursor ?? 'c0', hasMore: false, scopeReset: false, serverTime: this.serverTime });
 
   async push(req: PushRequest): Promise<PushResponse> {
     this.pushes.push(structuredClone(req));

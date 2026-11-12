@@ -5,20 +5,23 @@ import type { ReactNode } from 'react';
 import { AppText } from '../../components/ui.tsx';
 import { colors, radius, space, touch } from '../../theme/tokens.ts';
 
-export function Chip({ label, selected, onPress, testID, role = 'radio' }: {
+export function Chip({ label, selected, onPress, testID, role = 'radio', disabled = false }: {
   label: string;
   selected: boolean;
   onPress: () => void;
   testID: string;
   role?: 'radio' | 'checkbox';
+  /** Not selectable (e.g. quality for a no-quality status, F05-AC5); reported to screen readers. */
+  disabled?: boolean;
 }) {
   return (
     <Pressable
       testID={testID}
       accessibilityRole={role}
-      accessibilityState={role === 'radio' ? { selected } : { checked: selected }}
+      accessibilityState={role === 'radio' ? { selected, disabled } : { checked: selected, disabled }}
+      disabled={disabled}
       onPress={onPress}
-      style={[styles.chip, selected ? styles.chipOn : null]}
+      style={[styles.chip, selected ? styles.chipOn : null, disabled ? styles.chipOff : null]}
     >
       <AppText role="button" color={selected ? colors.brandPrimary : colors.textPrimary}>
         {`${selected ? '✓ ' : ''}${label}`}
@@ -68,4 +71,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   chipOn: { borderColor: colors.brandPrimary, backgroundColor: colors.surfaceSelected },
+  chipOff: { opacity: 0.5 },
 });

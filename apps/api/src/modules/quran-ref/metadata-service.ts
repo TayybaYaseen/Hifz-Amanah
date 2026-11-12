@@ -44,12 +44,10 @@ import { requireRole } from '../roster/shared.ts';
 import { blockReason, loadImportStates, productionVerified } from './distribution.ts';
 
 /**
- * Stored records that carry a Quran range, for the review list (F06-AC19). F05 (Sabaq portions) and F08 (homework)
- * register theirs; until then no record holds a range, so the list has only metadata findings.
+ * Stored records that carry a Quran range, for the review list (F06-AC19): F05 supplies the Sabaq portions
+ * (hifz/shared.ts `sabaqRanges`); F08 adds homework ranges.
  */
 export type RangeRecordSource = (db: Executor, organizationId: string) => Promise<{ kind: string; id: string; range: AyahRange }[]>;
-
-export const noRangeRecordsYet: RangeRecordSource = async () => [];
 
 type SurahRow = { id: string; number: number; name_ar: string; name_translit: string; ayah_count: number; source: 'SEED' | 'ADMIN'; row_version: string; updated_at: Date };
 type ParaRow = { id: string; number: number; start_surah: number; start_ayah: number; end_surah: number; end_ayah: number; source: 'SEED' | 'ADMIN'; row_version: string; updated_at: Date };
@@ -93,7 +91,7 @@ export class QuranMetadataService {
   private readonly allowSynthetic: boolean;
 
   /** `allowSynthetic`: true only when NODE_ENV=test; test data is never used outside tests. */
-  constructor(db: Db, clock: Clock, rangeRecords: RangeRecordSource = noRangeRecordsYet, options: { allowSynthetic: boolean } = { allowSynthetic: false }) {
+  constructor(db: Db, clock: Clock, rangeRecords: RangeRecordSource, options: { allowSynthetic: boolean } = { allowSynthetic: false }) {
     this.db = db;
     this.clock = clock;
     this.rangeRecords = rangeRecords;

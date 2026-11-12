@@ -92,6 +92,9 @@ export const ERROR_CODES = [
   'RECORDS_EXIST',
   /** 409: the Leave is not awaiting a decision (already decided, changed, or not a Leave). */
   'LEAVE_NOT_AWAITING',
+  // Daily Hifz entry (F05; plan docs/handover/F05-plan.md §4). HIFZ_ERROR_CODES in hifz.ts.
+  /** 409: switching to SINGLE is blocked while a student has more than one record on a date (F05-AC8). */
+  'MODE_CONFLICTS',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 
@@ -101,6 +104,8 @@ export interface ApiError {
     message: string;
     /** Field name → issue code, for VALIDATION errors. */
     fields?: Record<string, string>;
+    /** MODE_CONFLICTS (F05-AC8): the student/date pairs blocking the switch (hifz.ts ReportModeConflict). */
+    conflicts?: unknown[];
   };
 }
 

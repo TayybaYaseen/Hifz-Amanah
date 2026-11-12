@@ -1,17 +1,89 @@
 # F05 · Daily Hifz entry — mobile E2E (docs/specs/09-f05-daily-hifz-entry.md; design.md §4.7 Step 1)
 # Covers: F05-AC6, F05-AC7, F05-AC8, F05-AC9
+# SYNTHETIC DATA ONLY: seeded personas and the synthetic Quran fixture.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F05 report mode — single report, sessions, blocked switch, Teacher has no control
 tags:
-  - pending
   - F05
   - US-019
 ---
-- launchApp:
-    clearState: true
-# 1. Sign in as teacher.a1; S1 already has a record today; start a new one → warning; the existing record opens. (F05-AC6)
-# 2. Settings has no daily-report mode control for teacher.a1.                                         (F05-AC9)
-# 3. Sign in as admin.a → set multiple sessions.
-# 4. Sign in as teacher.a1 → Daily Entry shows a required Session label; save without it → error;
-#    save "Fajr" and "Asr" for S1 today → both exist.                                                  (F05-AC7)
-# 5. Sign in as admin.a → set one report per student/date → blocked; message lists S1 and today.      (F05-AC8)
+- runFlow: ../../support/maestro/reset.yaml
+- runScript:
+    file: ../../support/maestro/control.js
+    env:
+      ACTION: quranSeed
+# 1. teacher-a1 records S1 today (SINGLE mode, the default); starting a second record warns and opens the first. (F05-AC6)
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- runFlow:
+    file: ../../support/maestro/daily-sabqi.yaml
+    env: { STUDENT: EXT-A-001 }
+- runFlow: ../../support/maestro/back-home.yaml
+- tapOn: { id: "nav.dailyEntry" }
+- extendedWaitUntil:
+    visible: { id: "daily.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "daily.class.Hifz A1" }
+- tapOn: { id: "daily.student.EXT-A-001" }
+- extendedWaitUntil:
+    visible: { id: "daily.duplicate.sheet" }
+    timeout: 15000
+- assertVisible: { id: "daily.duplicate.body" }
+- tapOn: { id: "daily.duplicate.open" }
+- extendedWaitUntil:
+    visible: { id: "record.screen" }
+    timeout: 15000
+- assertVisible: { id: "record.student" }
+# 2. The Teacher's workspace settings have no daily-report mode control.                                       (F05-AC9)
+- runFlow: ../../support/maestro/back-home.yaml
+- tapOn: { id: "nav.more" }
+- tapOn: { id: "more.workspace" }
+- extendedWaitUntil:
+    visible: { id: "workspace.readOnly" }
+    timeout: 15000
+# The current mode is shown read-only; no mode chips and no Save are offered to a Teacher.
+- assertVisible: { id: "workspace.reportModeValue" }
+- assertNotVisible: { id: "workspace.reportMode" }
+- assertNotVisible: { id: "workspace.reportMode.SINGLE" }
+- assertNotVisible: { id: "workspace.reportMode.MULTI_SESSION" }
+- assertNotVisible: { id: "workspace.reportMode.save" }
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow: ../../support/maestro/sign-out.yaml
+# 3. admin-a sets multiple sessions per day.
+- runFlow:
+    file: ../../support/maestro/sign-in-staff.yaml
+    env: { USER_ID: admin-a }
+- runFlow:
+    file: ../../support/maestro/set-report-mode.yaml
+    env: { MODE: MULTI_SESSION }
+- assertVisible: { id: "workspace.reportMode.saved" }
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow: ../../support/maestro/sign-out.yaml
+# 4. teacher-a1: the Session label is required; "Fajr" and "Asr" for S1 today are both saved.                    (F05-AC7)
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- runFlow:
+    file: ../../support/maestro/daily-sabqi.yaml
+    env: { STUDENT: EXT-A-001, SESSION_FIRST_EMPTY: "true", SESSION: Fajr }
+- assertVisible: { id: "record.session" }
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow:
+    file: ../../support/maestro/daily-sabqi.yaml
+    env: { STUDENT: EXT-A-001, SESSION: Asr }
+- assertVisible: { id: "record.session" }
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow: ../../support/maestro/sign-out.yaml
+# 5. admin-a switches back to one report per student and date → blocked; the list names S1 and today.            (F05-AC8)
+- runFlow:
+    file: ../../support/maestro/sign-in-staff.yaml
+    env: { USER_ID: admin-a }
+- runFlow:
+    file: ../../support/maestro/set-report-mode.yaml
+    env: { MODE: SINGLE }
+- waitForAnimationToEnd
+- scrollUntilVisible: { element: { id: "workspace.reportMode.conflicts" }, direction: DOWN, timeout: 60000, optional: true }
+- scrollUntilVisible: { element: { id: "workspace.reportMode.conflicts" }, direction: UP, timeout: 60000, centerElement: true }
+- assertVisible: { id: "workspace.reportMode.conflict.0", text: ".*Test Student One.*" }
+- assertNotVisible: { id: "workspace.reportMode.saved" }
