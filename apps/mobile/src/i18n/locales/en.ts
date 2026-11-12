@@ -1,4 +1,5 @@
 // English messages (ICU message format). The source of truth for message keys: ur and ur-Latn must match it.
+import { qualityLabelCatalogue } from '@hifz/domain/quality';
 export const en = {
   common: {
     appName: 'HifzAmanah',
@@ -799,19 +800,25 @@ export const en = {
   },
   quality: {
     label: "Quality",
-    name: {
-      "1": "Excellent",
-      "2": "Good",
-      "3": "Average",
-      "4": "Needs Improvement",
-      "5": "Weak",
-    },
+    // The approved scale (SRS FR-ATT-009), one source for app, PDF, Excel, and charts.
+    name: qualityLabelCatalogue("en"),
     option: "{score} · {label}",
     notAssessed: "Not assessed",
     notRecorded: "Not recorded",
     lowerIsBetter: "1 is the best, 5 the weakest.",
     notForStatus: "Quality is not recorded for this status.",
     value: "Quality: {value}",
+  },
+  // F07 · Overall performance label (US-032): separate from the 1–5 quality; never derived from it.
+  overall: {
+    title: "Overall performance",
+    help: "One choice for the whole day. It is separate from the 1–5 quality of each portion.",
+    none: "Not chosen",
+    EXCELLENT: "Excellent",
+    GOOD: "Good",
+    AVERAGE: "Average",
+    NEEDS_IMPROVEMENT: "Needs Improvement",
+    value: "Overall performance: {label}",
   },
   mistakes: {
     title: "Mistakes",
@@ -825,6 +832,10 @@ export const en = {
     severity: "Severity",
     repeated: "Repeated",
     remove: "Remove mistake",
+    note: "Note (optional)",
+    noteShared: "Visible to the student and parent",
+    noteVisibility: "Note visibility",
+    shareNote: "Show note to student and parent",
     categories: {
       HARKAAT: "Harkaat",
       TAJWEED: "Tajweed",
@@ -999,6 +1010,7 @@ export const en = {
       },
       mistakes: {
         TOO_MANY: "at most {max} mistakes per attempt",
+        TOO_LONG: "a mistake note is at most {max} characters",
       },
       remarks: {
         TOO_LONG: "remarks are too long (at most {max} characters)",

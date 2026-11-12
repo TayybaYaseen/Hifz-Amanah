@@ -14,6 +14,10 @@ import {
   type DailyRecordView,
   type DailyReportModeResponse,
   type LessonPortionView,
+  type OverallLabel,
+  type PerformanceSummary,
+  PERFORMANCE_SUMMARY_MAX_DAYS,
+  PerformanceSummaryQuery,
   type PortionAttemptView,
   type ReportModeConflict,
   SetDailyReportModeRequest,
@@ -28,6 +32,8 @@ import {
   type AttemptLike,
   type SummaryPortion,
 } from '@hifz/domain/hifz';
+import { mistakeCounts } from '@hifz/domain/mistakes';
+import { attemptsQualityAverage } from '@hifz/domain/quality';
 import { SECTIONS } from '@hifz/domain/quantity';
 import { addDays, isCalendarDate } from '@hifz/domain/roster';
 import { sql } from 'kysely';
@@ -105,6 +111,7 @@ export class DailyRecordService {
           'r.class_id',
           'r.report_date',
           'r.session_label',
+          'r.overall_label',
           'r.recorded_by',
           'u.display_name',
           'r.client_saved_at',
@@ -138,6 +145,7 @@ export class DailyRecordService {
             classId: r.class_id,
             reportDate: r.report_date,
             sessionLabel: r.session_label,
+            overallLabel: r.overall_label,
             recordedBy: { userId: r.recorded_by, displayName: r.display_name },
             portionCount: Number(r.portion_count ?? 0),
             clientSavedAt: r.client_saved_at ? r.client_saved_at.toISOString() : null,
@@ -161,7 +169,7 @@ export class DailyRecordService {
         .selectFrom('daily_records as r')
         .innerJoin('students as s', (j) => j.onRef('s.id', '=', 'r.student_id').onRef('s.organization_id', '=', 'r.organization_id'))
         .innerJoin('users as u', 'u.id', 'r.recorded_by')
-        .select(['r.id', 'r.student_id', 's.name as student_name', 'r.class_id', 'r.report_date', 'r.session_label', 'r.recorded_by', 'u.display_name', 'r.client_saved_at', 'r.server_received_at', 'r.row_version'])
+        .select(['r.id', 'r.student_id', 's.name as student_name', 'r.class_id', 'r.report_date', 'r.session_label', 'r.overall_label', 'r.recorded_by', 'u.display_name', 'r.client_saved_at', 'r.server_received_at', 'r.row_version'])
         .where('r.organization_id', '=', org)
         .where('r.id', '=', id)
         .executeTakeFirst();
@@ -265,6 +273,7 @@ export class DailyRecordService {
           classId: r.class_id,
           reportDate: r.report_date,
           sessionLabel: r.session_label,
+          overallLabel: r.overall_label,
           recordedBy: { userId: r.recorded_by, displayName: r.display_name },
           portionCount: portionViews.filter((p) => !p.removed).length,
           clientSavedAt: r.client_saved_at ? r.client_saved_at.toISOString() : null,
@@ -277,6 +286,81 @@ export class DailyRecordService {
           const s = summary.find((x) => x.section === section)!;
           return { section, portionIds: s.portions.map((p) => p.id), totals: s.totals, extraTotals: s.extraTotals };
         }),
+      };
+    });
+  }
+
+  // ---------- GET /hifz/performance-summary (F07) ----------
+
+  /**
+   * A student's mistakes and quality over report dates `from`–`to` (F07-AC3, AC8, AC9; FR-RPT-004, FR-WKR-005).
+   * Staff only (`daily.write`). A Teacher reaches a student enrolled in one of their classes during the period and
+   * sees only records of those classes; a student out of reach, or in another madrasa, is 404 like a missing id.
+   * Derived on every call from the stored attempts (never a stored total), so an edited score shows on the next view.
+   * Every attempt on a non-removed portion counts: each is its own recitation with its own mistakes and rating. NULL
+   * quality and Absent/Not Assigned/Pending attempts add no rating; attempts without recorded mistakes are counted
+   * apart, never as 0. Overall labels are tallied as chosen and never derived from quality (F07-AC13).
+   */
+  async performanceSummary(actor: Actor, query: unknown): Promise<PerformanceSummary> {
+    requireRole(actor, 'daily.write');
+    const q = parse(PerformanceSummaryQuery, query);
+    if (!isCalendarDate(q.from)) throw fieldError('from', 'INVALID');
+    if (!isCalendarDate(q.to)) throw fieldError('to', 'INVALID');
+    if (addDays(q.from, PERFORMANCE_SUMMARY_MAX_DAYS - 1) < q.to) throw new AppError('VALIDATION', { to: 'TOO_LONG', 'to.max': String(PERFORMANCE_SUMMARY_MAX_DAYS) });
+    const org = actor.organizationId;
+    return withTenant(this.db, org, async (tx) => {
+      const reach = await this.reach(tx, actor);
+      if (reach === null) {
+        const student = await tx.selectFrom('students').select('id').where('organization_id', '=', org).where('id', '=', q.studentId).executeTakeFirst();
+        if (!student) throw new AppError('NOT_FOUND');
+      } else {
+        const enrolled = reach.length
+          ? await tx
+              .selectFrom('student_enrollments')
+              .select('id')
+              .where('organization_id', '=', org)
+              .where('student_id', '=', q.studentId)
+              .where('class_id', 'in', reach)
+              .where('start_date', '<=', q.to)
+              .where((eb) => eb.or([eb('end_date', 'is', null), eb('end_date', '>=', q.from)]))
+              .executeTakeFirst()
+          : undefined;
+        if (!enrolled) throw new AppError('NOT_FOUND');
+      }
+      let recordQuery = tx
+        .selectFrom('daily_records')
+        .select(['id', 'overall_label'])
+        .where('organization_id', '=', org)
+        .where('student_id', '=', q.studentId)
+        .where('report_date', '>=', q.from)
+        .where('report_date', '<=', q.to);
+      if (reach) recordQuery = recordQuery.where('class_id', 'in', reach);
+      const records = await recordQuery.execute();
+      const recordIds = records.map((r) => r.id);
+      const attempts = recordIds.length
+        ? await tx
+            .selectFrom('portion_attempts as a')
+            .innerJoin('lesson_portions as p', (j) => j.onRef('p.id', '=', 'a.lesson_portion_id').onRef('p.organization_id', '=', 'a.organization_id'))
+            .select(['a.id', 'a.status', 'a.quality', 'a.no_mistakes'])
+            .where('a.organization_id', '=', org)
+            .where('p.daily_record_id', 'in', recordIds)
+            .where('p.removed_at', 'is', null)
+            .execute()
+        : [];
+      const mistakes = await currentMistakes(tx, org, attempts.map((a) => a.id));
+      const counts = mistakeCounts(attempts.map((a) => ({ noMistakes: a.no_mistakes, mistakes: mistakes.get(a.id) ?? [] })));
+      const quality = attemptsQualityAverage(attempts.map((a) => ({ status: a.status, quality: a.quality })));
+      const overallLabels = { EXCELLENT: 0, GOOD: 0, AVERAGE: 0, NEEDS_IMPROVEMENT: 0, notChosen: 0 } satisfies Record<OverallLabel | 'notChosen', number>;
+      for (const r of records) overallLabels[r.overall_label ?? 'notChosen'] += 1;
+      return {
+        studentId: q.studentId,
+        from: q.from,
+        to: q.to,
+        recordCount: records.length,
+        attemptCount: attempts.length,
+        mistakes: counts,
+        quality: { count: quality.count, value: quality.value, display: quality.display, nearestScore: quality.nearestScore },
+        overallLabels,
       };
     });
   }

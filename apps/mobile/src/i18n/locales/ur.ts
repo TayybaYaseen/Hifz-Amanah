@@ -1,4 +1,5 @@
 // Urdu (Urdu script, RTL). Western digits (FR-I18N-009). Wording awaits glossary approval (DEC-B39).
+import { qualityLabelCatalogue } from '@hifz/domain/quality';
 import type { Messages } from './en.ts';
 
 export const ur: Messages = {
@@ -801,19 +802,25 @@ export const ur: Messages = {
   },
   quality: {
     label: "معیار",
-    name: {
-      "1": "ممتاز",
-      "2": "اچھا",
-      "3": "اوسط",
-      "4": "مزید محنت کی ضرورت",
-      "5": "کمزور",
-    },
+    // The approved scale (SRS FR-ATT-009), one source for app, PDF, Excel, and charts.
+    name: qualityLabelCatalogue("ur"),
     option: "{score} · {label}",
     notAssessed: "جانچ نہیں ہوئی",
     notRecorded: "درج نہیں",
     lowerIsBetter: "1 سب سے بہتر، 5 سب سے کمزور۔",
     notForStatus: "اس حیثیت کے لیے معیار درج نہیں ہوتا۔",
     value: "معیار: {value}",
+  },
+  // F07 · Overall performance label (US-032): separate from the 1–5 quality; never derived from it.
+  overall: {
+    title: "مجموعی کارکردگی",
+    help: "پورے دن کے لیے ایک انتخاب۔ یہ ہر حصے کے 1–5 معیار سے الگ ہے۔",
+    none: "منتخب نہیں",
+    EXCELLENT: "ممتاز",
+    GOOD: "اچھا",
+    AVERAGE: "اوسط",
+    NEEDS_IMPROVEMENT: "مزید محنت کی ضرورت",
+    value: "مجموعی کارکردگی: {label}",
   },
   mistakes: {
     title: "غلطیاں",
@@ -827,6 +834,10 @@ export const ur: Messages = {
     severity: "شدت",
     repeated: "دہرائی گئی",
     remove: "غلطی ہٹائیں",
+    note: "نوٹ (اختیاری)",
+    noteShared: "طالب علم اور والدین کو نظر آئے گا",
+    noteVisibility: "نوٹ کس کو نظر آئے",
+    shareNote: "نوٹ طالب علم اور والدین کو دکھائیں",
     categories: {
       HARKAAT: "حرکات",
       TAJWEED: "تجوید",
@@ -1001,6 +1012,7 @@ export const ur: Messages = {
       },
       mistakes: {
         TOO_MANY: "ایک کوشش میں زیادہ سے زیادہ {max} غلطیاں",
+        TOO_LONG: "غلطی کا نوٹ زیادہ سے زیادہ {max} حروف کا ہو",
       },
       remarks: {
         TOO_LONG: "تبصرہ بہت لمبا ہے (زیادہ سے زیادہ {max} حروف)",

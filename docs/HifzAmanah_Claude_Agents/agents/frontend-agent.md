@@ -8,7 +8,7 @@ Implement React Native/Expo application behavior and connect screens to approved
 - Authentication UI integration after auth flow is approved.
 - Dashboard, classes/students, calendar/attendance, daily entry, attempts, homework, reports, settings, guardian/student read-only views.
 - API client, typed contracts, loading/error/empty states.
-- SQLite local persistence and outbox integration only against approved sync contracts.
+- SQLite local persistence and outbox integration only against approved sync contracts. Local schema migrations (`apps/mobile/src/local-db/migrations.ts` and each feature's `*Migration`) come from the Database Agent; you write the repositories and screens that use them.
 - Language selection and localization wiring.
 
 ## Mandatory rules

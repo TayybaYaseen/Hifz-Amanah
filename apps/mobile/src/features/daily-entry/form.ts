@@ -10,6 +10,7 @@
 //   COMPLETED → assigned), and quality is null until a score is chosen.
 import {
   MISTAKES_MAX,
+  MISTAKE_NOTE_MAX,
   allowsQuality,
   normalizeAttempt,
   validatePortion,
@@ -52,7 +53,14 @@ export interface MistakeForm {
   category: MistakeCategory | null;
   severity: MistakeSeverity | null;
   repeated: boolean;
+  /** Optional short note (F07, ≤ 200 characters); '' is no note. */
+  note: string;
+  /** INTERNAL (default, staff only) or SHARED with the Student and Parent (FR-ATT-012). */
+  noteVisibility: 'INTERNAL' | 'SHARED';
 }
+
+/** A new, empty mistake row: no category or severity chosen, not repeated, no note, internal. */
+export const newMistake = (key: string): MistakeForm => ({ key, category: null, severity: null, repeated: false, note: '', noteVisibility: 'INTERNAL' });
 
 /** The attempt part of a card (shared with Add attempt). */
 export interface PerformanceForm {
@@ -162,7 +170,14 @@ export function portionFromSaved(p: LocalPortion): PortionForm {
       completedPreset: completed && completed.unit === 'PARA' ? presetOf(completed) : null,
       quality: latest?.quality ?? null,
       noMistakes: latest?.noMistakes ?? false,
-      mistakes: (latest?.mistakes ?? []).map((m, i) => ({ key: `${p.id}-m${i}`, ...m })),
+      mistakes: (latest?.mistakes ?? []).map((m, i) => ({
+        key: `${p.id}-m${i}`,
+        category: m.category,
+        severity: m.severity,
+        repeated: m.repeated,
+        note: m.note ?? '',
+        noteVisibility: m.noteVisibility ?? 'INTERNAL',
+      })),
       remarks: latest?.remarks ?? '',
     },
     attemptCount: p.attempts.length,
@@ -290,7 +305,8 @@ export function portionValues(form: PortionForm, position: number, index: Refere
   form.perf.mistakes.forEach((m, i) => {
     if (m.category === null) incompleteMistakes.push({ index: i + 1, missing: 'category' });
     else if (m.severity === null) incompleteMistakes.push({ index: i + 1, missing: 'severity' });
-    else complete.push({ category: m.category, severity: m.severity, repeated: m.repeated });
+    // Key order matches the stored shape, so an unchanged list compares equal (portionDiff).
+    else complete.push({ category: m.category, severity: m.severity, repeated: m.repeated, note: m.note.trim() === '' ? null : m.note.trim(), noteVisibility: m.noteVisibility });
   });
   const attempt: AttemptDraft = {
     status: form.perf.status,
@@ -368,6 +384,7 @@ const KNOWN_MESSAGES = new Set([
   'mistake.category.REQUIRED',
   'mistake.severity.REQUIRED',
   'mistakes.TOO_MANY',
+  'mistakes.TOO_LONG',
   'remarks.TOO_LONG',
 ]);
 
@@ -426,7 +443,7 @@ export function uiIssue(section: Section, unit: UnitChoice | null, e: { field: s
       return pick('quality', `quality.${e.code}`);
     case 'mistakes':
     case 'noMistakes':
-      return pick('mistakes', `mistakes.${e.code}`, e.code === 'TOO_MANY' ? { max: e.max ?? MISTAKES_MAX } : undefined);
+      return pick('mistakes', `mistakes.${e.code}`, e.code === 'TOO_MANY' ? { max: e.max ?? MISTAKES_MAX } : e.code === 'TOO_LONG' ? { max: e.max ?? MISTAKE_NOTE_MAX } : undefined);
     case 'remarks':
       return pick('remarks', `remarks.${e.code}`, max);
     default:

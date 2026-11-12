@@ -1,5 +1,6 @@
 // F09 · Weekly and monthly reports — unit: buildReport() (docs/specs/12-f09-weekly-monthly-reports.md)
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { mistakeCounts } from '../mistakes/index.ts';
 
 describe('F09 · period boundaries', () => {
   it.todo('F09-AC1 (US-039) a weekly report covers Monday 00:00 to Sunday 23:59 Asia/Karachi and states the range (AC-RPT-07)');
@@ -36,6 +37,10 @@ describe('F09 · provisional', () => {
 });
 
 describe('Decision review 2026-10-30 (SRS §17)', () => {
-  it.todo('F07-AC14 (US-028) "No mistakes" stores 0; an empty list stays Not recorded');
+  it('F07-AC14 (US-028) "No mistakes" stores 0; an empty list stays Not recorded', () => {
+    // The report's mistake counts come from @hifz/domain/mistakes (F07): No mistakes is a recorded 0, an empty list is apart.
+    const counts = mistakeCounts([{ noMistakes: true, mistakes: [] }, { noMistakes: false, mistakes: [] }]);
+    expect(counts).toMatchObject({ total: 0, recordedAttempts: 1, noMistakesAttempts: 1, notRecordedAttempts: 1 });
+  });
   it.todo('F09-AC17 (US-041) attended counts Present, Late, and Half day; Leave and Absent are separate');
 });

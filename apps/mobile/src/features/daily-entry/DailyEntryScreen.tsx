@@ -10,6 +10,7 @@
 // - Edit mode (`recordId`) corrects the portions and their latest attempts (UI spec 8.7) with audited UPDATEs.
 // Form state never holds localized text, so a language switch keeps every value (F05 edge case).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { OVERALL_LABELS, type OverallLabel } from '@hifz/domain/quality';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { AttendanceSheetResponse, ClassListResponse, ClassResponse, DailyRecordDetail, DailyRecordListResponse, DayKind, MeResponse, OrganizationSettingsResponse } from '@hifz/contracts';
@@ -95,6 +96,8 @@ export function DailyEntryScreen({ me, params, onSaved, onOpenRecord, onSyncQueu
   const [existing, setExisting] = useState<Array<{ id: string; sessionLabel: string | null }> | null>(null);
   const [duplicateDismissed, setDuplicateDismissed] = useState(false);
   const [sessionLabel, setSessionLabel] = useState('');
+  // F07 · The record's overall performance label (US-032): optional, never derived from the portions' quality.
+  const [overallLabel, setOverallLabel] = useState<OverallLabel | null>(null);
   const [savedMark, setSavedMark] = useState<LocalMark | null>(null);
   const [draftMark, setDraftMark] = useState<Mark | null>(null);
   const [recitedLocal, setRecitedLocal] = useState(false);
@@ -159,6 +162,7 @@ export function DailyEntryScreen({ me, params, onSaved, onOpenRecord, onSyncQueu
       setStudentId(local.studentId);
       setDate(local.reportDate);
       setSessionLabel(local.sessionLabel ?? '');
+      setOverallLabel(local.overallLabel);
       setPortions(local.portions.filter((p) => !p.removed).map(portionFromSaved));
     })();
     return () => {
@@ -383,6 +387,7 @@ export function DailyEntryScreen({ me, params, onSaved, onOpenRecord, onSyncQueu
           classId,
           reportDate: date,
           sessionLabel: mode === 'SINGLE' ? null : label,
+          overallLabel,
           studentName,
           className,
           actor,
@@ -433,7 +438,8 @@ export function DailyEntryScreen({ me, params, onSaved, onOpenRecord, onSyncQueu
         }
       }
       const newLabel = showSession && label !== (record.sessionLabel ?? null) ? label : undefined;
-      await saveCorrection(sync.outbox, { recordId: record.id, reportDate: record.reportDate, studentName, sessionLabel: newLabel, attendance, actor, portions: corrections, now });
+      const newOverall = overallLabel !== record.overallLabel ? overallLabel : undefined;
+      await saveCorrection(sync.outbox, { recordId: record.id, reportDate: record.reportDate, studentName, sessionLabel: newLabel, overallLabel: newOverall, attendance, actor, portions: corrections, now });
       onSaved(record.id, true);
     } catch {
       // Nothing was written (one transaction); the form keeps every value.
@@ -663,6 +669,21 @@ export function DailyEntryScreen({ me, params, onSaved, onOpenRecord, onSyncQueu
             );
           })
         : null}
+
+      {/* F07 · Overall performance (design.md §4.7): once per record, below the sections, optional. Captioned so it is
+          never read as the 1–5 quality, and never filled in from it (F07-AC12, AC13). */}
+      {sectionCards && duplicate === null ? (
+        <Card>
+          <AppText role="cardTitle" testID="daily.overall.title">{t('overall.title')}</AppText>
+          <AppText role="helper" color={colors.textSecondary}>{t('overall.help')}</AppText>
+          <ChipRow label={t('overall.title')}>
+            <Chip testID="daily.overall.NONE" label={t('overall.none')} selected={overallLabel === null} onPress={() => setOverallLabel(null)} />
+            {OVERALL_LABELS.map((l) => (
+              <Chip key={l} testID={`daily.overall.${l}`} label={t(`overall.${l}`)} selected={overallLabel === l} onPress={() => setOverallLabel(l)} />
+            ))}
+          </ChipRow>
+        </Card>
+      ) : null}
 
       <ConfirmSheet visible={confirmRemove !== null} title={confirmRemove ? t('daily.removeTitle', { portion: portionTitle(t, confirmRemove.section, numbered.get(confirmRemove.key) ?? 1) }) : ''} onCancel={() => setConfirmRemove(null)} testID="daily.removePortion.sheet">
         <AppText>{t('daily.removeBody', { count: isolate(String(confirmRemove?.attemptCount ?? 0)) })}</AppText>

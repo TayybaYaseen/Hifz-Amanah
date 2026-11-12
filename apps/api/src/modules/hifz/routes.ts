@@ -13,6 +13,8 @@ export interface HifzServices {
 
 export function registerHifzRoutes(app: FastifyInstance, { authenticate, records }: HifzServices): void {
   app.get('/hifz/daily-records', async (request) => records.list(await authenticate(request), request.query));
+  // F07: a student's mistakes and quality over a period (staff only).
+  app.get('/hifz/performance-summary', async (request) => records.performanceSummary(await authenticate(request), request.query));
   app.get('/hifz/daily-records/:id', async (request) => records.detail(await authenticate(request), (request.params as { id: string }).id));
 
   // The madrasa's daily-report mode (US-019): Owner/Admin only.

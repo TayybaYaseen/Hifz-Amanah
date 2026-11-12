@@ -9,6 +9,7 @@ import { urLatn } from '../../i18n/locales/ur-Latn.ts';
 import {
   applyUnit,
   attemptWrite,
+  newMistake,
   newPortion,
   portionIssues,
   portionWrite,
@@ -128,7 +129,7 @@ describe('F05 · Daily Entry form', () => {
   it('F05-AC5 (US-018) quality is blocked and cleared for Absent, Not Assigned, and Pending; mistakes stay', () => {
     for (const s of ['ABSENT', 'NOT_ASSIGNED', 'PENDING'] as const) expect(qualityBlocked(s)).toBe(true);
     expect(qualityBlocked('NOT_REMEMBERED')).toBe(false);
-    const rated = sabqi({ unit: 'COMPLETE', perf: { ...newPortion('x', 'SABQI').perf, status: 'COMPLETED', quality: 2, mistakes: [{ key: 'm', category: 'TAJWEED', severity: 'MINOR', repeated: false }] } });
+    const rated = sabqi({ unit: 'COMPLETE', perf: { ...newPortion('x', 'SABQI').perf, status: 'COMPLETED', quality: 2, mistakes: [{ key: 'm', category: 'TAJWEED', severity: 'MINOR', repeated: false, note: '', noteVisibility: 'INTERNAL' }] } });
     const pending = withStatus(rated, 'PENDING', index);
     expect(pending.perf.quality).toBeNull();
     expect(pending.perf.mistakes).toHaveLength(1);
@@ -151,7 +152,7 @@ describe('F05 · Daily Entry form', () => {
   });
 
   it('F05 unit: mistakes need a category and severity; "repeated" is a separate flag', () => {
-    const form = sabqi({ unit: 'HALF', perf: { ...newPortion('x', 'SABQI').perf, status: 'PARTIAL', completedPreset: 'RUBU', mistakes: [{ key: 'm', category: 'LAFZI', severity: null, repeated: true }] } });
+    const form = sabqi({ unit: 'HALF', perf: { ...newPortion('x', 'SABQI').perf, status: 'PARTIAL', completedPreset: 'RUBU', mistakes: [{ key: 'm', category: 'LAFZI', severity: null, repeated: true, note: '', noteVisibility: 'INTERNAL' }] } });
     const issue = portionIssues(form, 1, index).find((i) => i.field === 'mistake')!;
     expect(issue).toMatchObject({ mistake: 1, messageKey: 'mistake.severity.REQUIRED' });
     expect(message(en, issue)).toBe('Sabqi · Portion 1: mistake 1: severity is required');
@@ -164,5 +165,29 @@ describe('F05 · Daily Entry form', () => {
     expect(w).toMatchObject({ section: 'SABAQ', paraNumber: 1, range: { surahStart: 1, ayahStart: 1, surahEnd: 1, ayahEnd: 4 }, totalLinesSource: 'LAYOUT' });
     expect(w.assigned.unit).toBe('LINES');
     expect(w.assigned.numerator).toBe(w.totalLines);
+  });
+});
+
+describe('F07 · mistakes and quality in the form', () => {
+  const withMistake = (over: Partial<ReturnType<typeof newMistake>>) =>
+    sabqi({ unit: 'COMPLETE', perf: { ...newPortion('x', 'SABQI').perf, status: 'PARTIAL', mistakes: [{ ...newMistake('m'), category: 'TAJWEED', severity: 'MINOR', ...over }] } });
+
+  it('F07-AC15 (US-028) a new mistake is internal with no note; the note is trimmed and kept with its visibility', () => {
+    expect(newMistake('k')).toEqual({ key: 'k', category: null, severity: null, repeated: false, note: '', noteVisibility: 'INTERNAL' });
+    expect(attemptWrite(withMistake({ note: '   ' }), index).mistakes).toEqual([{ category: 'TAJWEED', severity: 'MINOR', repeated: false, note: null, noteVisibility: 'INTERNAL' }]);
+    expect(attemptWrite(withMistake({ note: ' Synthetic ', noteVisibility: 'SHARED' }), index).mistakes[0]).toMatchObject({ note: 'Synthetic', noteVisibility: 'SHARED' });
+  });
+
+  it('F07 unit: a note over 200 characters is a localized error on the mistakes field', () => {
+    const issues = portionIssues(withMistake({ note: 'x'.repeat(201) }), 1, index);
+    expect(issues).toContainEqual(expect.objectContaining({ field: 'mistakes', messageKey: 'mistakes.TOO_LONG', params: { max: 200 } }));
+    for (const m of [en, ur, urLatn]) expect(m.daily.fieldError.mistakes.TOO_LONG).toContain('{max}');
+  });
+
+  it('F07-AC6 (US-031) the quality labels in every locale are the approved scale (one source)', () => {
+    expect(en.quality.name).toEqual({ '1': 'Excellent', '2': 'Good', '3': 'Average', '4': 'Needs Improvement', '5': 'Weak' });
+    expect(ur.quality.name['1']).toBe('ممتاز');
+    expect(urLatn.quality.name['5']).toBe('Kamzor');
+    for (const m of [en, ur, urLatn]) expect(Object.keys(m.overall).sort()).toEqual(Object.keys(en.overall).sort());
   });
 });

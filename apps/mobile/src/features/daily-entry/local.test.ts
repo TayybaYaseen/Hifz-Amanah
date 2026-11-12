@@ -95,7 +95,7 @@ describe('F05 · daily records on the device', () => {
       { entity: 'attendance_record', entityId: id, opType: 'CREATE', baseVersion: null, fields: { studentId: STUDENT, classId: CLASS, reportDate: DATE, status: 'PRESENT', leaveReason: null, absentNote: null }, label: 'One' },
     );
     const snapshot = await db.all('SELECT * FROM outbox ORDER BY seq');
-    expect(await runMigrations(db, WORKSPACE_MIGRATIONS)).toEqual([6]);
+    expect(await runMigrations(db, WORKSPACE_MIGRATIONS.slice(0, 6))).toEqual([6]);
     expect(await schemaVersion(db)).toBe(6);
     expect(await db.all('SELECT * FROM outbox ORDER BY seq')).toEqual(snapshot);
     expect((await outbox.list()).map((i) => i.status.state)).toEqual(['PENDING']);
@@ -276,5 +276,90 @@ describe('F05 · daily records on the device', () => {
     expect(id).toBeNull();
     expect((await outbox.list()).map((o) => o.entity)).toEqual(['attendance_record']);
     expect(await db.all('SELECT id FROM daily_records')).toEqual([]);
+  });
+});
+
+describe('F07 · mistakes and quality on the device', () => {
+  it('F12-AC16 (US-051) the F07 migration runs over pending daily-entry operations and keeps the outbox unchanged', async () => {
+    const db = openNodeDriver();
+    await runMigrations(db, WORKSPACE_MIGRATIONS.slice(0, 6));
+    const registry = new EntityRegistry();
+    registerAttendance(registry);
+    registerDailyEntry(registry);
+    const outbox = makeOutbox(db, new FakeClock(), registry);
+    // A record queued by the previous app version (no overall_label column yet).
+    const id = outbox.newEntityId();
+    await outbox.saveWithOp(
+      async (tx) => {
+        await tx.run('INSERT INTO daily_records (id, row_version, student_id, class_id, report_date, session_label) VALUES (?, NULL, ?, ?, ?, NULL)', [id, STUDENT, CLASS, DATE]);
+      },
+      { entity: 'daily_record', entityId: id, opType: 'CREATE', baseVersion: null, fields: { studentId: STUDENT, classId: CLASS, reportDate: DATE, sessionLabel: null }, label: 'One' },
+    );
+    const snapshot = await db.all('SELECT * FROM outbox ORDER BY seq');
+    expect(await runMigrations(db, WORKSPACE_MIGRATIONS)).toEqual([7]);
+    expect(await schemaVersion(db)).toBe(7);
+    expect(await db.all('SELECT * FROM outbox ORDER BY seq')).toEqual(snapshot);
+    // Records saved before the migration have no overall label (never filled in from quality).
+    expect((await readRecord(db, id))!.overallLabel).toBeNull();
+    expect((await outbox.list()).map((i) => i.status.state)).toEqual(['PENDING']);
+  });
+
+  it('F07-AC12, AC13 (US-032) the overall label is saved once on the record and sent with it; quality is untouched', async () => {
+    const { db, outbox } = await setup();
+    const id = (await saveNewEntry(outbox, entry({ overallLabel: 'GOOD' })))!;
+    const record = (await readRecord(db, id))!;
+    expect(record.overallLabel).toBe('GOOD');
+    expect(record.portions.map((p) => p.attempts[0]!.quality)).toEqual([2, null, null]);
+    const ops = await outbox.list();
+    expect(ops.find((o) => o.entity === 'daily_record')!.fields).toMatchObject({ overallLabel: 'GOOD' });
+    // Without a choice the record's label is null, whatever the scores.
+    const other = (await saveNewEntry(outbox, entry({ studentId: '0190f5c0-0000-7000-8000-0000000000a2' })))!;
+    expect((await readRecord(db, other))!.overallLabel).toBeNull();
+  });
+
+  it('F07-AC12 (US-032) changing only the overall label queues one daily_record UPDATE with that field', async () => {
+    const { db, outbox } = await setup();
+    const id = (await saveNewEntry(outbox, entry()))!;
+    const before = (await outbox.list()).length;
+    const n = await saveCorrection(outbox, { recordId: id, reportDate: DATE, studentName: 'Test Student One', overallLabel: 'NEEDS_IMPROVEMENT', attendance: null, actor: ACTOR, portions: [], now: '2026-11-10T06:00:00.000Z' });
+    expect(n).toBe(1);
+    expect((await readRecord(db, id))!.overallLabel).toBe('NEEDS_IMPROVEMENT');
+    const ops = await outbox.list();
+    expect(ops.length).toBeGreaterThanOrEqual(before);
+    const record = ops.filter((o) => o.entity === 'daily_record');
+    // The unsynced CREATE absorbs the change or an UPDATE carries it; either way only the label travels.
+    const last = record.at(-1)!;
+    expect(last.fields).toMatchObject({ overallLabel: 'NEEDS_IMPROVEMENT' });
+    expect(Object.keys(last.fields)).not.toContain('quality');
+  });
+
+  it('F07-AC15 (US-028) a mistake note and its visibility round-trip on the device; INTERNAL is the default', async () => {
+    const { db, outbox } = await setup();
+    const id = (await saveNewEntry(
+      outbox,
+      entry({
+        portions: [
+          {
+            portion: sabqi(1, 3),
+            attempt: attempt({
+              status: 'PARTIAL',
+              mistakes: [
+                { category: 'TAJWEED', severity: 'MINOR', repeated: false, note: 'Synthetic staff note', noteVisibility: 'INTERNAL' },
+                { category: 'LAFZI', severity: 'MAJOR', repeated: true, note: 'Synthetic shared note', noteVisibility: 'SHARED' },
+                { category: 'HARKAAT', severity: 'MINOR', repeated: false },
+              ],
+            }),
+          },
+        ],
+      }),
+    ))!;
+    const mistakes = (await readRecord(db, id))!.portions[0]!.attempts[0]!.mistakes;
+    expect(mistakes).toEqual([
+      { category: 'TAJWEED', severity: 'MINOR', repeated: false, note: 'Synthetic staff note', noteVisibility: 'INTERNAL' },
+      { category: 'LAFZI', severity: 'MAJOR', repeated: true, note: 'Synthetic shared note', noteVisibility: 'SHARED' },
+      { category: 'HARKAAT', severity: 'MINOR', repeated: false, note: null, noteVisibility: 'INTERNAL' },
+    ]);
+    // A note is staff text: never in an operation label (the Sync Queue).
+    expect((await outbox.list()).every((o) => !String(o.label).includes('Synthetic'))).toBe(true);
   });
 });

@@ -10,3 +10,4 @@ file here, numbered after the last one in §19, and a row in that table.
 | [ADR-016](ADR-016-postgres-row-level-security-pattern.md) | Postgres row-level security: the `hifz_tenant` role and `app.current_org_id` | Accepted 2026-11-08 (F12, decision Q9) |
 | [ADR-018](ADR-018-quran-reference-snapshot-offline-cache.md) | Quran reference snapshot and offline SQLite cache (no F12 change) | **Accepted and implemented 2026-11-09** (DEC-B75, DEC-B79, DEC-B80…B84); synthetic data only |
 | [ADR-017](ADR-017-quran-reference-data-model.md) | Quran reference data: model, 16-line layout, offline distribution, import and validation | Accepted 2026-11-09 (DEC-B72); §8 delivery waits on OD-QR-7 |
+| [ADR-019](ADR-019-database-access-layer.md) | Database access layer: Kysely over `pg` on the server, a small typed SQL driver over `expo-sqlite` on mobile (no Drizzle) | Accepted 2026-11-12 (DEC-B85) |

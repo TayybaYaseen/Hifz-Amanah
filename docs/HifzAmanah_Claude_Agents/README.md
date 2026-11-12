@@ -11,7 +11,8 @@ This pack contains implementation instructions for Claude Code. It is based on t
 ## Files
 - `CLAUDE.md`: project-wide master instructions and hard guardrails.
 - `agents/master-agent.md`: orchestration and implementation workflow.
-- `agents/backend-agent.md`: Node.js API, PostgreSQL, auth, domain services.
+- `agents/database-agent.md`: PostgreSQL and SQLite schema, migrations, constraints, indexes, row-level security, query plans.
+- `agents/backend-agent.md`: Node.js API, services and queries, auth, domain services.
 - `agents/frontend-agent.md`: React Native/Expo app integration, state and data flow.
 - `agents/ui-ux-agent.md`: UX, screen specifications, accessibility, localization.
 - `agents/code-review-agent.md`: independent code and security review.
@@ -19,9 +20,9 @@ This pack contains implementation instructions for Claude Code. It is based on t
 - `agents/documentation-agent.md`: docs, decisions, setup, API and release documentation.
 - `agents/security-agent.md`: authentication, authorization, tenant isolation, privacy, secure sync, audit, secrets, and security tests.
 - `IMPLEMENTATION_PLAN.md`: phases and gates, following the spec order `01`–`17`.
-- `OPEN_DECISIONS.md`: what is still open (two Deferred decisions and three product-owner actions), and where each former open item was decided.
+- `OPEN_DECISIONS.md`: what is still open (Deferred decisions and product-owner actions), and where each former open item was decided.
 
-Each role is registered with Claude Code by a thin wrapper in `.claude/agents/<role>.md` that points back to the role file here (the role file stays the single source of truth). The `/dal <task>` command (`.claude/skills/dal/SKILL.md`) sends an implementation task to `master-agent`, which delegates to the specialists.
+Each role is registered with Claude Code by a thin wrapper in `.claude/agents/<role>.md` that points back to the role file here (the role file stays the single source of truth). The `/dal <task>` command (`.claude/skills/dal/SKILL.md`) runs the Master Agent role in the main session, which delegates to the specialist subagents directly (Claude Code subagents cannot launch other subagents). The `master-agent` subagent type remains for planning-only use.
 
 ## Source of truth (highest wins)
 1. `SRS.md` §17 (decision register) and §16 (consolidated finalized decisions)

@@ -16,6 +16,7 @@
 //   server derives the stored one.
 import type { AttendanceStatus, DailyRecordDetail, LessonPortionSyncFields, PortionAttemptSyncFields, DailyRecordSyncFields } from '@hifz/contracts';
 import type { DailyReportMode } from '@hifz/domain/hifz';
+import { isOverallLabel, type OverallLabel } from '@hifz/domain/quality';
 import { DAILY_RECORD_FIELDS, LESSON_PORTION_FIELDS, PORTION_ATTEMPT_FIELDS, nextAttemptNo, type MistakeEntry, type PortionStatus, type TotalLinesSource } from '@hifz/domain/hifz';
 import { fractionText, type Quantity, type QuantityUnit } from '@hifz/domain/quantity';
 import type { MarkingRole } from '@hifz/domain/calendar';
@@ -97,6 +98,18 @@ export const dailyEntryMigration = (version: number): Migration => ({
   },
 });
 
+/**
+ * Local schema for F07 (workspace migration 7): the record's overall performance label. Mistake notes need no column:
+ * mistakes are JSON on the attempt row. Additive only: the outbox is untouched (F12-AC16).
+ */
+export const mistakesQualityMigration = (version: number): Migration => ({
+  version,
+  name: 'F07 overall performance label on daily records',
+  up: async (tx) => {
+    await tx.exec('ALTER TABLE daily_records ADD COLUMN overall_label TEXT;');
+  },
+});
+
 // ---------- Local shapes ----------
 
 export interface LocalAttempt {
@@ -147,6 +160,8 @@ export interface LocalRecord {
   classId: string;
   reportDate: string;
   sessionLabel: string | null;
+  /** The overall performance label (F07, US-032), or null; never derived from quality. */
+  overallLabel: OverallLabel | null;
   recordedBy: string | null;
   recordedByName: string | null;
   clientSavedAt: string | null;
@@ -163,6 +178,7 @@ interface RecordRow {
   class_id: string;
   report_date: string;
   session_label: string | null;
+  overall_label: string | null;
   recorded_by: string | null;
   recorded_by_name: string | null;
   client_saved_at: string | null;
@@ -216,10 +232,19 @@ const quantityOf = (unit: QuantityUnit | null, n: number | null, d: number | nul
 
 const SECTION_ORDER: Record<Section, number> = { SABAQ: 0, SABQI: 1, MANZIL: 2 };
 
+/** A mistake in its stored shape: the note (F07) is internal unless SHARED. */
+const mistakeOf = (m: MistakeEntry): MistakeEntry => ({
+  category: m.category,
+  severity: m.severity,
+  repeated: Boolean(m.repeated),
+  note: typeof m.note === 'string' && m.note.trim() !== '' ? m.note.trim() : null,
+  noteVisibility: m.noteVisibility === 'SHARED' ? 'SHARED' : 'INTERNAL',
+});
+
 function parseMistakes(text: string): MistakeEntry[] {
   try {
     const list = JSON.parse(text) as unknown;
-    return Array.isArray(list) ? (list as MistakeEntry[]).map(({ category, severity, repeated }) => ({ category, severity, repeated: Boolean(repeated) })) : [];
+    return Array.isArray(list) ? (list as MistakeEntry[]).map(mistakeOf) : [];
   } catch {
     return [];
   }
@@ -265,12 +290,12 @@ const toPortion = (r: PortionRow, attempts: LocalAttempt[]): LocalPortion => ({
 
 async function upsertRecord(tx: SqlExecutor, id: string, rowVersion: number, f: Partial<DailyRecordSyncFields>): Promise<void> {
   await tx.run(
-    `INSERT INTO daily_records (id, row_version, student_id, class_id, report_date, session_label, recorded_by, client_saved_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO daily_records (id, row_version, student_id, class_id, report_date, session_label, overall_label, recorded_by, client_saved_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (id) DO UPDATE SET row_version = excluded.row_version, student_id = excluded.student_id, class_id = excluded.class_id,
-       report_date = excluded.report_date, session_label = excluded.session_label, recorded_by = excluded.recorded_by,
-       client_saved_at = excluded.client_saved_at`,
-    [id, rowVersion, f.studentId ?? null, f.classId ?? null, f.reportDate ?? null, f.sessionLabel ?? null, f.recordedBy ?? null, f.clientSavedAt ?? null],
+       report_date = excluded.report_date, session_label = excluded.session_label, overall_label = excluded.overall_label,
+       recorded_by = excluded.recorded_by, client_saved_at = excluded.client_saved_at`,
+    [id, rowVersion, f.studentId ?? null, f.classId ?? null, f.reportDate ?? null, f.sessionLabel ?? null, f.overallLabel ?? null, f.recordedBy ?? null, f.clientSavedAt ?? null],
   );
   // Portions or attempts pulled before their record get its date now (cache retention, F12-AC19).
   if (f.reportDate) {
@@ -345,7 +370,7 @@ async function upsertAttempt(tx: SqlExecutor, id: string, rowVersion: number, f:
       c?.denominator ?? null,
       f.quality ?? null,
       f.noMistakes ? 1 : 0,
-      JSON.stringify(f.mistakes ?? []),
+      JSON.stringify((f.mistakes ?? []).map(mistakeOf)),
       f.remarks ?? null,
     ],
   );
@@ -377,7 +402,7 @@ export const dailyRecordHandler: LocalEntityHandler = {
   upsertFromServer: (tx, id, rowVersion, f) => upsertRecord(tx, id, rowVersion, f as Partial<DailyRecordSyncFields>),
   // The op label (student name · date) is shown; the fields carry nothing else safe to show.
   label: () => null,
-  fieldLabelKey: (field) => ({ sessionLabel: 'daily.sessionLabel' })[field] ?? null,
+  fieldLabelKey: (field) => ({ sessionLabel: 'daily.sessionLabel', overallLabel: 'overall.title' })[field] ?? null,
   formatValue,
   retention,
   onDiscard: async (tx, op) => {
@@ -457,6 +482,7 @@ export async function readRecord(db: SqlExecutor, id: string): Promise<LocalReco
     classId: row.class_id,
     reportDate: row.report_date,
     sessionLabel: row.session_label,
+    overallLabel: isOverallLabel(row.overall_label) ? row.overall_label : null,
     recordedBy: row.recorded_by,
     recordedByName: row.recorded_by_name,
     clientSavedAt: row.client_saved_at,
@@ -522,6 +548,7 @@ export async function storeDetail(db: SqlDriver, detail: DailyRecordDetail, name
         classId: r.classId,
         reportDate: r.reportDate,
         sessionLabel: r.sessionLabel,
+        overallLabel: r.overallLabel,
         recordedBy: r.recordedBy.userId,
         clientSavedAt: r.clientSavedAt,
       });
@@ -559,7 +586,7 @@ export async function storeDetail(db: SqlDriver, detail: DailyRecordDetail, name
           completed: a.completed,
           quality: a.quality,
           noMistakes: a.noMistakes,
-          mistakes: a.mistakes.map(({ category, severity, repeated }) => ({ category, severity, repeated })),
+          mistakes: a.mistakes.map(({ category, severity, repeated, note, noteVisibility }) => ({ category, severity, repeated, note, noteVisibility })),
           remarks: a.remarks,
         });
         await tx.run('UPDATE portion_attempts SET recorded_by_name = ? WHERE id = ?', [a.recordedBy.displayName, a.id]);
@@ -726,6 +753,8 @@ export interface NewEntryInput {
   classId: string;
   reportDate: string;
   sessionLabel: string | null;
+  /** The overall performance label (F07, US-032), or null when not chosen. */
+  overallLabel?: OverallLabel | null;
   studentName: string;
   className: string;
   actor: Actor;
@@ -749,16 +778,16 @@ export async function saveNewEntry(outbox: Outbox, input: NewEntryInput): Promis
     if (input.portions.length === 0) return null;
     const recordId = outbox.newEntityId();
     await tx.run(
-      `INSERT INTO daily_records (id, row_version, student_id, class_id, report_date, session_label, recorded_by, recorded_by_name, client_saved_at,
-         student_name, class_name) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [recordId, input.studentId, input.classId, input.reportDate, input.sessionLabel, input.actor.userId, input.actor.name, input.now, input.studentName, input.className],
+      `INSERT INTO daily_records (id, row_version, student_id, class_id, report_date, session_label, overall_label, recorded_by, recorded_by_name,
+         client_saved_at, student_name, class_name) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [recordId, input.studentId, input.classId, input.reportDate, input.sessionLabel, input.overallLabel ?? null, input.actor.userId, input.actor.name, input.now, input.studentName, input.className],
     );
     const { opId: recordOp } = await outbox.enqueue(tx, {
       entity: 'daily_record',
       entityId: recordId,
       opType: 'CREATE',
       baseVersion: null,
-      fields: { studentId: input.studentId, classId: input.classId, reportDate: input.reportDate, sessionLabel: input.sessionLabel, clientSavedAt: input.now },
+      fields: { studentId: input.studentId, classId: input.classId, reportDate: input.reportDate, sessionLabel: input.sessionLabel, overallLabel: input.overallLabel ?? null, clientSavedAt: input.now },
       dependsOn: deps,
       label,
     });
@@ -791,6 +820,8 @@ export interface CorrectionInput {
   studentName: string;
   /** A new session label (MULTI_SESSION), or undefined when unchanged. */
   sessionLabel?: string | null;
+  /** A new overall performance label (or null to clear it), or undefined when unchanged (F07, US-032). */
+  overallLabel?: OverallLabel | null;
   attendance: AttendanceWrite | null;
   actor: Actor;
   portions: PortionCorrection[];
@@ -811,9 +842,17 @@ export async function saveCorrection(outbox: Outbox, input: CorrectionInput): Pr
       deps.push((await writeMarkInTx(tx, outbox, input.attendance.input, input.attendance.ctx)).opId);
       ops += 1;
     }
-    if (input.sessionLabel !== undefined) {
-      await tx.run('UPDATE daily_records SET session_label = ? WHERE id = ?', [input.sessionLabel, input.recordId]);
-      await outbox.enqueueUpdate(tx, { entity: 'daily_record', entityId: input.recordId, fields: { sessionLabel: input.sessionLabel }, label });
+    if (input.sessionLabel !== undefined || input.overallLabel !== undefined) {
+      const fields: Record<string, unknown> = {};
+      if (input.sessionLabel !== undefined) {
+        await tx.run('UPDATE daily_records SET session_label = ? WHERE id = ?', [input.sessionLabel, input.recordId]);
+        fields.sessionLabel = input.sessionLabel;
+      }
+      if (input.overallLabel !== undefined) {
+        await tx.run('UPDATE daily_records SET overall_label = ? WHERE id = ?', [input.overallLabel, input.recordId]);
+        fields.overallLabel = input.overallLabel;
+      }
+      await outbox.enqueueUpdate(tx, { entity: 'daily_record', entityId: input.recordId, fields, label });
       ops += 1;
     }
     const recordCreate = await pendingCreate(tx, outbox, 'daily_record', input.recordId);

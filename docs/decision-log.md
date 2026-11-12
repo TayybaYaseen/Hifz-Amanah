@@ -424,3 +424,12 @@ plan questions of `docs/handover/F06-snapshot-implementation-plan.md` §8:
 evidence gate, workspace migration 5 (not 4: F04 uses 4), the device cache, background sync and refresh, revocation
 handling, the reference screen with reusable range fields, the F06-AC24 API E2E test, and the Maestro flow
 `offline-reference.yaml`. Results and remaining blockers: the implementation plan's §9 and the pull request.
+
+### 2026-11-12 — Database access layer recorded (DEC-B85, ADR-019)
+
+ARCHITECTURE.md §3 said the database access choice made at scaffolding would be recorded in an ADR; none existed, and
+the approved stack (DEC-B51, AGENTS.md §3) still named Drizzle, which the code never used.
+
+| ID | Question | Answer |
+|---|---|---|
+| DEC-B85 | Accept the database access layer as built? | **Yes.** Server: Kysely over `pg` with plain SQL migrations (an approved option). Mobile: `expo-sqlite` behind a small typed SQL driver, no ORM, replacing "Drizzle". Recorded in [ADR-019](adr/ADR-019-database-access-layer.md); AGENTS.md §3 and ARCHITECTURE.md §3 updated |

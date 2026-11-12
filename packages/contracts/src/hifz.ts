@@ -34,6 +34,17 @@ export type MistakeCategory = (typeof MISTAKE_CATEGORIES)[number];
 export const MISTAKE_SEVERITIES = ['MINOR', 'MAJOR'] as const;
 export type MistakeSeverity = (typeof MISTAKE_SEVERITIES)[number];
 
+/** A mistake note: INTERNAL (staff only, the default) or SHARED with the Student and Parent (FR-ATT-012, DEC-B28). */
+export const NOTE_VISIBILITIES = ['INTERNAL', 'SHARED'] as const;
+export type NoteVisibility = (typeof NOTE_VISIBILITIES)[number];
+
+/**
+ * The overall performance label, once per daily record and optional (US-032). Not a quality score and never
+ * converted to or from one (FR-ATT-009).
+ */
+export const OVERALL_LABELS = ['EXCELLENT', 'GOOD', 'AVERAGE', 'NEEDS_IMPROVEMENT'] as const;
+export type OverallLabel = (typeof OVERALL_LABELS)[number];
+
 /** LAYOUT: counted on the edition's layout. MANUAL: entered or corrected by the Teacher (FR-SAB-008). */
 export const TOTAL_LINES_SOURCES = ['LAYOUT', 'MANUAL'] as const;
 export type TotalLinesSource = (typeof TOTAL_LINES_SOURCES)[number];
@@ -48,6 +59,10 @@ export const SESSION_LABEL_MAX = 40;
 export const REMARKS_MAX = 500;
 /** Mistakes per attempt. */
 export const MISTAKES_MAX = 50;
+/** A mistake note, after trimming (DEC-B86). */
+export const MISTAKE_NOTE_MAX = 200;
+/** The longest period one performance summary may cover (a month and a bit, like the record list). */
+export const PERFORMANCE_SUMMARY_MAX_DAYS = 62;
 export const QUALITY_MIN = 1;
 export const QUALITY_MAX = 5;
 /** Largest amount accepted in any unit; a guard against junk, not a domain limit. */
@@ -151,12 +166,22 @@ export type QuantityValue = z.infer<typeof QuantitySchema>;
 export const AyahRangeSchema = z.strictObject({ surahStart: surah, ayahStart: ayah, surahEnd: surah, ayahEnd: ayah });
 export type AyahRangeValue = z.infer<typeof AyahRangeSchema>;
 
+/**
+ * One mistake: exactly one category, MINOR or MAJOR, and the separate `repeated` flag (FR-ATT-010). The optional note
+ * (F07, FR-ATT-012) is internal unless `noteVisibility` is SHARED; it is accepted up to 4× the limit so the handler can
+ * answer TOO_LONG. Omitted, `note` is null and `noteVisibility` INTERNAL.
+ */
 export const MistakeSchema = z.strictObject({
   category: z.enum(MISTAKE_CATEGORIES),
   severity: z.enum(MISTAKE_SEVERITIES),
   repeated: z.boolean(),
+  note: z.string().max(MISTAKE_NOTE_MAX * 4).nullable().default(null),
+  noteVisibility: z.enum(NOTE_VISIBILITIES).default('INTERNAL'),
 });
 export type MistakeValue = z.infer<typeof MistakeSchema>;
+export type MistakeInput = z.input<typeof MistakeSchema>;
+
+const overallLabel = z.enum(OVERALL_LABELS).nullable();
 
 const quality = z.number().int().min(QUALITY_MIN).max(QUALITY_MAX).nullable();
 /** Accepts up to 4× the limit so the handler can answer with a TOO_LONG field error (as F04 does). */
@@ -188,13 +213,20 @@ export const DailyRecordCreateFields = z.strictObject({
   reportDate: isoDate,
   /** Required in MULTI_SESSION, null in SINGLE (checked against the madrasa's mode by the handler). */
   sessionLabel,
+  /** The overall performance label (US-032); optional, never derived from quality (F07-AC13). */
+  overallLabel: overallLabel.default(null),
   /** When the device saved it (informational). */
   clientSavedAt: datetime.optional(),
 });
 export type DailyRecordCreateFields = z.infer<typeof DailyRecordCreateFields>;
 
-/** `daily_record` UPDATE: only the session label; moving a record to another student or date is not supported. */
-export const DailyRecordUpdateFields = z.strictObject({ sessionLabel });
+/**
+ * `daily_record` UPDATE: the session label and/or the overall performance label; moving a record to another student or
+ * date is not supported.
+ */
+export const DailyRecordUpdateFields = z
+  .strictObject({ sessionLabel: sessionLabel.optional(), overallLabel: overallLabel.optional() })
+  .superRefine((f, ctx) => notEmpty(f, ctx));
 export type DailyRecordUpdateFields = z.infer<typeof DailyRecordUpdateFields>;
 
 // ---------- Sync fields: lesson_portion ----------
@@ -347,6 +379,8 @@ export interface DailyRecordView {
   /** The Teacher's chosen date (F05-AC1); separate from save and sync time. */
   reportDate: string;
   sessionLabel: string | null;
+  /** The record's overall performance label (US-032), or null when the Teacher chose none. */
+  overallLabel: OverallLabel | null;
   recordedBy: UserRef;
   /** Non-removed portions. */
   portionCount: number;
@@ -447,6 +481,7 @@ export interface DailyRecordSyncFields {
   classId: string;
   reportDate: string;
   sessionLabel: string | null;
+  overallLabel: OverallLabel | null;
   recordedBy: string;
   clientSavedAt: string | null;
 }
@@ -476,6 +511,62 @@ export interface PortionAttemptSyncFields {
   noMistakes: boolean;
   mistakes: MistakeValue[];
   remarks: string | null;
+}
+
+// ---------- REST: performance summary (F07; staff only) ----------
+
+/**
+ * GET /hifz/performance-summary?studentId&from&to (inclusive report dates, at most 62 days). Staff only
+ * (`daily.write`; a Teacher reaches assigned classes). F09 builds the full weekly/monthly report on the same domain
+ * functions (@hifz/domain/quality, @hifz/domain/mistakes).
+ */
+export const PerformanceSummaryQuery = z
+  .strictObject({ studentId: uuid, from: isoDate, to: isoDate })
+  .superRefine((q, ctx) => {
+    if (q.from > q.to) ctx.addIssue({ code: 'custom', path: ['to'], message: HIFZ_FIELD_ISSUES.END_BEFORE_START });
+  });
+export type PerformanceSummaryQuery = z.infer<typeof PerformanceSummaryQuery>;
+
+/** A quality average: the exact value, one decimal, the nearest score's label key, and the ratings used. */
+export interface QualityAverageView {
+  /** Ratings used; NULL scores and Absent/Not Assigned/Pending attempts are not ratings (FR-RPT-004). */
+  count: number;
+  /** Exact average (lower is better); null with no ratings ("Not recorded"). */
+  value: number | null;
+  /** One decimal, half up ("1.7"); null with no ratings. */
+  display: string | null;
+  /** Nearest whole score, .5 up (1.5 → 2); null with no ratings. The label comes from the approved scale. */
+  nearestScore: number | null;
+}
+
+export interface MistakeCountsView {
+  byCategory: Record<MistakeCategory, number>;
+  /** Imported uncategorized MistakeCount totals (F14), never split into categories. */
+  uncategorized: number;
+  major: number;
+  minor: number;
+  repeated: number;
+  total: number;
+  /** Attempts with a known count (mistakes listed or "No mistakes"). */
+  recordedAttempts: number;
+  /** Attempts with an explicit "No mistakes" (0). */
+  noMistakesAttempts: number;
+  /** Attempts whose mistakes were not recorded; never counted as 0. */
+  notRecordedAttempts: number;
+}
+
+export interface PerformanceSummary {
+  studentId: string;
+  from: string;
+  to: string;
+  /** Daily records in the period. */
+  recordCount: number;
+  /** Attempts on non-removed portions in the period (every attempt; each is its own recitation). */
+  attemptCount: number;
+  mistakes: MistakeCountsView;
+  quality: QualityAverageView;
+  /** How often each overall label was chosen; records without one are `notChosen` (never derived from quality). */
+  overallLabels: Record<OverallLabel, number> & { notChosen: number };
 }
 
 // ---------- REST: the daily-report mode (US-019) ----------
