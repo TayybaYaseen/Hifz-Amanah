@@ -249,6 +249,11 @@ export const LessonPortionCreateFields = z
     assigned: QuantitySchema,
     totalLines: z.number().int().min(0).max(QUANTITY_AMOUNT_MAX).nullable(),
     totalLinesSource: z.enum(TOTAL_LINES_SOURCES).nullable(),
+    /**
+     * F08 (FR-HW-015, F08-AC16): the confirmed homework portion this lesson portion is the next-class work for. It must
+     * be the same student's, in the same section, and confirmed. Omitted means none.
+     */
+    homeworkPortionId: uuid.nullable().default(null),
   })
   .superRefine((p, ctx) => {
     const issue = (path: string, message: string) => ctx.addIssue({ code: 'custom', path: [path], message });
@@ -440,6 +445,8 @@ export interface LessonPortionView {
   totalLinesSource: TotalLinesSource | null;
   /** The edition Total Lines was counted on (Sabaq only). */
   lineCountEdition: string | null;
+  /** F08: the confirmed homework portion this is the next-class work for (FR-HW-015), or null. */
+  homeworkPortionId: string | null;
   removed: boolean;
   removedAt: string | null;
   /** Oldest first; the current attempt is last (FR-ATT-005). */
@@ -497,6 +504,8 @@ export interface LessonPortionSyncFields {
   totalLines: number | null;
   totalLinesSource: TotalLinesSource | null;
   lineCountEdition: string | null;
+  /** F08: the confirmed homework portion this is the next-class work for (FR-HW-015), or null. */
+  homeworkPortionId: string | null;
   removed: boolean;
 }
 

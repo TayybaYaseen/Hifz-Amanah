@@ -157,7 +157,8 @@ export type PushRequest = z.infer<typeof PushRequest>;
 const issueMap = z.record(z.string(), z.string());
 
 export const OpResult = z.discriminatedUnion('status', [
-  z.strictObject({ opId: UuidV7, status: z.literal('APPLIED'), rowVersion, entityId: UuidV7 }),
+  /** `notices` (F08): facts to show, e.g. CONFIRMED_HOMEWORK_UNCHANGED after a source correction (F08-AC14). */
+  z.strictObject({ opId: UuidV7, status: z.literal('APPLIED'), rowVersion, entityId: UuidV7, notices: z.array(z.string().regex(/^[A-Z][A-Z0-9_]{0,63}$/)).max(10).optional() }),
   /** The record is action required until the conflict is resolved. */
   z.strictObject({ opId: UuidV7, status: z.literal('CONFLICT'), conflictId: z.uuid() }),
   z.strictObject({ opId: UuidV7, status: z.literal('REJECTED'), code: z.enum(OP_REJECT_CODES), fields: issueMap.optional() }),
