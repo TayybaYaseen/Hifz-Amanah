@@ -323,6 +323,8 @@ export interface LessonPortionsTable {
   total_lines: number | null;
   total_lines_source: 'LAYOUT' | 'MANUAL' | null;
   line_count_edition: string | null;
+  /** F08 (0014): the confirmed homework portion this is the next-class work for (FR-HW-015); set on create only. */
+  homework_portion_id: string | null;
   removed_at: Timestamp | null;
   removed_by: string | null;
   created_by: string;
@@ -367,6 +369,62 @@ export interface AttemptMistakesTable {
   note_visibility: ColumnType<'INTERNAL' | 'SHARED', 'INTERNAL' | 'SHARED' | undefined>;
   created_at: Timestamp;
   superseded_at: Timestamp | null;
+}
+
+// ---------- F08 · Homework (0014_homework.sql). Row-level security applies: query through withTenant(). ----------
+
+export type HomeworkStatusColumn = 'DRAFT' | 'CONFIRMED' | 'SUPERSEDED' | 'REJECTED';
+
+export interface HomeworkAssignmentsTable {
+  id: string;
+  organization_id: string;
+  student_id: string;
+  class_id: string;
+  source_daily_record_id: string | null;
+  assigned_date: string;
+  due_date: string;
+  status: HomeworkStatusColumn;
+  revision_of: string | null;
+  /** Staff text: never logged, audited by field name only. */
+  instructions: string | null;
+  created_by: string;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+  updated_by: string;
+  confirmed_by: string | null;
+  confirmed_at: Timestamp | null;
+  rejected_by: string | null;
+  rejected_at: Timestamp | null;
+  superseded_by_user: string | null;
+  superseded_at: Timestamp | null;
+  row_version: ColumnType<string, number | undefined, number>;
+}
+
+export interface HomeworkPortionsTable {
+  id: string;
+  organization_id: string;
+  assignment_id: string;
+  section: 'SABAQ' | 'SABQI' | 'MANZIL';
+  position: number;
+  para_number: number;
+  surah_start: number | null;
+  ayah_start: number | null;
+  surah_end: number | null;
+  ayah_end: number | null;
+  total_lines: number | null;
+  line_count_edition: string | null;
+  assigned_unit: QuantityUnitColumn | null;
+  assigned_num: number | null;
+  assigned_den: number | null;
+  needs_review: boolean;
+  origin: 'SUGGESTED' | 'TEACHER_EDITED' | 'TEACHER_ADDED';
+  source_attempt_id: string | null;
+  source_lesson_portion_id: string | null;
+  source_homework_portion_id: string | null;
+  instructions: string | null;
+  removed_at: Timestamp | null;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }
 
 // ---------- F06 · Quran reference (0009_quran_ref.sql) ----------
@@ -530,6 +588,8 @@ export interface Database {
   lesson_portions: LessonPortionsTable;
   portion_attempts: PortionAttemptsTable;
   attempt_mistakes: AttemptMistakesTable;
+  homework_assignments: HomeworkAssignmentsTable;
+  homework_portions: HomeworkPortionsTable;
   mushaf_editions: MushafEditionsTable;
   quran_imports: QuranImportsTable;
   quran_sources: QuranSourcesTable;

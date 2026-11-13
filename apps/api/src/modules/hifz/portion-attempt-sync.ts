@@ -33,6 +33,7 @@ import type { Quantity } from '@hifz/domain/quantity';
 import type { PortionAttemptsTable, Tx } from '../../platform/db.ts';
 import { recordAudit } from '../audit/audit.ts';
 import type { AppliedChange, Prepared, SyncHandler, SyncRow, WriteMeta } from '../sync/handler.ts';
+import { lessonPortionOfAttempt, type HomeworkSourceHooks } from './sources.ts';
 import {
   UUID,
   attendanceOn,
@@ -149,7 +150,12 @@ async function writeMistakes(tx: Tx, organizationId: string, attemptId: string, 
 const mistakesOf = (list: readonly MistakeInput[]): MistakeValue[] =>
   list.map((m) => ({ category: m.category, severity: m.severity, repeated: m.repeated, note: cleanNote(m.note), noteVisibility: m.noteVisibility ?? 'INTERNAL' }));
 
-export function portionAttemptSyncHandler(): SyncHandler {
+export interface PortionAttemptSyncDeps {
+  /** F08: draft rebuild when an attempt is added or corrected (FR-HW-011, F08-AC14). */
+  homework?: HomeworkSourceHooks;
+}
+
+export function portionAttemptSyncHandler(deps: PortionAttemptSyncDeps = {}): SyncHandler {
   const refuse = (issues: Issues): Prepared => ({ ok: false, issues });
 
   /** Scope, enrollment, the portion not removed, and (for a new attempt) attendance on the record's date. */
@@ -361,6 +367,15 @@ export function portionAttemptSyncHandler(): SyncHandler {
         await tx.updateTable('attempt_mistakes').set({ superseded_at: meta.at }).where('organization_id', '=', organizationId).where('attempt_id', '=', id).where('superseded_at', 'is', null).execute();
         await writeMistakes(tx, organizationId, id, changes.mistakes as MistakeValue[], meta);
       }
+    },
+
+    // F08: a new latest attempt, or a corrected one, rebuilds the drafts carried forward from its portion; confirmed
+    // homework is never changed, and the result says so (F05-AC4, F08-AC14).
+    async afterApply(tx, change) {
+      if (!deps.homework) return [];
+      const portionId =
+        typeof change.changes.lessonPortionId === 'string' ? change.changes.lessonPortionId : await lessonPortionOfAttempt(tx, change.actor.organizationId, change.entityId);
+      return portionId ? deps.homework.sourceChanged(tx, change, portionId) : [];
     },
 
     // Safe for conflict lists: attempt number and status, never a remark.

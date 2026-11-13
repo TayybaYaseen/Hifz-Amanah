@@ -5,6 +5,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { Writable } from 'node:stream';
 import type { FastifyInstance } from 'fastify';
 import { sql } from 'kysely';
+import { v7 as uuidv7 } from 'uuid';
 import { z } from 'zod';
 import { loginIdKey } from '@hifz/contracts';
 import type { Clock } from '../platform/clock.ts';
@@ -314,6 +315,48 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
         const { id } = z.object({ id: z.string().regex(UUID) }).parse(request.params);
         const { revokedVersions } = await quranSources.recordLicence(id, { recordedBy: 'E2E test', ...(request.body as object) });
         return { ok: true, revokedVersions };
+      });
+
+      // F08-AC4: a legacy attempt whose completed unit differs from the portion's assigned unit. Validation refuses this
+      // on every write path today (FR-QTY-004); data from before the rule, or a future import, could still hold it, so
+      // tests plant it directly (synthetic only) to prove nothing is converted and the portion is flagged for review.
+      scope.post('/hifz/legacy-attempt', async (request) => {
+        const input = parse(
+          z.strictObject({
+            lessonPortionId: z.uuid(),
+            status: z.enum(['COMPLETED', 'PARTIAL', 'NOT_REMEMBERED', 'ABSENT', 'NOT_ASSIGNED', 'PENDING']),
+            completed: z.strictObject({ unit: z.enum(['PARA', 'LINES', 'AYAT', 'PAGES']), numerator: z.number().int().min(0), denominator: z.number().int().min(1) }).nullable(),
+          }),
+          request.body,
+        );
+        const portion = await deps.db.selectFrom('lesson_portions').select(['organization_id', 'created_by']).where('id', '=', input.lessonPortionId).executeTakeFirst();
+        if (!portion) throw new AppError('NOT_FOUND');
+        const last = await deps.db.selectFrom('portion_attempts').select((eb) => eb.fn.max('attempt_no').as('n')).where('lesson_portion_id', '=', input.lessonPortionId).executeTakeFirst();
+        const now = deps.clock.now();
+        const id = uuidv7();
+        await deps.db
+          .insertInto('portion_attempts')
+          .values({
+            id,
+            organization_id: portion.organization_id,
+            lesson_portion_id: input.lessonPortionId,
+            attempt_no: Number(last?.n ?? 0) + 1,
+            attempted_at: now,
+            recorded_by: portion.created_by,
+            status: input.status,
+            completed_unit: input.completed?.unit ?? null,
+            completed_num: input.completed?.numerator ?? null,
+            completed_den: input.completed?.denominator ?? null,
+            quality: null,
+            no_mistakes: false,
+            remarks: null,
+            created_at: now,
+            updated_at: now,
+            updated_by: portion.created_by,
+            row_version: 1,
+          })
+          .execute();
+        return { id };
       });
 
       scope.get('/roster/ids', async () => {

@@ -21,7 +21,7 @@ import type { Actor } from '../identity/auth-service.ts';
 import { appendChange, changedSince, lockOrganization } from './change-log.ts';
 import type { SyncControl } from './control-state.ts';
 import { decodeCursor, encodeCursor, maxSeq, type Cursor } from './cursor.ts';
-import type { SyncHandler, SyncRegistry, SyncRow } from './handler.ts';
+import type { AppliedChange, SyncHandler, SyncRegistry, SyncRow } from './handler.ts';
 import { opHash } from './op-hash.ts';
 import { inScope, type SyncScope, type SyncScopeProvider } from './scope.ts';
 
@@ -202,8 +202,97 @@ export class SyncService {
   private async decide(tx: Tx, actor: Actor, deviceId: string, op: SyncOp, scope: SyncScope): Promise<OpResult> {
     const handler = this.d.registry.get(op.entity);
     if (!handler) return rejected(op.opId, 'ENTITY_NOT_SUPPORTED');
-    if (op.opType === 'COMMAND' || !handler.opTypes.includes(op.opType)) return rejected(op.opId, 'VALIDATION', { opType: 'NOT_SUPPORTED' });
+    if (op.opType === 'COMMAND') {
+      return handler.commands && handler.prepareCommand ? this.command(tx, actor, deviceId, op, handler, scope) : rejected(op.opId, 'VALIDATION', { opType: 'NOT_SUPPORTED' });
+    }
+    if (!handler.opTypes.includes(op.opType)) return rejected(op.opId, 'VALIDATION', { opType: 'NOT_SUPPORTED' });
     return op.opType === 'CREATE' ? this.create(tx, actor, op, handler, scope) : this.update(tx, actor, deviceId, op, handler, scope);
+  }
+
+  /** The APPLIED result, with the handler's notices when it has any (F08-AC14). */
+  private async appliedResult(tx: Tx, op: SyncOp, handler: SyncHandler, change: AppliedChange): Promise<OpResult> {
+    const notices = [...((await handler.afterApply?.(tx, change)) ?? [])];
+    const result: OpResult = { opId: op.opId, status: 'APPLIED', rowVersion: change.rowVersion, entityId: change.entityId };
+    return notices.length > 0 ? { ...result, notices } : result;
+  }
+
+  /** Stores an explicit conflict holding both versions (never last-write-wins, F12-AC11, NFR-OFF-006). */
+  private async storeConflict(
+    tx: Tx,
+    actor: Actor,
+    op: SyncOp,
+    row: SyncRow,
+    base: number | null,
+    device: Record<string, unknown>,
+    conflictFields: readonly string[],
+    at: Date,
+  ): Promise<OpResult> {
+    const conflictId = uuidv7();
+    await tx
+      .insertInto('sync_conflicts')
+      .values({
+        id: conflictId,
+        organization_id: actor.organizationId,
+        entity: op.entity,
+        entity_id: row.id,
+        base_version: base,
+        server_version: row.rowVersion,
+        device_fields: JSON.stringify(device),
+        server_fields: JSON.stringify(row.fields),
+        conflict_fields: [...conflictFields],
+        student_id: row.keys.studentId,
+        class_id: row.keys.classId,
+        caused_by_user_id: actor.userId,
+        op_id: op.opId,
+        status: 'OPEN',
+        resolved_by: null,
+        resolved_at: null,
+        resolution: null,
+        created_at: at,
+      })
+      .execute();
+    return { opId: op.opId, status: 'CONFLICT', conflictId };
+  }
+
+  /**
+   * A COMMAND on an existing row (F08: CONFIRM_HOMEWORK, FR-HW-017). Same guards as an UPDATE (scope, base version, one
+   * open conflict per row); the handler decides whether it applies, is refused, or becomes a conflict.
+   */
+  private async command(tx: Tx, actor: Actor, deviceId: string, op: SyncOp, handler: SyncHandler, scope: SyncScope): Promise<OpResult> {
+    const schema = op.command === undefined ? undefined : Object.hasOwn(handler.commands!, op.command) ? handler.commands![op.command] : undefined;
+    if (!schema || op.command === undefined) return rejected(op.opId, 'VALIDATION', { command: 'NOT_SUPPORTED' });
+    const parsed = schema.safeParse(op.fields);
+    if (!parsed.success) return rejected(op.opId, 'VALIDATION', issueFields(parsed.error));
+    const org = actor.organizationId;
+    const row = await handler.load(tx, org, op.entityId, { forUpdate: true });
+    if (!row || !inScope(scope, row.keys)) return rejected(op.opId, 'NOT_FOUND');
+    if ((op.baseVersion ?? 0) > row.rowVersion) return rejected(op.opId, 'VALIDATION', { baseVersion: 'INVALID' });
+    if (await this.openConflict(tx, org, op.entity, op.entityId)) return { opId: op.opId, status: 'RETRY', code: 'CONFLICT_OPEN' };
+    const at = this.d.clock.now();
+    const outcome = await handler.prepareCommand!(tx, actor, row, op.command, parsed.data, { opId: op.opId, deviceId, seq: op.seq, baseVersion: op.baseVersion });
+    if (!outcome.ok) {
+      if ('conflict' in outcome) return this.storeConflict(tx, actor, op, row, op.baseVersion, outcome.conflict.device, outcome.conflict.conflictFields, at);
+      return 'notFound' in outcome ? rejected(op.opId, 'NOT_FOUND') : rejected(op.opId, 'VALIDATION', outcome.issues);
+    }
+    const changes = outcome.fields;
+    if (Object.keys(changes).length === 0) return { opId: op.opId, status: 'APPLIED', rowVersion: row.rowVersion, entityId: op.entityId };
+    const next = row.rowVersion + 1;
+    await handler.update(tx, org, op.entityId, changes, next, { actorUserId: actor.userId, at });
+    await appendChange(tx, {
+      organizationId: org,
+      entity: op.entity,
+      entityId: op.entityId,
+      rowVersion: next,
+      op: 'UPSERT',
+      changedFields: Object.keys(changes),
+      keys: row.keys,
+      actorUserId: actor.userId,
+      opId: op.opId,
+      at,
+    });
+    const change: AppliedChange = { actor, opType: 'COMMAND', command: op.command, opId: op.opId, entityId: op.entityId, rowVersion: next, changes, at };
+    await handler.audit?.(tx, change);
+    return this.appliedResult(tx, op, handler, change);
   }
 
   private async create(tx: Tx, actor: Actor, op: SyncOp, handler: SyncHandler, scope: SyncScope): Promise<OpResult> {
@@ -234,8 +323,9 @@ export class SyncService {
       opId: op.opId,
       at,
     });
-    await handler.audit?.(tx, { actor, opType: 'CREATE', entityId: op.entityId, rowVersion: 1, changes: fields, at });
-    return { opId: op.opId, status: 'APPLIED', rowVersion: 1, entityId: op.entityId };
+    const change: AppliedChange = { actor, opType: 'CREATE', opId: op.opId, entityId: op.entityId, rowVersion: 1, changes: fields, at };
+    await handler.audit?.(tx, change);
+    return this.appliedResult(tx, op, handler, change);
   }
 
   /**
@@ -325,34 +415,8 @@ export class SyncService {
     const outcome = detect({ local: parsed.data, server: row.fields, serverChanged }, handler.fieldSpec);
     const at = this.d.clock.now();
 
-    if (outcome.kind === 'CONFLICT') {
-      // Never last-write-wins: both versions are kept for explicit resolution (F12-AC11, NFR-OFF-006).
-      const conflictId = uuidv7();
-      await tx
-        .insertInto('sync_conflicts')
-        .values({
-          id: conflictId,
-          organization_id: org,
-          entity: op.entity,
-          entity_id: op.entityId,
-          base_version: base,
-          server_version: row.rowVersion,
-          device_fields: JSON.stringify(outcome.device),
-          server_fields: JSON.stringify(row.fields),
-          conflict_fields: outcome.conflictFields,
-          student_id: row.keys.studentId,
-          class_id: row.keys.classId,
-          caused_by_user_id: actor.userId,
-          op_id: op.opId,
-          status: 'OPEN',
-          resolved_by: null,
-          resolved_at: null,
-          resolution: null,
-          created_at: at,
-        })
-        .execute();
-      return { opId: op.opId, status: 'CONFLICT', conflictId };
-    }
+    // Never last-write-wins: both versions are kept for explicit resolution (F12-AC11, NFR-OFF-006).
+    if (outcome.kind === 'CONFLICT') return this.storeConflict(tx, actor, op, row, base, outcome.device, outcome.conflictFields, at);
 
     // Disjoint or safe-merge changes apply on top of the server row (F12-AC13); nothing new → no write.
     if (Object.keys(outcome.apply).length === 0) return { opId: op.opId, status: 'APPLIED', rowVersion: row.rowVersion, entityId: op.entityId };
@@ -373,8 +437,9 @@ export class SyncService {
       opId: op.opId,
       at,
     });
-    await handler.audit?.(tx, { actor, opType: 'UPDATE', entityId: op.entityId, rowVersion: next, changes, at });
-    return { opId: op.opId, status: 'APPLIED', rowVersion: next, entityId: op.entityId };
+    const change: AppliedChange = { actor, opType: 'UPDATE', opId: op.opId, entityId: op.entityId, rowVersion: next, changes, at };
+    await handler.audit?.(tx, change);
+    return this.appliedResult(tx, op, handler, change);
   }
 
   // ---------- GET /sync/pull ----------

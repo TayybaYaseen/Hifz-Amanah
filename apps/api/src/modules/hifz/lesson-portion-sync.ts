@@ -30,6 +30,7 @@ import { recordAudit } from '../audit/audit.ts';
 import type { Actor } from '../identity/auth-service.ts';
 import type { QuranMetadataService } from '../quran-ref/metadata-service.ts';
 import type { AppliedChange, Prepared, SyncHandler, SyncRow } from '../sync/handler.ts';
+import type { HomeworkSourceHooks } from './sources.ts';
 import {
   UUID,
   attendanceOn,
@@ -65,6 +66,7 @@ type Row = Pick<
   | 'total_lines'
   | 'total_lines_source'
   | 'line_count_edition'
+  | 'homework_portion_id'
   | 'removed_at'
 > & { row_version: string | number; student_id: string; class_id: string };
 
@@ -85,6 +87,7 @@ const COLUMNS = [
   'p.total_lines',
   'p.total_lines_source',
   'p.line_count_edition',
+  'p.homework_portion_id',
   'p.removed_at',
   'p.row_version',
   'r.student_id',
@@ -105,6 +108,7 @@ const toRow = (r: Row): SyncRow => ({
     totalLines: r.total_lines,
     totalLinesSource: r.total_lines_source,
     lineCountEdition: r.line_count_edition,
+    homeworkPortionId: r.homework_portion_id,
     removed: r.removed_at !== null,
   },
   keys: { studentId: r.student_id, classId: r.class_id },
@@ -140,6 +144,8 @@ const draftOf = (f: Record<string, unknown>, position: number): PortionDraft => 
 
 export interface LessonPortionSyncDeps {
   quran: QuranMetadataService;
+  /** F08: draft rebuild after a correction, and the next-class link check (FR-HW-011, FR-HW-015). */
+  homework?: HomeworkSourceHooks;
 }
 
 export function lessonPortionSyncHandler(deps: LessonPortionSyncDeps): SyncHandler {
@@ -227,7 +233,14 @@ export function lessonPortionSyncHandler(deps: LessonPortionSyncDeps): SyncHandl
         totalLines: f.totalLines,
         totalLinesSource: f.totalLinesSource,
         lineCountEdition: null,
+        homeworkPortionId: f.homeworkPortionId,
       };
+      // F08-AC16: next-class work for a confirmed homework portion of this student, in the same section.
+      if (f.homeworkPortionId !== null) {
+        const record = (await loadRecordContext(tx, actor.organizationId, f.dailyRecordId))!;
+        const ok = deps.homework ? await deps.homework.checkLink(tx, actor.organizationId, { homeworkPortionId: f.homeworkPortionId, studentId: record.studentId, section: f.section }) : false;
+        if (!ok) return refuse({ homeworkPortionId: 'HOMEWORK_PORTION_MISMATCH' });
+      }
       const checked = await checkPortion(tx, actor.organizationId, fields, f.position);
       if ('issues' in checked) return refuse(checked.issues);
       return { ok: true, fields: { ...fields, assigned: canonical(f.assigned), ...checked.derived, removed: false } };
@@ -299,6 +312,7 @@ export function lessonPortionSyncHandler(deps: LessonPortionSyncDeps): SyncHandl
           total_lines: (fields.totalLines as number | null) ?? null,
           total_lines_source: (fields.totalLinesSource as LessonPortionsTable['total_lines_source']) ?? null,
           line_count_edition: (fields.lineCountEdition as string | null) ?? null,
+          homework_portion_id: (fields.homeworkPortionId as string | null) ?? null,
           removed_at: null,
           removed_by: null,
           created_by: meta.actorUserId,
@@ -353,6 +367,13 @@ export function lessonPortionSyncHandler(deps: LessonPortionSyncDeps): SyncHandl
         }
       }
       await tx.updateTable('lesson_portions').set(set).where('organization_id', '=', organizationId).where('id', '=', id).execute();
+    },
+
+    // F08: a corrected or removed portion rebuilds the drafts carried forward from it (FR-HW-011); confirmed homework
+    // is never changed, and the result says so (F05-AC4, F08-AC14).
+    async afterApply(tx, change) {
+      if (change.opType !== 'UPDATE' || !deps.homework) return [];
+      return deps.homework.sourceChanged(tx, change, change.entityId);
     },
 
     // Safe for conflict lists: section, portion number, and Para; never a remark.

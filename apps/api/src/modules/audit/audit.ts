@@ -62,7 +62,15 @@ export type AuditAction =
   | 'LESSON_PORTION_REMOVED'
   | 'PORTION_ATTEMPT_CREATED'
   | 'PORTION_ATTEMPT_CORRECTED'
-  | 'DAILY_REPORT_MODE_CHANGED';
+  | 'DAILY_REPORT_MODE_CHANGED'
+  // F08 · Homework (ARCHITECTURE §15: homework confirm/revise/reject)
+  | 'HOMEWORK_DRAFT_CREATED'
+  | 'HOMEWORK_DRAFT_UPDATED'
+  | 'HOMEWORK_DRAFT_RECALCULATED'
+  | 'HOMEWORK_REJECTED'
+  | 'HOMEWORK_CONFIRMED'
+  | 'HOMEWORK_REVISED'
+  | 'HOMEWORK_SUPERSEDED';
 
 export interface AuditEvent {
   organizationId: string | null;
@@ -75,7 +83,8 @@ export interface AuditEvent {
     | 'QURAN_SOURCE'
     | 'DAILY_RECORD'
     | 'LESSON_PORTION'
-    | 'PORTION_ATTEMPT';
+    | 'PORTION_ATTEMPT'
+    | 'HOMEWORK_ASSIGNMENT';
   targetId: string | null;
   summary?: Record<string, unknown>;
   at: Date;

@@ -25,6 +25,10 @@ import { lessonPortionSyncHandler } from './modules/hifz/lesson-portion-sync.ts'
 import { portionAttemptSyncHandler } from './modules/hifz/portion-attempt-sync.ts';
 import { registerHifzRoutes } from './modules/hifz/routes.ts';
 import { countDailyRecords, recitedPortions, sabaqRanges } from './modules/hifz/shared.ts';
+import { homeworkAssignmentSyncHandler } from './modules/homework/assignment-sync.ts';
+import { HomeworkService } from './modules/homework/homework-service.ts';
+import { homeworkHooks } from './modules/homework/hooks.ts';
+import { registerHomeworkRoutes } from './modules/homework/routes.ts';
 import { QuranReferenceService } from './modules/quran-ref/reference-service.ts';
 import { registerQuranRoutes } from './modules/quran-ref/routes.ts';
 import { QuranSeedLoader, readSeedFile } from './modules/quran-ref/seed.ts';
@@ -136,13 +140,19 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   // ---------- Daily Hifz entry (F05) ----------
   registerHifzRoutes(app, { authenticate: (request) => auth.authenticate(bearer(request)), records: new DailyRecordService(deps.db, deps.clock) });
 
-  // Production entity handlers: attendance (F04), daily records, portions, attempts (F05). F07/F08 register theirs
-  // here; tests may add sync_probe.
+  // ---------- Homework (F08) ----------
+  registerHomeworkRoutes(app, { authenticate: (request) => auth.authenticate(bearer(request)), homework: new HomeworkService(deps.db, deps.clock, quranMetadata) });
+  // Source changes rebuild drafts and say when confirmed homework was left unchanged (FR-HW-011, F08-AC14).
+  const homework = homeworkHooks();
+
+  // Production entity handlers: attendance (F04), daily records, portions, attempts (F05), homework (F08); tests may
+  // add sync_probe.
   const syncRegistry = new SyncRegistry([
     attendanceSyncHandler({ clock: deps.clock, recited: recitedPortions }),
     dailyRecordSyncHandler({ clock: deps.clock }),
-    lessonPortionSyncHandler({ quran: quranMetadata }),
-    portionAttemptSyncHandler(),
+    lessonPortionSyncHandler({ quran: quranMetadata, homework }),
+    portionAttemptSyncHandler({ homework }),
+    homeworkAssignmentSyncHandler({ clock: deps.clock, quran: quranMetadata }),
     ...(deps.testSync?.handlers ?? []),
   ]);
   const syncScopes = deps.testSync?.scopes ?? rosterScope(deps.db, deps.clock);
