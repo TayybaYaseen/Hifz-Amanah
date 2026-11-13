@@ -1,6 +1,6 @@
 # F08 · Homework and carry forward
 
-**Status:** draft
+**Status:** Approved
 **Brief:** [00-product-brief.md](../00-product-brief.md) · **Flow:** Homework — suggestions and confirmed assignments ([design.md §4.9, §5.7](../design.md))
 **Requirements:** FR-HW-001…015, FR-QTY-005, FR-RPT-007, NFR-PERF-003, NFR-REL-003, FR-HW-016/017, FR-HW-018
 **Stories:** US-033 – US-038 · **Depends on:** F05, F06

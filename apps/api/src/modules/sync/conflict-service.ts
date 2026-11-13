@@ -234,6 +234,11 @@ export class ConflictService {
         opId: null,
         at: now,
       });
+      // Derived work and business audit of the applied values (F08: draft rebuild after a source change, and
+      // HOMEWORK_CONFIRMED when the resolution confirms homework).
+      const applied = { actor, opType: 'UPDATE' as const, opId: null, entityId: conflict.entity_id, rowVersion: next, changes, at: now };
+      await handler.afterApply?.(tx, applied);
+      await handler.auditResolution?.(tx, applied);
       await tx
         .updateTable('sync_conflicts')
         .set({

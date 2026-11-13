@@ -10,7 +10,7 @@ import type { Harness } from '../support/harness.ts';
 export type StudentKey = 'S1' | 'S2' | 'S3' | 'SB1';
 export type ClassKey = 'A1' | 'A2' | 'B1';
 export type Ids = { classes: Record<ClassKey, string>; students: Record<StudentKey, string> };
-export type OpResult = { opId: string; status: string; code?: string; fields?: Record<string, string>; rowVersion?: number; entityId?: string; conflictId?: string };
+export type OpResult = { opId: string; status: string; code?: string; fields?: Record<string, string>; rowVersion?: number; entityId?: string; conflictId?: string; notices?: string[] };
 export type Quantity = { unit: string; numerator: number; denominator: number };
 
 export const DEVICE = '0190f5c0-0000-4000-8000-0000000000f1';
@@ -40,8 +40,9 @@ export function classDayFrom(h: Harness, back: number): string {
   return d;
 }
 
-function op(entity: string, opType: 'CREATE' | 'UPDATE', entityId: string, fields: Record<string, unknown>, baseVersion: number | null, dependsOn: string[] = []) {
-  return { opId: uuidv7(), seq: nextSeq(), entity, entityId, opType, baseVersion, fields, dependsOn, clientSavedAt: new Date().toISOString() };
+/** One sync operation. Every helper shares one outbox `seq` counter, as a device does (the conflict check uses it). */
+export function op(entity: string, opType: 'CREATE' | 'UPDATE' | 'COMMAND', entityId: string, fields: Record<string, unknown>, baseVersion: number | null, dependsOn: string[] = [], command?: string) {
+  return { opId: uuidv7(), seq: nextSeq(), entity, entityId, opType, ...(command ? { command } : {}), baseVersion, fields, dependsOn, clientSavedAt: new Date().toISOString() };
 }
 
 export const attendanceOp = (ids: Ids, student: StudentKey, date: string, status: string, classKey: ClassKey = 'A1', extra: Record<string, unknown> = {}) =>

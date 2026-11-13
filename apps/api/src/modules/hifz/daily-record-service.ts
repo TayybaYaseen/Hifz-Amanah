@@ -251,6 +251,7 @@ export class DailyRecordService {
           totalLines: p.total_lines,
           totalLinesSource: p.total_lines_source,
           lineCountEdition: p.line_count_edition,
+          homeworkPortionId: p.homework_portion_id,
           removed: p.removed_at !== null,
           removedAt: p.removed_at ? p.removed_at.toISOString() : null,
           attempts: history,

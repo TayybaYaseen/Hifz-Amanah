@@ -39,9 +39,13 @@ export type Prepared =
 
 export interface AppliedChange {
   actor: Actor;
-  // Conflict resolutions are audited by the conflict service (SYNC_CONFLICT_RESOLVED), not through this hook. F05
-  // decides whether entity handlers also need a resolution audit and adds the op type then.
-  opType: 'CREATE' | 'UPDATE';
+  // Conflict resolutions are audited by the conflict service (SYNC_CONFLICT_RESOLVED), not through `audit`; a handler
+  // whose resolution is itself a business event (F08: confirming homework) adds `auditResolution`.
+  opType: 'CREATE' | 'UPDATE' | 'COMMAND';
+  /** The command name of a COMMAND (F08: CONFIRM_HOMEWORK). */
+  command?: string;
+  /** The sync operation that made the change, or null (a conflict resolution). */
+  opId?: string | null;
   entityId: string;
   rowVersion: number;
   /** Fields written by this change (names and values; the handler decides what is safe to audit). */
@@ -51,7 +55,7 @@ export interface AppliedChange {
 
 export interface SyncHandler {
   readonly entity: SyncEntity;
-  /** Supported operation types. COMMAND handlers arrive with F05/F08. */
+  /** Supported CREATE/UPDATE types. COMMANDs are listed in `commands` (F08). */
   readonly opTypes: readonly ('CREATE' | 'UPDATE')[];
   /** Strict schema of a CREATE's fields: unknown keys (an organization, a role, a total) are refused. */
   readonly createSchema: FieldsSchema;
@@ -99,7 +103,37 @@ export interface SyncHandler {
   readonly collisionFields?: readonly string[];
   /** Writes the owning module's audit entry for an applied change, in the same transaction (ARCHITECTURE §15). */
   audit?(tx: Tx, change: AppliedChange): Promise<void>;
+  /**
+   * Commands this entity accepts (F08 decision: COMMAND ops), each with its strict fields schema. A COMMAND changes an
+   * existing row in a way an UPDATE may not (e.g. confirming homework, FR-HW-017).
+   */
+  readonly commands?: Readonly<Record<string, FieldsSchema>>;
+  /**
+   * Business validation of a COMMAND on `row` in the op's transaction: the changes to write, a refusal, or a conflict
+   * (the device's intent and the fields it collides on), which the engine stores for explicit review (FR-SYNC-008).
+   */
+  prepareCommand?(tx: Tx, actor: Actor, row: SyncRow, command: string, fields: Record<string, unknown>, ctx: CommandContext): Promise<CommandOutcome>;
+  /**
+   * Runs after a change is applied, in the same transaction (op path and conflict resolution): derived work another
+   * module owns (F08 rebuilds draft homework when a source attempt changes, FR-HW-011). Returns notices for the
+   * APPLIED result (e.g. CONFIRMED_HOMEWORK_UNCHANGED).
+   */
+  afterApply?(tx: Tx, change: AppliedChange): Promise<readonly string[] | void>;
+  /** An extra audit entry when a conflict resolution applies a business event (F08: HOMEWORK_CONFIRMED). */
+  auditResolution?(tx: Tx, change: AppliedChange): Promise<void>;
 }
+
+/** What a COMMAND's handler knows about the operation, for its own conflict check (F12 `changedSince`). */
+export interface CommandContext {
+  opId: string;
+  deviceId: string;
+  /** The device's outbox position: own earlier changes are not a conflict (review H3, N1). */
+  seq: number;
+  /** The row version the device based the command on; null when it never saw the row synced. */
+  baseVersion: number | null;
+}
+
+export type CommandOutcome = Prepared | { ok: false; conflict: { device: Record<string, unknown>; conflictFields: string[] } };
 
 export class SyncRegistry {
   private readonly handlers = new Map<string, SyncHandler>();

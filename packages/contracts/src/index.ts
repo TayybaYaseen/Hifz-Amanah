@@ -6,3 +6,4 @@ export * from './calendar.ts';
 export * from './quran.ts';
 export * from './quran-reference.ts';
 export * from './hifz.ts';
+export * from './homework.ts';
