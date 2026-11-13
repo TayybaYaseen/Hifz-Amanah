@@ -6,7 +6,7 @@
 | **User story** | US-034 |
 | **Feature** | [F08 · Homework and carry forward](11-f08-homework-carry-forward.md) |
 | **Epic** | EPIC 8 — Homework and Carry Forward ([user-stories.md](../user-stories.md)) |
-| **Status** | draft |
+| **Status** | Approved |
 | **Priority** | Not specified in the source documents (SRS, user-stories.md, feature specs). None is assigned here. |
 | **Split from** | `docs/specs/F08-homework-carry-forward.md` on 2026-10-30 |
 

@@ -58,6 +58,11 @@ export interface TestControl {
   convertSyntheticQuran(options?: { production?: boolean; datasetVersion?: string; defect?: QuranSourceDefect }): Promise<QuranConversion>;
   /** The reviewer sign step; a refusal returns status 400 with its reasons. */
   signQuranDataset(seed: unknown, report: unknown, review: QuranReview): Promise<{ status: number; body: Record<string, unknown> }>;
+  /**
+   * F08-AC4: plants a legacy attempt whose completed unit differs from the portion's assigned unit (refused by every
+   * write path today; data from before the rule could still hold it). Synthetic values only. Returns its id.
+   */
+  legacyAttempt(input: { lessonPortionId: string; status: string; completed: { unit: string; numerator: number; denominator: number } | null }): Promise<string>;
   /** Registers a source file in the catalogue (synthetic file; `synthetic: false` only for production-path tests). */
   registerQuranSource(source: { provider: string; resourceId: string | null; category: string; fileName: string; fileSha256: string; synthetic: boolean }): Promise<{ id: string }>;
   /** Appends a licence record to a registered source. */
@@ -155,6 +160,7 @@ export const test = base.extend<Fixtures>({
         const res = await ctx.post('quran/sign', { data: { seed, report, review } });
         return { status: res.status(), body: (await res.json()) as Record<string, unknown> };
       },
+      legacyAttempt: async (input) => (await json(await ctx.post('hifz/legacy-attempt', { data: input }))).id,
       registerQuranSource: async (source) => (await json(await ctx.post('quran/sources', { data: source }))) as unknown as { id: string },
       recordQuranLicence: async (sourceId, licence) =>
         (await json(await ctx.post(`quran/sources/${sourceId}/licence`, { data: { licenceName: null, attributionText: null, ...licence } }))) as unknown as { revokedVersions: number },
