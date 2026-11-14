@@ -6,6 +6,7 @@
     "apps/api",
     "apps/mobile",
     "packages/contracts",
+    "packages/domain",
     "packages/i18n-keys"
   ],
   "scripts": {
@@ -13,10 +14,12 @@
     "test:unit": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
-    "typecheck": "tsc -p apps/api --noEmit && tsc -p packages/contracts --noEmit && tsc -p packages/i18n-keys --noEmit && tsc -p apps/mobile --noEmit",
+    "typecheck": "tsc -p apps/api --noEmit && tsc -p packages/contracts --noEmit && tsc -p packages/domain --noEmit && tsc -p packages/i18n-keys --noEmit && tsc -p apps/mobile --noEmit",
     "api:dev": "npm run dev -w @hifz/api",
     "api:e2e-server": "npm run e2e-server -w @hifz/api",
     "db:migrate": "npm run migrate -w @hifz/api",
+    "quran:source": "npm run quran:source -w @hifz/api --",
+    "quran:convert": "npm run quran:convert -w @hifz/api --",
     "docs:check": "node scripts/check-traceability.mjs",
     "e2e:trace": "node e2e/scripts/traceability.mjs",
     "e2e:gate": "node e2e/scripts/spec-gate.mjs",
@@ -28,6 +31,7 @@
     "@playwright/test": "^1.64.1",
     "@types/node": "^24.0.0",
     "eslint": "^9.39.0",
+    "fast-check": "^4.10.2",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.1",
     "vitest": "^5.0.5"

@@ -2,8 +2,11 @@
 
 **Document type:** System architecture (planning baseline)
 **Status:** Planning only — not implemented
-**Version:** 1.2
-**Last updated:** 2026-11-01
+**Version:** 1.5
+**Last updated:** 2026-11-09
+**Changes in 1.5:** Taj Company is the primary target publisher (SRS §17 DEC-B71). The 16-line, 548-page layout is a candidate only, unverified until it is checked against a physical Taj Mushaf. ADR-017 (still Proposed) now has a Taj edition profile, puts divisions in a later phase, and lists the F06 MVP priorities. No table, rule, or migration changed.
+**Changes in 1.4:** Quran reference data design, **proposed and not approved**: [ADR-017](adr/ADR-017-quran-reference-data-model.md) extends the `quran-ref` tables (source catalogue, line types and word positions, optional divisions), adds an offline reference snapshot for devices (§8.1), and defines the import validation and sign-off. Nothing was implemented. Open decisions OD-QR-1…11 are in SRS §17.3.
+**Changes in 1.3:** The target Mushaf is the 16-line Indo-Pak Mushaf (SRS §17 DEC-B70). The `quran-ref` tables (§6.3) now hold an edition catalogue, import provenance, and versioned page/line layouts (migration 0009, F06). No Quran data is shipped until a dataset is approved (DEC-B31, SRS §17.3).
 **Requirements baseline:** `SRS.md` v1.12 (decision register §17), `user-stories.md` v1.4 (73 stories / 17 epics), `design.md` v1.7
 **Changes in 1.2:** Sabaq is measured in lines over one Surah's Ayat range (SRS §17 DEC-B60…B64, ADR-014). Quantity validation now depends on the section (§6.2). Sabaq fields were added to `lesson_portions` and `homework_portions` (§6.3), with a Sabaq carry-forward rule (§9.2), Excel rules (§11), compatibility notes (§6.6), and tests (§17). Sabqi and Manzil are unchanged.
 **Changes in 1.1:** Every "Proposed" item and ADR-001…011 was approved on 2026-10-30 (SRS §17 DEC-B51). The open gates are closed, and §7.3 is the approved matrix. The data model gained new attendance statuses, Leave, two-factor sign-in, the "all classes" flag, extra portions, and publishing. Two items are Deferred: the Android application ID and the AI provider vendor.
@@ -76,7 +79,7 @@ flowchart LR
 |---|---|---|
 | Framework | React Native + Expo (development builds, not Expo Go, for native modules) | Decided (RN/Expo); build mode Approved |
 | Language | TypeScript (strict) | Approved |
-| Local DB | `expo-sqlite` + a typed query layer (e.g. Drizzle ORM for SQLite) with versioned local migrations | Approved |
+| Local DB | `expo-sqlite` behind a small typed SQL driver (`apps/mobile/src/local-db/driver.ts`), no ORM, with versioned append-only local migrations ([ADR-019](adr/ADR-019-database-access-layer.md), DEC-B85) | Approved |
 | Server state | TanStack Query for online-only reads (Student/Parent views, AI, authoritative reports) | Approved |
 | Navigation | React Navigation with role-specific navigators (`TeacherNavigator`, `AdminNavigator`, `StudentNavigator`, `GuardianNavigator`) | From `design.md` §9 |
 | i18n | i18next + ICU message format; locales `en`, `ur`, `ur-Latn` (Roman Urdu) | Approved |
@@ -95,7 +98,7 @@ flowchart LR
 | Runtime | Node.js LTS, TypeScript | Decided (Node.js) |
 | HTTP framework | Fastify (schema-first, fast, good plugin model) | Approved |
 | Validation / contracts | Zod schemas shared with the app through `packages/contracts` | Approved |
-| DB access | Drizzle ORM or Kysely over `pg`, with SQL migrations in version control | Approved (the one chosen at scaffolding is recorded in an ADR; versioned migrations Decided, NFR-MNT-002) |
+| DB access | Kysely over `pg`, with plain SQL migrations in version control ([ADR-019](adr/ADR-019-database-access-layer.md), DEC-B85) | Approved (versioned migrations Decided, NFR-MNT-002) |
 | Job queue | `pg-boss` (Postgres-backed, so no extra Redis service in MVP) | Approved |
 | Password hashing | Argon2id | Approved |
 | API style | REST + JSON for resources; dedicated `/sync/push` and `/sync/pull` endpoints for offline sync | Approved |
@@ -139,8 +142,9 @@ hifz-amanah/
         navigation/         # Teacher / Admin / Student / Guardian navigators
         features/           # auth, workspaces, classes, students, attendance, daily-entry,
                             # homework, reports, sync, import-export, analytics, settings, audit
-        local-db/           # SQLite schema, local migrations, repositories, outbox
-        sync/               # sync engine (push/pull, retry/backoff, conflict store)
+        local-db/           # SQLite driver, local migrations, repositories
+        sync/               # outbox, sync engine (push/pull, retry/backoff, conflict store), retention
+        app-lock/           # PIN / fingerprint app lock (NFR-OFF-011)
     api/
       src/
         modules/            # one folder per bounded module (§5)
@@ -173,7 +177,7 @@ Each module owns its tables, services, and API routes. Other modules call it onl
 | `access` | Policy engine: role + tenant + assignment scope + audience projection | FR-SEC-*, US-008, US-046, US-068 |
 | `roster` | Classes, teacher assignments, students, enrollments (with history), guardian links | FR-CLS-*, FR-STU-*, US-010…012 |
 | `calendar` | Class schedules, holidays/closures/no-class days, attendance (Present/Late/Half day/Leave/Absent), Leave approval | FR-CAL-*, US-013…017 |
-| `quran-ref` | Admin-managed Surah/Ayat/Para metadata, 15-line Mushaf configuration, range validation. Its service exposes `paraFor(surah, ayah)` and `countLines(surah, ayahStart, ayahEnd, edition)` for Sabaq (FR-SAB-001, FR-SAB-008) | FR-SAB-005…008, US-024…026 |
+| `quran-ref` | Admin-managed Surah/Ayat/Para metadata, Mushaf edition configuration (16-line Indo-Pak by default, DEC-B70; target publisher Taj Company, DEC-B71, printing and layout unverified), the versioned seed loader with import provenance, range validation, and the review list. Its service exposes `paraFor(surah, ayah)` and `countLines(surah, ayahStart, ayahEnd, edition)` for Sabaq (FR-SAB-001, FR-SAB-008) | FR-SAB-005…008, US-024…026 |
 | `hifz` | Daily records, lesson portions, attempts, mistakes, quality, performance labels, note visibility. Validates each portion with the section's quantity rule from `packages/domain/quantity` | FR-DAY-*, FR-SAB/SBQ/MNZ-*, FR-QTY-010, FR-ATT-*, US-018…032 |
 | `homework` | Assignments, portions, suggestion engine, review/confirm/revise lifecycle | FR-HW-*, US-033…038 |
 | `reporting` | Weekly/monthly reports, report cache, PDF rendering, report templates | FR-WKR/MNR/RPT/PDF/EXP-*, US-039…043, US-055…057 |
@@ -205,7 +209,7 @@ A quantity is stored as **`(unit, numerator, denominator)`**. Never use floats.
 | Canonical unit | Allowed values | UI presets |
 |---|---|---|
 | `PARA` | rational, 0 < q ≤ 1 per portion (denominator 4 in MVP) | Rubu = 1/4, Half = 1/2, Salasah = 3/4, Complete = 1 |
-| `LINES` | integer ≥ 0 (15-line Mushaf) | — |
+| `LINES` | integer ≥ 0 (counted on the madrasa's Mushaf edition, 16-line Indo-Pak by default) | — |
 | `AYAT` | integer ≥ 0 | — |
 | `PAGES` | integer ≥ 0 | — |
 
@@ -248,11 +252,13 @@ identity / organization
                   data_categories jsonb)                              -- FR-AI-012/013
   report_templates(organization_id, logo_object_key, colors jsonb, headings jsonb, layout jsonb)
 
-roster
-  classes(id, organization_id, name, status)      -- active names unique per org, case-insensitive (FR-CLS-003)
-  class_teachers(organization_id, class_id, teacher_user_id, assigned_at, unassigned_at)
-  students(id, organization_id, external_student_id NULL, name, admission_date, status, …)
-  student_enrollments(id, organization_id, student_id, class_id, start_date, end_date)  -- one active per student (FR-STU-006)
+roster (as built in F03, migration 0007; RLS on all four; DELETE refused for every role)
+  classes(id, organization_id, name, status, deactivated_at, row_version)   -- active names unique per org, case-insensitive (FR-CLS-003)
+  class_teachers(id, organization_id, class_id, teacher_user_id, assigned_at, assigned_by, unassigned_at, unassigned_by)
+  students(id, organization_id, external_student_id NULL, name, admission_date NULL, private_notes NULL,   -- DEC-B56 fields only
+           status, deactivated_at, row_version)     -- external_student_id unique per org, case-insensitive
+  student_enrollments(id, organization_id, student_id, class_id, start_date, end_date NULL,   -- dates inclusive
+                      created_by, ended_at, ended_by)  -- one open per student (FR-STU-006); a move ends the old one the day before
   student_accounts(organization_id, student_id, user_id)               -- student login
   student_guardians(organization_id, student_id, guardian_user_id,
                     verified_by, verified_at, verification_method, revoked_at)   -- FR-PORT-007
@@ -268,10 +274,34 @@ calendar
                      absent_note NULL,                                                   -- FR-DAY-010, internal
                      recorded_by, row_version)
 
-quran-ref (per organization, Admin-maintained)
-  quran_surahs(organization_id, number, name_ar, name_translit, ayah_count)
-  quran_paras(organization_id, number, start_surah, start_ayah, end_surah, end_ayah)
-  mushaf_layout(organization_id, edition='STANDARD_15_LINE', page, line, surah, ayah_start, ayah_end)
+quran-ref (per organization, Admin-maintained; migration 0009_quran_ref.sql, F06)
+  mushaf_editions(code PK, name, lines_per_page, publisher NULL, page_count NULL,     -- global catalogue, not tenant data
+                  verification[UNVERIFIED|VERIFIED])                                  -- a new edition is a row (DEC-B70)
+  organizations.mushaf_edition DEFAULT 'INDOPAK_16_LINE'                              -- the edition this madrasa counts on
+  quran_imports(id, organization_id, kind[METADATA|LAYOUT], edition NULL, dataset_key, dataset_version,
+                source_name, source_url, licence, reviewed_by, approved_on, synthetic, checksum, counts,
+                applied_at, applied_by)                                               -- provenance, FR-SAB-007, DEC-B31
+  quran_surahs(id, organization_id, number, name_ar, name_translit, ayah_count,
+               source[SEED|ADMIN], import_id NULL, row_version)                       -- name_ar byte-exact (BR-15)
+  quran_paras(id, organization_id, number, start_surah, start_ayah, end_surah, end_ayah,
+              source[SEED|ADMIN], import_id NULL, row_version)
+  mushaf_layouts(organization_id, edition, import_id)                                 -- the active layout per edition
+  mushaf_layout_lines(organization_id, import_id, page, line, surah, ayah_start, ayah_end)
+                                                                                      -- verified imports only; never derived
+  -- 0010_quran_ref_v2.sql (ADR-017, DEC-B72):
+  quran_sources(id, provider, resource_name, resource_id, category, source_url, download_url, downloaded_on,
+                file_name, file_sha256, source_version, notes, synthetic, registered_at, registered_by)  -- global
+  quran_source_licences(id, source_id, status[LICENSE_REVIEW_REQUIRED|OPEN_LICENCE_VERIFIED|PERMISSION_GRANTED|REFUSED],
+                licence_name, permission_ref, publisher_clearance_ref, attribution_text, recorded_at, recorded_by)
+                                                                   -- global, append-only; the latest row is current
+  quran_import_sources(organization_id, import_id, source_id, role[METADATA|LAYOUT|WORDS])        -- tenant, RLS
+  quran_imports + seed_format_version, review_decision, validation_report_sha256  -- production: format 2, signed
+  mushaf_editions + printing_id, printing_notes, page_count_source                 -- Taj profile (DEC-B71)
+  quran_surahs + revelation_place, revelation_order, bismillah_pre                 -- display only
+  mushaf_layout_lines + line_type[AYAH|SURAH_NAME|BASMALLAH], is_centered, word_start, word_end,
+                src_first_word_id, src_last_word_id (ayah_* NULL on non-AYAH lines)
+  -- Later phase (DEC-B71): quran_divisions. Not stored: Quran text, word tables, quran_ayahs.
+  -- Student records keep canonical (surah, ayah) values only.
 
 hifz
   daily_records(id, organization_id, student_id, class_id NULL, report_date, session_label NULL,
@@ -314,10 +344,21 @@ reporting / platform
   report_published(organization_id, student_id, period_kind, period_start, published_by, published_at,
                    updated_after_publish_at NULL)                      -- FR-RPT-010
   report_cache(organization_id, student_id, period_kind, period_start, source_seq, payload jsonb)
-  change_log(organization_id, seq BIGSERIAL, entity, entity_id, op, at)
-  sync_ops(organization_id, op_id UUID PRIMARY KEY, device_id, user_id, received_at, result jsonb)
-  sync_conflicts(id, organization_id, entity, entity_id, local_payload, server_payload,
-                 base_version, status[OPEN|RESOLVED], resolved_by, resolution)
+  -- sync tables as built in F12 (migrations 0004/0005/0006, ADR-015); RLS forced on all four (ADR-016)
+  change_log(seq BIGSERIAL, organization_id, entity, entity_id, row_version, op[UPSERT|REMOVE],
+             changed_fields text[], student_id NULL, class_id NULL,       -- scope keys at change time (F12-AC7)
+             actor_user_id, op_id NULL, at)                                -- append-only (trigger)
+  sync_ops(op_id UUID PRIMARY KEY, organization_id, user_id, device_id, entity, entity_id,
+           op_hash bytea, seq bigint NULL, status[APPLIED|CONFLICT|REJECTED], result jsonb, received_at)
+           -- RETRY never stored; seq = the client's outbox seq (0006), NULL on older rows, not unique.
+           -- Conflict check: a change since the base counts as a server change if its op_id is NULL, it came from
+           -- another user or device, its seq is NULL, or its seq > the incoming op's seq (own earlier edits excluded)
+  sync_conflicts(id, organization_id, entity, entity_id, base_version, server_version,
+                 device_fields jsonb, server_fields jsonb, conflict_fields text[],
+                 student_id NULL, class_id NULL, caused_by_user_id, op_id,
+                 status[OPEN|RESOLVED], resolved_by, resolved_at, resolution jsonb, created_at)
+                 -- one OPEN conflict per (organization_id, entity, entity_id)
+  scope_changes(organization_id, user_id, seq, at)   -- seq from change_log's sequence; drives pull scopeReset; written by roster (F03)
   import_jobs(id, organization_id, kind, file_object_key, status, row_count, summary jsonb, created_by)
   import_rows(job_id, row_no, status[NEW|EXACT_MATCH|SUSPECTED_DUP|INVALID|PROPOSED_UPDATE|COMMITTED|FAILED],
               errors jsonb, target_id NULL)
@@ -444,16 +485,28 @@ For `STUDENT` and `PARENT` audiences it removes `notes.visibility = INTERNAL`, i
 ### 8.1 Device storage
 
 ```text
-SQLite (per signed-in account + organization)
-  entity tables (mirror of permitted server data + local edits)
-  outbox(op_id, seq, entity, entity_id, op_type, payload, base_version,
+SQLite (per signed-in account + organization; local migrations in apps/mobile/src/local-db/migrations.ts)
+  entity tables (mirror of permitted server data + local edits; added by F04/F05/F08)
+  ref_* tables  PROPOSED (ADR-017 §8.2): read-only Quran reference cache (surahs, paras, active layout lines,
+                divisions) + ref_meta(reference_version, snapshot_sha256); filled from one checksummed snapshot
+                after the first online sign-in; never in the outbox; droppable and re-fetchable
+  outbox(op_id, seq, entity, entity_id, op_type, command, payload, base_version,
          depends_on[], state[PENDING|SYNCING|SYNCED|FAILED|ACTION_REQUIRED],
-         attempts, last_error, created_at)
-  sync_meta(last_pull_cursor, last_success_at, protocol_version, schema_version)
-  conflicts(local copy of server conflicts for review UI)
+         attempts, last_error, next_attempt_at, failure_code, failure_fields,
+         row_version, conflict_id, label, sent_count, created_at, synced_at)
+  sync_meta(last_pull_cursor, last_success_at, last_server_time, protocol_version, schema_version,
+            workspace_state[ACTIVE|LOCKED_REVOKED], revoked_at, signed_out_at, upgrade_required_at,
+            last_cleanup_at, org_time_zone, next_seq, refetch_requested, refetch_done)
+  conflicts(local copy of server conflicts for review UI; last_checked_at for reconciliation)
+  discards(local record of discarded or superseded operations, with reason)
+  deferred_changes(pulled server changes held back while the row has unsynced local edits)
+  row_sync_marks(entity, entity_id, last_synced_seq)   -- highest acknowledged seq per row; Retry refuses older changes
+SQLite device index (one per install): device_id; workspaces(db_name, user, org, role, state[ACTIVE|HELD|LOCKED_REVOKED], since)
 ```
 
-**Save path (NFR-OFF-002):** the entity write and the outbox insert happen in **one SQLite transaction**. The UI shows "Saved on device" only after that commit. "Synced" appears only after the server acknowledges the operation (FR-SYNC-007, `design.md` §8).
+**Local migrations (F12):** v1 creates `outbox`, `sync_meta`, `conflicts`, `discards`. v2 adds `outbox.sent_count`, `sync_meta.last_server_time`, `discards.reason`, and the `deferred_changes` table. v3 adds `row_sync_marks`, the `sync_meta.refetch_requested` / `refetch_done` counters, and `conflicts.last_checked_at`. All are additive and keep the outbox intact (F12-AC16).
+
+**Save path (NFR-OFF-002):** the entity write and the outbox insert happen in **one SQLite transaction**. The UI shows "Saved on device" only after that commit. "Synced" appears only after the server acknowledges the operation (FR-SYNC-007, `design.md` §8). A CREATE or COMMAND is saved with `saveWithOp`; every edit of an existing row goes through `saveWithUpdate` / `enqueueUpdate`, which derive the base version and dependencies (ADR-015 §4). F04, F05, and F08 must use them.
 
 ### 8.2 Protocol
 
@@ -468,7 +521,7 @@ sequenceDiagram
   alt no conflict
     API->>DB: apply, bump row_version, append change_log, audit, record sync_ops
   else meaningful conflict
-    API->>DB: insert sync_conflicts (both versions), record sync_ops = ACTION_REQUIRED
+    API->>DB: insert sync_conflicts (both versions), record sync_ops = CONFLICT (app shows action required)
   end
   API-->>App: per-op results [{op_id, status, row_version | conflict_id | error}]
   App->>API: GET /sync/pull?cursor=…
@@ -476,12 +529,13 @@ sequenceDiagram
 ```
 
 - **Idempotency:** `op_id` (a client UUID) is the primary key of `sync_ops`. A replayed operation returns the stored result and creates no duplicate (NFR-OFF-004).
-- **Ordering:** operations carry `depends_on`. The server rejects an operation whose dependency has not been applied, using the retryable error `DEPENDENCY_PENDING`. The client sends operations in outbox order.
-- **Retry:** exponential backoff with jitter. A `FAILED` operation stays visible with its reason (NFR-OFF-007).
+- **Ordering:** operations carry `depends_on`. The server rejects an operation whose dependency has not been applied (or whose conflict is resolved but whose record does not exist), using the retryable error `DEPENDENCY_PENDING`. The client sends operations in outbox order, holds an operation while an earlier edit of the same row is unsynced (`WAITING_FOR_EARLIER_EDIT`), and sends at most one operation per row at a time (ADR-015 §12).
+- **Retry:** exponential backoff with jitter. A `FAILED` operation stays visible with its reason (NFR-OFF-007). A manual Retry keeps the original `seq` under a new `op_id`, and is refused once a newer edit of the same row has synced.
 - **Versioning:** `protocolVersion` is checked on every request. The server answers `UPGRADE_REQUIRED` for unsupported clients, and pending operations are kept.
-- **Conflicts (FR-SYNC-008):** these fields are "meaningful": attempt status, quantities, quality, mistakes, attendance status, and homework status/portions. If one of them changed on both sides since `base_version`, a conflict is created. Last-write-wins is never used for them. Non-meaningful fields (e.g. display ordering) may use a documented safe merge. An authorized user resolves the conflict in the Conflict Review screen. The resolution is a new operation and is audited.
+- **Conflicts (FR-SYNC-008):** these fields are "meaningful": attempt status, quantities, quality, mistakes, attendance status, and homework status/portions. If one of them changed on both sides since `base_version`, a conflict is created. Last-write-wins is never used for them. Non-meaningful fields (e.g. display ordering) may use a documented safe merge. An authorized user resolves the conflict in the Conflict Review screen. The resolution is an online request (`POST /sync/conflicts/:id/resolve`, F12 decision Q6) applied as a new audited change (`SYNC_CONFLICT_RESOLVED`). Protocol details, the one-open-conflict-per-row rule, and the per-organization lock that keeps the pull cursor gap-free are in ADR-015.
 - **Revocation (NFR-OFF-010, FR-SYNC-009):** if push or pull returns `ACCESS_REVOKED`, the app stops syncing that workspace and locks its cached data. Unsynced operations stay visible but cannot be sent. Synced data is purged at once. Unsynced operations stay locked and visible, and are purged on sign-out or after 30 days (NFR-OFF-011). The app lock (PIN or fingerprint) is required for Owner/Admin and optional for Teachers; it locks after 5 minutes in the background. Synced daily records older than 120 days are removed from the device cache.
-- **Sign-out with pending operations** shows a warning (`design.md` §4.13).
+- **Sign-out with pending operations** shows a warning (`design.md` §4.13). Sign-out first quiesces the workspace: new saves are refused, the sync engine starts no new run, and the run and saves in flight finish before the unsynced count and the purge.
+- **Conflict reconciliation (client):** each open conflict is checked with the server at most once every 5 minutes, at most 50 per run, least recently checked first. A conflict that is no longer reachable moves its item to `FAILED NOT_FOUND` (domain event `CONFLICT_GONE`). Discarding an acknowledged edit makes the next pull start from a fresh snapshot, so the server's values come back.
 - **Local schema upgrades** run in a transaction and are tested with a populated outbox (NFR-OFF-009).
 
 ### 8.3 What works offline
@@ -636,7 +690,7 @@ App (online, Teacher/Admin) → POST /analytics/{studentId}/ai-recommendation
 
 - Audit rows are written **in the same transaction** as the change they describe.
 - The writer role has INSERT-only access. No UPDATE/DELETE grants exist on `audit_logs`.
-- **Audited actions include:** account/role/membership changes, password reset, guardian link/verification/revocation, note visibility changes, daily record/attempt create/edit, Leave decisions, attendance changes, "all classes" flag changes, report publishing, 2FA setup/reset and recovery-code regeneration, account locks, homework confirm/revise/reject, Quran metadata edits, daily-report mode change, AI settings change, import/export jobs, conflict resolution, sensitive report access (NFR-PORT-006).
+- **Audited actions include:** account/role/membership changes, password reset, guardian link/verification/revocation, note visibility changes, daily record/attempt create/edit, Leave decisions, attendance changes, "all classes" flag changes, report publishing, 2FA setup/reset and recovery-code regeneration, account locks, homework confirm/revise/reject, Quran metadata edits, daily-report mode change, AI settings change, import/export jobs, conflict resolution (`SYNC_CONFLICT_RESOLVED`: entity, record ID, choice, field names and picks, old/new values only for fields the entity handler declares non-sensitive), sensitive report access (NFR-PORT-006).
 - `summary` holds field names plus old/new values **for non-sensitive fields only**. Note bodies, passwords, OTPs, and tokens are never stored.
 
 ---
@@ -649,7 +703,7 @@ App (online, Teacher/Admin) → POST /analytics/{studentId}/ai-recommendation
 | `staging` | Production-like, synthetic data, used for acceptance testing |
 | `production` | AWS Mumbai: managed Postgres with daily backups kept 30 days + 7-day PITR (NFR-PRV-005), S3, SES; a tested restore runbook (NFR-REL-001/002). Sized for 20 madaris / 200 teachers / 5,000 students; targets in NFR-PERF-006 |
 
-- **Mobile distribution:** EAS Build → Play Console internal/closed/production tracks. Minimum Android 8.0 (API 26) or the Expo SDK minimum, and the device matrix in NFR-COMP-001. **The Android application ID is Deferred** until the domain is registered (DEC-B55).
+- **Mobile distribution:** EAS Build → Play Console internal/closed/production tracks. Minimum Android 8.0 (API 26) or the Expo SDK minimum, and the device matrix in NFR-COMP-001. **The Android application ID is `com.hifzamanah.app`** (DEC-B55, decided 2026-11-08); it never changes after the first release.
 - **Observability:** structured JSON logs with redaction, error tracking for app and API (Sentry or equivalent, with PII scrubbing), and metrics for sync failures, conflict rate, job failures, AI usage/cost, and push failures.
 
 ---
@@ -711,6 +765,11 @@ App (online, Teacher/Admin) → POST /analytics/{studentId}/ai-recommendation
 | ADR-012 | Authentication built into the API; TOTP two-factor sign-in for Owner/Admin | Approved 2026-10-30 |
 | ADR-013 | AWS Mumbai hosting with S3 and SES; Expo Push Service for Android push | Approved 2026-10-30 |
 | ADR-014 | Quantity rules chosen by section: Sabaq = `LINES` over a single-Surah range with `total_lines`; Sabqi/Manzil unchanged (extends ADR-005; no conversion) | Approved 2026-11-01 (SRS DEC-B60…B64) |
+| ADR-015 | Sync protocol v1: `op_hash` idempotency, stored terminal results, `RETRY` not stored, one open conflict per row, per-organization advisory lock for a gap-free pull cursor ([docs/adr/ADR-015](adr/ADR-015-sync-protocol-idempotency-conflicts.md); refines ADR-003/004) | Accepted 2026-11-08 (F12 plan §10 answers); amended 2026-11-08 after the re-review (per-row send order, client `seq` in the own-change rule, Retry keeps `seq`, `CONFLICT_GONE`) |
+| ADR-016 | Row-level security pattern: `hifz_tenant` role, `SET LOCAL ROLE` + `app.current_org_id` per transaction, `FORCE` RLS ([docs/adr/ADR-016](adr/ADR-016-postgres-row-level-security-pattern.md); implements ADR-006) | Accepted 2026-11-08 (F12 decision Q9) |
+| ADR-017 | Quran reference data: extend `quran-ref` (source catalogue + licence gate, line-level 16-line layout with line types and word positions, optional divisions), offline snapshot cache on devices, import validation and reviewer sign-off ([docs/adr/ADR-017](adr/ADR-017-quran-reference-data-model.md)) | Accepted 2026-11-09 (SRS DEC-B72); §8 delivery waits on OD-QR-7 |
+| ADR-018 | Quran reference snapshot (`GET /quran/reference/version|snapshot`, content-addressed version, SHA-256, ETag) and disposable `ref_*` SQLite cache on staff devices; full atomic replace; no F12 protocol change; licence withdrawal revokes snapshot versions, removed from devices on next connection ([docs/adr/ADR-018](adr/ADR-018-quran-reference-snapshot-offline-cache.md)) | **Accepted and implemented 2026-11-09** (DEC-B75, DEC-B79, DEC-B80…B84); server migration 0011, workspace migration 5 |
+| ADR-019 | Database access layer as built: Kysely over `pg` with plain SQL migrations on the server (an approved option); a small typed SQL driver over `expo-sqlite` with append-only local migrations on mobile, no Drizzle ([docs/adr/ADR-019](adr/ADR-019-database-access-layer.md)) | Accepted 2026-11-12 (SRS DEC-B85) |
 
 ### 19.1 Implementation gates (closed 2026-10-30)
 
@@ -726,7 +785,6 @@ Every SRS §13 gate and every design.md §11 item (D1–D8) is closed; SRS §17 
 - **Excel `_meta` sheet and 200-row batches:** §11 (D7).
 
 **Deferred:**
-- The Android application ID (DEC-B55).
 - The AI provider vendor (DEC-B45, Phase 7). The provider adapter interface in §12 keeps it swappable.
 
 ---

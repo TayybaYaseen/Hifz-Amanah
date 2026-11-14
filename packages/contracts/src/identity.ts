@@ -65,12 +65,36 @@ export const ERROR_CODES = [
   'FORBIDDEN',
   'NOT_FOUND',
   'LOGIN_ID_TAKEN',
+  'LAST_ADMIN',
   'OTP_INVALID',
   'CURRENT_PASSWORD_INCORRECT',
   'TWO_FACTOR_INVALID',
   'REAUTH_REQUIRED',
   'RATE_LIMITED',
   'INTERNAL',
+  // Sync (F12; plan docs/handover/F12-plan.md §5).
+  /** 403: the membership was revoked or the account deactivated; the app locks the workspace. */
+  'ACCESS_REVOKED',
+  /** 426: the app's sync protocol version is below the server's minimum. */
+  'UPGRADE_REQUIRED',
+  'DEPENDENCY_PENDING',
+  /** Push RETRY code: the row has an open sync conflict; the change waits until it is resolved (decision Q7). */
+  'CONFLICT_OPEN',
+  'OP_ID_REUSED',
+  'ID_TAKEN',
+  'ENTITY_NOT_SUPPORTED',
+  /** 409: the server row changed since the conflict was opened. */
+  'CONFLICT_STALE',
+  /** 409: the conflict was already resolved. */
+  'CONFLICT_CLOSED',
+  // Calendar (F04; plan docs/handover/F04-plan.md).
+  /** 409: records already exist on the date of a new holiday; the Admin must confirm (FR-CAL-009, F04-AC20). */
+  'RECORDS_EXIST',
+  /** 409: the Leave is not awaiting a decision (already decided, changed, or not a Leave). */
+  'LEAVE_NOT_AWAITING',
+  // Daily Hifz entry (F05; plan docs/handover/F05-plan.md §4). HIFZ_ERROR_CODES in hifz.ts.
+  /** 409: switching to SINGLE is blocked while a student has more than one record on a date (F05-AC8). */
+  'MODE_CONFLICTS',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 
@@ -80,6 +104,8 @@ export interface ApiError {
     message: string;
     /** Field name → issue code, for VALIDATION errors. */
     fields?: Record<string, string>;
+    /** MODE_CONFLICTS (F05-AC8): the student/date pairs blocking the switch (hifz.ts ReportModeConflict). */
+    conflicts?: unknown[];
   };
 }
 
@@ -199,6 +225,8 @@ export interface AccountResponse {
   /** Set while the account is locked after repeated failed sign-ins (FR-AUTH-014). */
   lockedUntil: string | null;
   twoFactorEnabled: boolean;
+  /** A Teacher's "all classes" flag (FR-SEC-003); always false for other roles. */
+  allClasses: boolean;
   createdAt: string;
 }
 

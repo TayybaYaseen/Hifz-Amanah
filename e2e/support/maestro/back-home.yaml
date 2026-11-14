@@ -1,0 +1,12 @@
+# Subflow: go back to Home from any pushed screen.
+appId: com.hifzamanah.app
+---
+- repeat:
+    while:
+      notVisible:
+        id: "home.screen"
+    times: 6
+    commands:
+      - back
+- assertVisible:
+    id: "home.screen"

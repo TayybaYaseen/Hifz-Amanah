@@ -1,6 +1,6 @@
 # F03 · Classes and students
 
-**Status:** draft
+**Status:** Approved
 **Brief:** [00-product-brief.md](../00-product-brief.md) · **Flow:** More → Classes (design gap); Student list and profile ([design.md §4.5–4.6](../design.md))
 **Requirements:** FR-CLS-001/002, FR-STU-001…004, NFR-PERF-001, NFR-PRV-001, FR-CLS-003, FR-STU-005/006
 **Stories:** US-010 – US-012 · **Depends on:** F02

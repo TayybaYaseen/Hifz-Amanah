@@ -1,7 +1,7 @@
 // F11 · Localization and accessibility — unit: message catalogues (docs/specs/02-f11-localization-accessibility.md)
 import { describe, expect, it } from 'vitest';
 import { IntlMessageFormat } from 'intl-messageformat';
-import { ERROR_CODES, LOCALES, RECITATION_STATUSES } from '@hifz/contracts';
+import { ERROR_CODES, LOCALES, PORTION_STATUSES } from '@hifz/contracts';
 import { appCatalogues } from '../../apps/mobile/src/i18n/resources.ts';
 import {
   CORE_TERMS,
@@ -133,7 +133,7 @@ describe('F11 · canonical values', () => {
     }
     const urdu = optionsOf('ur', 'recitationStatus').find((o) => o.label === 'یاد نہیں');
     expect(urdu?.value).toBe('NOT_REMEMBERED');
-    expect(optionsOf('en', 'recitationStatus').map((o) => o.value)).toEqual([...RECITATION_STATUSES]);
+    expect(optionsOf('en', 'recitationStatus').map((o) => o.value)).toEqual([...PORTION_STATUSES]);
   });
 
   it('F11 unit: quality is shown as number and the approved label, lower is better (FR-ATT-009)', () => {

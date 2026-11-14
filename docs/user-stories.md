@@ -2,8 +2,9 @@
 
 **Document type:** Product backlog / acceptance baseline  
 **Status:** Planning only — not implemented  
-**Version:** 1.5  
-**Last updated:** 2026-11-01  
+**Version:** 1.6  
+**Last updated:** 2026-11-09  
+**Changes in 1.6:** The target Mushaf is the 16-line Indo-Pak Mushaf (SRS §17 DEC-B70, 2026-11-09), replacing the standard 15-line Mushaf. US-026 is retitled "Use 16-line Indo-Pak Mushaf"; criterion 3 of US-024, US-025 and US-026 names the new edition. The criteria count is unchanged.  
 **Changes in 1.5:** US-033 criterion 2 now says a Sabaq homework portion has a required Surah/Ayat range and a quantity in lines (SRS §17 DEC-B60). The criteria count is unchanged.  
 **Changes in 1.4:** Applied the decision review of 2026-10-30 (SRS §17).
 - **New stories:** US-071 (Manage my profile), US-072 (Owner/Admin two-factor sign-in), US-073 (Class summary report). That is 9 new criteria.
@@ -29,7 +30,7 @@ This backlog consolidates the user stories supported by the current HifzAmanah p
 - Quality rating is optional integer 1–5; missing is unknown, not zero. Each score has an approved label (SRS FR-ATT-009; lower is better): 1 Excellent, 2 Good, 3 Average, 4 Needs Improvement, 5 Weak. Overall performance label is Excellent/Good/Average/Needs Improvement and is a separate selection.
 - Mistakes: Harkaat, Tajweed, Lafzi, Ayat bhoolna, Tarteeb, Waqf/Ibtida; severity Minor/Major and repeated flag are separate attributes.
 - Leave (which replaced "excused absence") is marked by the Teacher with a required reason and approved by the Admin; reports distinguish Leave from normal absence.
-- Quran metadata is Admin-managed; MVP uses standard 15-line Mushaf.
+- Quran metadata is Admin-managed; MVP uses the 16-line Indo-Pak Mushaf (DEC-B70).
 - Homework carry-forward is suggested, reviewed, and explicitly confirmed by Teacher. Only an Owner/Admin revises confirmed homework. Homework missed through absence or a holiday carries over unchanged.
 - Notifications: Android push only. No email/SMS/WhatsApp notifications in MVP.
 - AI is online, advisory, Admin-configurable, privacy-minimized, and cannot mutate source records or confirm homework.
@@ -307,7 +308,7 @@ As a Madrasa Admin, I want to add and edit Surah, Ayat, and Para reference data.
 
 1. The selected reference data and quantity are stored using canonical values independent of interface language.
 2. Rubu = 1/4, Half = 1/2, Salasah = 3/4, and Complete = 1 Para; incompatible units are not summed.
-3. MVP line-based portions follow the standard 15-line Mushaf and Admin-maintained Quran metadata.
+3. MVP line-based portions follow the 16-line Indo-Pak Mushaf and Admin-maintained Quran metadata.
 
 #### US-025 — Select Para and Ayat range
 
@@ -317,17 +318,17 @@ As a Teacher, I want to specify Para and optional Surah/Ayat start-end ranges.
 
 1. The selected reference data and quantity are stored using canonical values independent of interface language.
 2. Rubu = 1/4, Half = 1/2, Salasah = 3/4, and Complete = 1 Para; incompatible units are not summed.
-3. MVP line-based portions follow the standard 15-line Mushaf and Admin-maintained Quran metadata.
+3. MVP line-based portions follow the 16-line Indo-Pak Mushaf and Admin-maintained Quran metadata.
 
-#### US-026 — Use 15-line Mushaf
+#### US-026 — Use 16-line Indo-Pak Mushaf
 
-As a Teacher, I want line quantities to follow the standard 15-line Mushaf supported by the MVP.
+As a Teacher, I want line quantities to follow the 16-line Indo-Pak Mushaf supported by the MVP.
 
 **Acceptance criteria**
 
 1. The selected reference data and quantity are stored using canonical values independent of interface language.
 2. Rubu = 1/4, Half = 1/2, Salasah = 3/4, and Complete = 1 Para; incompatible units are not summed.
-3. MVP line-based portions follow the standard 15-line Mushaf and Admin-maintained Quran metadata.
+3. MVP line-based portions follow the 16-line Indo-Pak Mushaf and Admin-maintained Quran metadata.
 
 #### US-027 — Select portion quantities
 

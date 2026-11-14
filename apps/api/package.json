@@ -7,7 +7,9 @@
     "dev": "node --watch src/dev.ts",
     "start": "node src/main.ts",
     "e2e-server": "node src/e2e-server.ts",
-    "migrate": "node src/platform/migrate-cli.ts"
+    "migrate": "node src/platform/migrate-cli.ts",
+    "quran:source": "node src/modules/quran-ref/sources-cli.ts",
+    "quran:convert": "node src/modules/quran-ref/converter/cli.ts"
   },
   "dependencies": {
     "@aws-sdk/client-sesv2": "^3.1161.0",

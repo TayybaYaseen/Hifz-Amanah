@@ -1,7 +1,7 @@
 # F11 handover — Localization and accessibility
 
-**Branch:** `feature/f11-localization-accessibility` · **Audited:** 2026-11-06
-**Gate:** `npm run e2e:gate -- F11` → **PENDING** (7 of 11 E2E tests pending). F11 is **not complete**.
+**Branch:** `feature/f11-localization-accessibility` · **Audited:** 2026-11-06 · **Updated:** 2026-11-14
+**Gate:** `npm run e2e:gate -- F11` → **PENDING** (6 of 11 E2E tests pending). F11 is **not complete**.
 
 ## Commits
 
@@ -14,6 +14,33 @@
 The branch is based on the F01 tip `33b6455`, which is merged into `origin/main` by PR #3 (`bcf3b05`). The tree
 of `origin/main` equals the F01 tip, and a trial merge of this branch into `origin/main` has no conflicts.
 
+## Update 2026-11-14: merged with main (F02–F07)
+
+`main` moved from the F01 tip to F07 (PR #12), so the branch now merges `main` in. Resolutions:
+
+- **Canonical vocabularies have one source.** `packages/contracts/src/vocabulary.ts` is removed: F04 (`calendar.ts`)
+  and F05 (`hifz.ts`) define the same values. `packages/i18n-keys/src/labels.ts` now reads `SECTIONS`,
+  `QUANTITY_UNITS`, `PORTION_STATUSES`, and `ATTENDANCE_STATUSES` from contracts, and `QUALITY_SCORES` and
+  `PARA_PRESET_KEYS` from `packages/domain`. The former contracts `RECITATION_STATUSES` (all six portion statuses)
+  is gone: in `packages/domain/hifz/status.ts` that name means the three recitation outcomes only, and the two must
+  not be confused. The label group keeps its `domain.recitationStatus.*` keys.
+- **App root:** main's providers (sync, Quran reference, app lock) wrap F11's `DirectedNavigation`, which now also
+  passes main's `navigationRef`.
+- **Mobile flows** use the decided application ID `com.hifzamanah.app` (DEC-B55, 2026-11-08).
+- **`apps/mobile/src/i18n/locales/package.json`** (`"type": "module"`) is new. F07 made the locale files import
+  `@hifz/domain/quality`; Playwright compiled them as CommonJS, which cannot load that ES module package. Metro,
+  tsc, and Vitest are unaffected (bundle, typecheck, and tests re-run).
+- **F11-AC6 API E2E is now real**, using F05's `/sync/push`: `NOT_REMEMBERED` saved with `Accept-Language: ur` and
+  `en` is stored canonically, and the Urdu label sent as a status is refused.
+
+Run on 2026-11-14 (merged tree): `npm test` 841 passed, 0 failed (92 todo belong to other features); API E2E (whole
+suite against a fresh `api:e2e-server`) 126 passed, 0 failed, 175 skipped (`test.fixme` of unbuilt features);
+`typecheck`, `lint`, `e2e:trace`, `docs:check`, `bundle:android` clean. No Maestro flow was run.
+
+Follow-up, not done here: main's screens (F04–F07) label statuses with their own screen keys, and F07 has its own
+quality label table (`qualityLabelCatalogue`). Moving them onto the shared `domain.*` labels would leave one label
+source; it touches F05/F08 screens and belongs with that work.
+
 ## Acceptance criteria
 
 PASS means the tests listed ran and passed on 2026-11-06. **No F11 story gate passes yet**: each story still has a
@@ -25,8 +52,8 @@ pending E2E test.
 | F11-AC2 Urdu, RTL | US-048 | Unit PASS · E2E **PENDING** | Same flow |
 | F11-AC3 Roman Urdu, LTR | US-049 | Unit PASS · E2E **PENDING** | Same flow |
 | F11-AC4 Language kept across sessions/devices | US-047 | API E2E PASS · integration PASS · mobile **NOT RUN** | `f11-i18n.spec.ts`, `locale-preference.test.ts`. `language-persists.yaml` is written and unpended but has never run (see below) |
-| F11-AC5 Values kept when switching mid-entry | US-048 | **PENDING** | Needs Daily Entry (F05, spec 09). `switch-mid-entry.yaml` |
-| F11-AC6 Status stored canonically | US-048 | Unit PASS · API E2E **PENDING** | Needs a route that saves a recitation status (F05). `test.fixme` in `f11-i18n.spec.ts`; also in `switch-mid-entry.yaml` |
+| F11-AC5 Values kept when switching mid-entry | US-048 | **PENDING** | Daily Entry (F05) is now on main; `switch-mid-entry.yaml` can be unpended and run on an emulator |
+| F11-AC6 Status stored canonically | US-048 | Unit PASS · API E2E PASS (2026-11-14) · mobile **PENDING** | `f11-i18n.spec.ts`; the mobile half is in `switch-mid-entry.yaml` |
 | F11-AC7 Glossary spelling | US-049 | Unit PASS · E2E **PENDING** | No screen shows the terms until F05/F06. Glossary wording awaits DEC-B39 |
 | F11-AC8 Arabic unchanged | US-050 | Unit PASS · E2E **PENDING** | `arabic-and-bidi.yaml` needs a stored Surah range (F05/F06) |
 | F11-AC9 Mixed range readable both ways | US-050 | Unit PASS · E2E **PENDING** | Same flow; visual check needs golden screenshots |
@@ -59,8 +86,7 @@ to today's screens to make the gate pass.
 - **It has never run.** Maestro 2.12.1, `emulator-5554`, and a dev build (`dev.local.hifzamanah`) are present. But
   running it would reset the data of an E2E server on port 3000 and use a Metro bundler on port 8081. Both were
   started before this work (06:37) by another session, so they were not touched. Run it once that is confirmed:
-  `npm run e2e:mobile -- --include-tags US-047 -e APP_ID=dev.local.hifzamanah`. That local ID is a development
-  placeholder only, not a decision on DEC-B55.
+  `npm run e2e:mobile -- --include-tags US-047`. (Since 2026-11-14 the flows use the decided ID `com.hifzamanah.app`.)
 
 ## Outstanding quality work
 
@@ -71,7 +97,7 @@ to today's screens to make the gate pass.
 | Coverage (≥ 80 % on new code) | Not measured | Add `@vitest/coverage-v8` and a `test:coverage` script; report `packages/i18n-keys` and `apps/mobile/src/i18n` |
 | CI workflow | None in the repository | GitHub Actions on each PR: `npm ci`, `typecheck`, `lint`, `npm test` (includes the missing-key check), `e2e:trace`, `docs:check`, API E2E. Maestro nightly (NFR-MNT-005) |
 | DEC-B39 glossary approval | Product-owner action | `packages/i18n-keys/src/glossary.ts` and `labels.ts` are drafts (`GLOSSARY_STATUS = 'DRAFT'`). Only the Quality Rating Scale is approved |
-| DEC-B55 Android application ID | Deferred | Blocks every mobile gate and release. Builds read `APP_ID`; nothing in code chooses one |
+| DEC-B55 Android application ID | Decided 2026-11-08: `com.hifzamanah.app` | The F11 flows use it since 2026-11-14 |
 
 ## Merge note
 

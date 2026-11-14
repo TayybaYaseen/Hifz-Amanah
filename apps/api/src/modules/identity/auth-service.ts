@@ -44,7 +44,7 @@ import {
   sha256,
   verifyPassword,
 } from './secrets.ts';
-import { createSession, revokeSessions } from './sessions.ts';
+import { createSession, revokeSessions, sessionRefusal } from './sessions.ts';
 import type { TokenService } from './tokens.ts';
 import { matchTotpStep, newTotpSecret, totpUri } from './totp.ts';
 
@@ -54,6 +54,8 @@ export interface Actor {
   sessionId: string;
   organizationId: string;
   role: Role;
+  /** A Teacher's "all classes" flag (FR-SEC-003), re-read from the membership on every request. */
+  allClasses: boolean;
   loginId: string;
   authenticatedAt: Date;
 }
@@ -385,7 +387,15 @@ export class AuthService {
       .leftJoin('memberships', (join) =>
         join.onRef('memberships.user_id', '=', 'users.id').on('memberships.status', '=', 'ACTIVE'),
       )
-      .select(['sessions.id', 'sessions.user_id', 'sessions.expires_at', 'sessions.revoked_at', 'users.status', 'memberships.id as membership_id'])
+      .select([
+        'sessions.id',
+        'sessions.user_id',
+        'sessions.expires_at',
+        'sessions.revoked_at',
+        'sessions.revoked_reason',
+        'users.status',
+        'memberships.id as membership_id',
+      ])
       .where('sessions.refresh_token_hash', '=', presented)
       .executeTakeFirst();
     if (!session) {
@@ -399,9 +409,9 @@ export class AuthService {
         .execute();
       throw new AppError('SESSION_EXPIRED');
     }
-    if (session.revoked_at || session.expires_at <= now || session.status !== 'ACTIVE' || !session.membership_id) {
-      throw new AppError('SESSION_EXPIRED');
-    }
+    // Removed access answers 403 ACCESS_REVOKED; every other ending stays 401 SESSION_EXPIRED (F12-AC14).
+    const refusal = sessionRefusal(session, { accountActive: session.status === 'ACTIVE', membershipActive: Boolean(session.membership_id) }, now);
+    if (refusal) throw new AppError(refusal);
     const next = newRefreshToken();
     // Compare-and-swap on the presented hash, so two concurrent refreshes cannot both succeed.
     const rotated = await this.d.db
@@ -449,7 +459,7 @@ export class AuthService {
     const row = await this.d.db
       .selectFrom('sessions')
       .innerJoin('users', 'users.id', 'sessions.user_id')
-      .innerJoin('memberships', (join) =>
+      .leftJoin('memberships', (join) =>
         join.onRef('memberships.user_id', '=', 'users.id').on('memberships.status', '=', 'ACTIVE'),
       )
       .select([
@@ -457,21 +467,29 @@ export class AuthService {
         'sessions.authenticated_at',
         'sessions.expires_at',
         'sessions.revoked_at',
+        'sessions.revoked_reason',
         'users.id as userId',
         'users.login_id',
         'users.status',
         'memberships.organization_id',
         'memberships.role',
+        'memberships.all_classes',
       ])
       .where('sessions.id', '=', result.claims.sessionId)
       .where('sessions.user_id', '=', result.claims.userId)
       .executeTakeFirst();
-    if (!row || row.revoked_at || row.expires_at <= now || row.status !== 'ACTIVE') throw new AppError('SESSION_EXPIRED');
+    if (!row) throw new AppError('SESSION_EXPIRED');
+    // Removed access answers 403 ACCESS_REVOKED so the app can lock the workspace; expiry, sign-out, and
+    // password resets stay 401 SESSION_EXPIRED (F12-AC14, plan §5 "Identity change").
+    const refusal = sessionRefusal(row, { accountActive: row.status === 'ACTIVE', membershipActive: row.organization_id !== null }, now);
+    if (refusal) throw new AppError(refusal);
+    if (row.organization_id === null || row.role === null || row.all_classes === null) throw new AppError('ACCESS_REVOKED');
     return {
       userId: row.userId,
       sessionId: row.sessionId,
       organizationId: row.organization_id,
       role: row.role,
+      allClasses: row.all_classes,
       loginId: row.login_id,
       authenticatedAt: row.authenticated_at,
     };

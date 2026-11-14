@@ -6,7 +6,7 @@
 | **User story** | US-032 |
 | **Feature** | [F07 · Mistakes and quality](10-f07-mistakes-quality.md) |
 | **Epic** | EPIC 7 — Mistakes and Quality ([user-stories.md](../user-stories.md)) |
-| **Status** | draft |
+| **Status** | Approved |
 | **Priority** | Not specified in the source documents (SRS, user-stories.md, feature specs). None is assigned here. |
 | **Split from** | `docs/specs/F07-mistakes-quality.md` on 2026-10-30 |
 

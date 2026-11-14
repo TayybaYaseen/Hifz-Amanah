@@ -63,6 +63,39 @@ export function AppText({ role = 'body', color = colors.textPrimary, style, chil
 }
 
 /**
+ * Quranic Arabic and Surah names (BR-15, FR-I18N-006): shown exactly as stored, in Noto Naskh Arabic, always right to
+ * left in every interface language. The text is never trimmed, normalized, translated, or transliterated. Inside a
+ * sentence, wrap it with {@link isolate} so mixed Arabic, Latin, and digits keep their order.
+ */
+export function QuranText({ children, role = 'body', color = colors.textPrimary, testID }: { children: string; role?: TypeRole; color?: string; testID?: string }) {
+  const base = type[role];
+  const { direction } = useLocale();
+  return (
+    <Text
+      testID={testID}
+      style={[
+        base as TextStyle,
+        {
+          color,
+          writingDirection: 'rtl',
+          // Arabic sits on the right in every language. In an Urdu (right-to-left) layout the start already is the
+          // right; an explicit 'right' there is swapped by Android and would pin it left (see AppText).
+          ...(direction === 'ltr' ? { textAlign: 'right' as const } : {}),
+          fontFamily: 'NotoNaskhArabic_400Regular',
+          fontWeight: 'normal',
+          lineHeight: Math.round(base.fontSize * 1.6),
+        },
+      ]}
+    >
+      {children}
+    </Text>
+  );
+}
+
+/** First-strong isolation (U+2068 … U+2069): an embedded Arabic name cannot reorder the text around it. */
+export const isolate = (text: string): string => `\u2068${text}\u2069`;
+
+/**
  * Height of the open Android keyboard in dp, 0 when closed. With edge-to-edge the window is not resized for the
  * keyboard and React Native reports the keyboard's top (`screenY`) as the bottom of the screen, so
  * KeyboardAvoidingView sees no overlap. The reported `height` is right: it already excludes the navigation bar,
@@ -165,8 +198,10 @@ export function Card({ children }: { children: ReactNode }) {
 }
 
 /** Primary, secondary, tertiary, or destructive button (design.md §5.1). Disabled while busy. */
-export function Button({ label, busyLabel, onPress, variant = 'primary', busy = false, disabled = false, testID }: {
+export function Button({ label, busyLabel, onPress, variant = 'primary', busy = false, disabled = false, testID, accessibilityLabel }: {
   label: string;
+  /** A fuller spoken label when the visible one is short (e.g. "Retry {item}"). */
+  accessibilityLabel?: string;
   busyLabel?: string;
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'tertiary' | 'destructive';
@@ -182,6 +217,7 @@ export function Button({ label, busyLabel, onPress, variant = 'primary', busy = 
     <Pressable
       testID={testID}
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: inactive, busy }}
       disabled={inactive}
       onPress={onPress}
@@ -209,7 +245,7 @@ export function Field({ label, value, onChangeText, error, helper, secure = fals
   helper?: string;
   secure?: boolean;
   testID: string;
-} & Pick<TextInputProps, 'keyboardType' | 'autoComplete' | 'textContentType' | 'maxLength' | 'editable' | 'inputMode'>) {
+} & Pick<TextInputProps, 'keyboardType' | 'autoComplete' | 'textContentType' | 'maxLength' | 'editable' | 'inputMode' | 'multiline' | 'autoCapitalize' | 'placeholder'>) {
   const { t } = useTranslation();
   const { direction } = useLocale();
   const [hidden, setHidden] = useState(true);

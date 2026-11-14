@@ -1,7 +1,7 @@
 # F11 · Localization and accessibility — mobile E2E (docs/specs/02-f11-localization-accessibility.md; design.md §6.2)
 # Covers: F11-AC5, F11-AC6
 # Pending until Daily Entry exists (F05, spec 09). The language kept after sign-in is checked by language-persists.yaml.
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F11 language switch — values kept mid-entry, stored value unchanged
 tags:
   - pending

@@ -6,7 +6,7 @@
 | **User story** | US-015 |
 | **Feature** | [F04 · Calendar and attendance](08-f04-calendar-attendance.md) |
 | **Epic** | EPIC 4 — Calendar and Attendance ([user-stories.md](../user-stories.md)) |
-| **Status** | draft |
+| **Status** | Approved |
 | **Priority** | Not specified in the source documents (SRS, user-stories.md, feature specs). None is assigned here. |
 | **Split from** | `docs/specs/F04-calendar-attendance.md` on 2026-10-30 |
 

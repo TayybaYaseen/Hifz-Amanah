@@ -15,13 +15,67 @@ export type AuditAction =
   | 'TWO_FACTOR_ENABLED'
   | 'TWO_FACTOR_RESET'
   | 'RECOVERY_CODE_USED'
-  | 'RECOVERY_CODES_REGENERATED';
+  | 'RECOVERY_CODES_REGENERATED'
+  // F02 · Organization and roles
+  | 'ORGANIZATION_CREATED'
+  | 'ORGANIZATION_UPDATED'
+  | 'ADMIN_ADDED'
+  | 'ADMIN_REMOVED'
+  | 'OWNER_ADDED'
+  | 'ALL_CLASSES_SET'
+  | 'ALL_CLASSES_CLEARED'
+  // F12 · Offline sync
+  | 'SYNC_CONFLICT_RESOLVED'
+  // F03 · Classes and students
+  | 'CLASS_CREATED'
+  | 'CLASS_UPDATED'
+  | 'CLASS_DEACTIVATED'
+  | 'CLASS_REACTIVATED'
+  | 'STUDENT_CREATED'
+  | 'STUDENT_UPDATED'
+  | 'STUDENT_DEACTIVATED'
+  | 'STUDENT_REACTIVATED'
+  | 'STUDENT_ENROLLED'
+  | 'STUDENT_MOVED'
+  // F04 · Calendar and attendance
+  | 'SCHEDULE_SET'
+  | 'CALENDAR_EXCEPTION_CREATED'
+  | 'CALENDAR_EXCEPTION_CANCELLED'
+  | 'ATTENDANCE_RECORDED'
+  | 'ATTENDANCE_CHANGED'
+  | 'LEAVE_APPROVED'
+  | 'LEAVE_REJECTED'
+  // F06 · Quran reference
+  | 'QURAN_SURAH_CREATED'
+  | 'QURAN_SURAH_UPDATED'
+  | 'QURAN_PARA_CREATED'
+  | 'QURAN_PARA_UPDATED'
+  | 'QURAN_SEED_APPLIED'
+  | 'QURAN_LAYOUT_APPLIED'
+  /** F06 · a licence withdrawal revoked a snapshot version that carried the source (DEC-B79). */
+  | 'QURAN_REFERENCE_REVOKED'
+  // F05 · Daily Hifz entry
+  | 'DAILY_RECORD_CREATED'
+  | 'DAILY_RECORD_UPDATED'
+  | 'LESSON_PORTION_CREATED'
+  | 'LESSON_PORTION_UPDATED'
+  | 'LESSON_PORTION_REMOVED'
+  | 'PORTION_ATTEMPT_CREATED'
+  | 'PORTION_ATTEMPT_CORRECTED'
+  | 'DAILY_REPORT_MODE_CHANGED';
 
 export interface AuditEvent {
   organizationId: string | null;
   actorUserId: string | null;
   action: AuditAction;
-  targetType: 'USER';
+  targetType: 'USER' | 'ORGANIZATION' | 'SYNC_CONFLICT' | 'CLASS' | 'STUDENT' | 'CALENDAR_EXCEPTION' | 'ATTENDANCE_RECORD'
+    | 'QURAN_SURAH'
+    | 'QURAN_PARA'
+    | 'QURAN_IMPORT'
+    | 'QURAN_SOURCE'
+    | 'DAILY_RECORD'
+    | 'LESSON_PORTION'
+    | 'PORTION_ATTEMPT';
   targetId: string | null;
   summary?: Record<string, unknown>;
   at: Date;
@@ -38,7 +92,17 @@ export function redact(summary: Record<string, unknown>): Record<string, unknown
   return out;
 }
 
+/**
+ * Test-only fault switch (F02-AC13): when set, the next audit write throws, so tests can prove the change it
+ * describes rolls back with it. Only the test-control API sets it, and that API never runs in production.
+ */
+export const auditFaults = { failNext: false };
+
 export async function recordAudit(db: Executor, event: AuditEvent): Promise<void> {
+  if (auditFaults.failNext) {
+    auditFaults.failNext = false;
+    throw new Error('audit write failed (test fault)');
+  }
   await db
     .insertInto('audit_logs')
     .values({

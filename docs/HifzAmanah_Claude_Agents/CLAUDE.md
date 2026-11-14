@@ -10,7 +10,7 @@ Read and follow, in priority order (highest wins; same order as `docs/AGENTS.md`
 6. `docs/specs/` — one spec per story, in implementation order; criteria `F<nn>-AC<k>`.
 7. `docs/AGENTS.md`, this file, and `agents/*.md` — implementation workflow and role guardrails.
 
-`OPEN_DECISIONS.md` summarizes what is still open (DEC-B55, DEC-B45, and product-owner actions); it is a summary of SRS §17, not a separate authority. `IMPLEMENTATION_PLAN.md` gives the phase order, which follows the spec order.
+`OPEN_DECISIONS.md` summarizes what is still open (DEC-B45 and product-owner actions); it is a summary of SRS §17, not a separate authority. `IMPLEMENTATION_PLAN.md` gives the phase order, which follows the spec order.
 
 If documents conflict, or a needed decision is missing or Deferred, stop and report it with exact sections. Do not silently rewrite requirements. Preserve the product's terminology: Sabaq, Sabqi, Manzil, Para/Juz, portion, attempt, assignment, suggestion, confirmed homework.
 

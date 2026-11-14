@@ -30,7 +30,7 @@ A story whose tests are all in one layer (API-only or mobile-only) skips the oth
 | `FAIL` | 1 | A test ran and failed, or the run did not match the tests found | Fix the code or the test |
 | `INCOMPLETE` | 3 | A criterion has no E2E test, or a test cites a criterion without its story tag | Write or tag the test |
 | `PENDING` | 4 | Tests exist but are still `test.fixme` / tagged `pending` | Expected until the feature is implemented |
-| `BLOCKED` | 5 | Tests are ready, but no API answers at `E2E_API_URL`, `APP_ID` is unset, or the Maestro CLI is missing | Set up the environment |
+| `BLOCKED` | 5 | Tests are ready, but no API answers at `E2E_API_URL`, or the Maestro CLI is missing | Set up the environment |
 
 Exit code 2 means the argument was not a story, feature, or `APP`.
 
@@ -101,8 +101,8 @@ Maestro selects elements by `testID`, named `<screen>.<element>`, for example `s
 | Workspace onboarding by the platform operator, offline homework confirmation, Excel `_meta` sheet and 200-row batches | FR-ORG-001, FR-HW-017, FR-XLS-018 |
 | SRS §10.8 step 1: the Admin creates the class, and the Teacher adds the student | DEC-B04 |
 
-**Still deferred:**
-- **The Android application ID (`APP_ID`, DEC-B55).** Mobile flows read it from `-e APP_ID=…`.
+**Decided:**
+- **The Android application ID is `com.hifzamanah.app`** (DEC-B55, decided 2026-11-08). Every flow's `appId` names it.
 
 **API routes and session transport** are defined (`apps/api/README.md`): bearer access tokens, with the routes
 listed there. The fixtures sign personas in (completing two-factor sign-in for Owner/Admin) and call the
@@ -120,7 +120,7 @@ from a freshly reset and seeded environment.
 | Release gate | `npm run e2e:gate -- APP` |
 | API E2E against a local server | `npm run api:e2e-server`, then in another terminal `npm run e2e:api` |
 | API E2E against another environment | `E2E_API_URL=… E2E_CONTROL_SECRET=… npm run e2e:api` |
-| Mobile E2E | `npm run e2e:mobile -- -e APP_ID=…` (needs the Maestro CLI, an emulator running a development build, and `npm run api:e2e-server`) |
+| Mobile E2E | `npm run e2e:mobile` (needs the Maestro CLI, an emulator running a development build, and `npm run api:e2e-server`) |
 
 **Mobile flows and test control.** `support/maestro/control.js` calls the test-control API from Maestro: reset,
 OTP, TOTP, and clock. Maestro runs it on the host, so it uses `http://localhost:3000`; override with

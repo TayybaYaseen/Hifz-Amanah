@@ -1,0 +1,12 @@
+# Subflow: close the development build's LogBox warning toast ("Open debugger to view warnings") when it shows, so
+# it cannot cover a button at the bottom of the screen. Release builds have no toast; this is a no-op there.
+# The close control is the round button at the right end of the toast.
+appId: com.hifzamanah.app
+---
+- runFlow:
+    when:
+      visible:
+        text: "Open debugger to view warnings.*"
+    commands:
+      - tapOn:
+          point: "92%,92%"

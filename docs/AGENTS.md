@@ -18,9 +18,10 @@ Instructions for AI coding agents (Claude Code, Codex, Cursor, Copilot, etc.) wo
 
 **If the documents conflict, or a needed decision is missing or marked Deferred (SRS §17.3), stop and ask the user.** Never quietly pick a value and treat it as approved. If you must leave a placeholder, make it configurable and mark it `// DEFERRED: <DEC-ID>` in code.
 
-Two decisions are Deferred:
-- **The Android application ID** (DEC-B55).
+One decision is Deferred:
 - **The AI provider vendor** (DEC-B45, Phase 7).
+
+The Android application ID is **`com.hifzamanah.app`** (DEC-B55, decided 2026-11-08).
 
 Always cite requirement IDs (e.g. `FR-HW-012`, `US-037`) in PR descriptions, ADRs, and test names.
 
@@ -28,8 +29,8 @@ Always cite requirement IDs (e.g. `FR-HW-012`, `US-037`) in PR descriptions, ADR
 
 | Layer | Decided | Approved 2026-10-30 (SRS §17 DEC-B51; changes need a new ADR) |
 |---|---|---|
-| Mobile | React Native + Expo, Android , SQLite on device | TypeScript strict, expo-sqlite + Drizzle, React Navigation, TanStack Query, i18next |
-| API | Node.js, PostgreSQL, HTTPS | TypeScript, Fastify, Zod, Drizzle/Kysely, pg-boss, Argon2id |
+| Mobile | React Native + Expo, Android , SQLite on device | TypeScript strict, expo-sqlite behind a small SQL driver (no ORM; ADR-019), React Navigation, TanStack Query, i18next |
+| API | Node.js, PostgreSQL, HTTPS | TypeScript, Fastify, Zod, Kysely (ADR-019), pg-boss, Argon2id |
 | Files | — | exceljs (Excel), Playwright/Chromium (PDF), AWS S3 |
 | Platform | — | AWS Mumbai, Amazon SES (OTP email), Expo Push Service, auth built into the API with TOTP 2FA for Owner/Admin |
 | Tests | — | Vitest, fast-check, Testcontainers, Maestro |
@@ -51,12 +52,14 @@ Do not guess commands that don't exist. Mobile-only commands (`npm start`, `npm 
 | API dev server (embedded Postgres in `apps/api/.data` unless `DATABASE_URL` is set) | `npm run api:dev` |
 | API for E2E runs (fresh in-memory database, seeded personas, test-control API) on port 3000 | `npm run api:e2e-server` |
 | Apply migrations to `DATABASE_URL` | `npm run db:migrate` |
+| Quran source catalogue (privileged; `list`, `register <file>`, `licence <id> <file>`; see `apps/api/README.md`) | `npm run quran:source -- list` |
+| Quran source converter (offline; `convert <manifest> --out <dir>`, `sign <dir> <review>`; see `apps/api/README.md`) | `npm run quran:convert -- convert <manifest.json> --out <dir>` |
 | E2E traceability (every criterion has an E2E test) | `npm run e2e:trace` |
 | **Spec completion gate** (one story spec) | `npm run e2e:gate -- US-022` |
 | Feature gate (every story in a feature) | `npm run e2e:gate -- F05` |
 | Release gate (app-wide E2E) | `npm run e2e:gate -- APP` |
 | API E2E (Playwright Test; start `npm run api:e2e-server` first, or set `E2E_API_URL`) | `npm run e2e:api` |
-| Mobile E2E (Maestro; needs the Maestro CLI and an emulator) | `npm run e2e:mobile -- -e APP_ID=<android application id>` |
+| Mobile E2E (Maestro; needs the Maestro CLI and an emulator) | `npm run e2e:mobile` |
 | Docs traceability (one story per spec, verbatim criteria, requirement IDs, links) | `npm run docs:check` |
 
 **Specs are one per user story,** all directly in `docs/specs/` (no subfolders), indexed in `docs/specs/README.md`. Sorted by name, they list in implementation order:
@@ -131,7 +134,7 @@ Breaking any of these is a bug, even if a test or UI mock seems to want it.
 15. Students and Parents see only **published** reports. A Teacher (assigned classes) or Admin publishes after the period is fully synced (FR-RPT-010). The visible field set is FR-PORT-006.
 
 **Quran metadata**
-16. Quran metadata (Surah/Ayat/Para) is Admin-managed per organization, starting from a reviewed seed (FR-SAB-007). MVP supports the **standard 15-line Mushaf only**. Metadata edits never change existing records; invalid ranges are flagged for review.
+16. Quran metadata (Surah/Ayat/Para) is Admin-managed per organization, starting from a reviewed seed (FR-SAB-007). MVP counts lines on the **16-line Indo-Pak Mushaf** only (DEC-B70, 2026-11-09); the target publisher is **Taj Company** (DEC-B71). The exact Taj printing and page count (548 is only a candidate), the dataset, its licence, the layout source, and the reviewer are still open (SRS §17.3): never generate, guess, or type in Quran metadata or line layouts. Editions are rows in `mushaf_editions`, not constants. Metadata edits never change existing records; invalid ranges are flagged for review.
 
 ## 6. Security and privacy rules
 
@@ -157,6 +160,7 @@ Breaking any of these is a bug, even if a test or UI mock seems to want it.
 
 - Write the entity **and** its outbox operation in **one SQLite transaction** before showing "Saved on device".
 - Show "Synced" **only** after the server acknowledges the operation. Keep these states distinct: pending, syncing, synced, failed, action-required.
+- The Quran reference cache (F06, ADR-018) is separate from F12: its own `ref_*` tables, never referenced by records or the outbox, replaced only whole after its SHA-256 checks out. A revoked version is deleted on the next successful check; never claim an offline device can be wiped. No snapshot carries Quran text, word data, test data, or data from a withdrawn source.
 - Offline-creatable entities use **client-generated UUIDv7** IDs. Every operation has an `op_id`; replaying it must not create duplicates.
 - **Never use last-write-wins** for attempts, attendance, quantities, quality, mistakes, or homework. Preserve both versions as a conflict for explicit resolution.
 - Local schema migrations must keep the outbox intact. Test them with pending operations.
@@ -244,3 +248,17 @@ Report test results honestly. If something was not run, say so.
 - After completing and testing a feature, merge its branch into `main` through a Pull Request.
 - Keep `main` stable and free from incomplete or untested changes.
 - Do not merge or push changes without the user's approval.
+
+## Activate HifzAmanah Master Agent & Specialist Team
+Activate my existing HifzAmanah agent team. Do not recreate existing agents or modify their responsibilities. Include the newly added `security-agent.md` in `.claude/agents/`.
+
+Configure Master Agent as the central orchestrator. Whenever I give an implementation command using `/dal`, Master Agent must analyze the task, automatically delegate work to relevant specialist agents using actual Claude Code subagents, coordinate their work, integrate results, perform code review and testing, and report the final outcome to me.
+
+Verify that all existing agents are properly configured and callable, and that `/dal` invokes Master Agent correctly. Fix any missing configuration without duplicating files.
+
+Working with the agent team:
+- The Master Agent and all registered specialist agents in `.claude/agents/` are available for development tasks.
+- The user starts every implementation task, through `/dal` or another direct instruction. Claude never starts application implementation on its own.
+- All implementation follows the approved SRS, ARCHITECTURE, specs, and acceptance criteria, in the source-of-truth order of §2 of this file.
+- Raise any unresolved or Deferred decision that affects a task (SRS §17.3, e.g. DEC-B45) with the user before implementing the affected functionality.
+- Planning documents and recorded decisions are not proof that functionality is implemented.

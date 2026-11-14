@@ -1,7 +1,7 @@
 # F14 · Excel import and export — mobile E2E (docs/specs/14-f14-excel-import-export.md; design.md §4.15)
 # Covers: F14-AC1, F14-AC2, F14-AC3, F14-AC4, F14-AC5, F14-AC11, F14-AC12
 # Workbooks are pushed to the device from e2e/fixtures/workbooks (built by the test; see workbooks.md).
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F14 student import — preview, confirm, re-import, rejections
 tags:
   - pending

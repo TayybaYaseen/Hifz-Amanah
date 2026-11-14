@@ -1,6 +1,6 @@
 # F13 · PDF and print — mobile E2E (docs/specs/16-f13-pdf-print.md; decision review 2026-10-30, SRS §17)
 # Covers: F13-AC13
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F13 report template controls
 tags:
   - pending

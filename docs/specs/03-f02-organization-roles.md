@@ -1,6 +1,6 @@
 # F02 · Organization and roles
 
-**Status:** draft
+**Status:** Approved
 **Brief:** [00-product-brief.md](../00-product-brief.md) · **Flow:** Settings → Workspace, Roles and permissions ([design.md §4.16](../design.md)); every list screen (teacher scope)
 **Requirements:** FR-ORG-001…006, FR-SEC-002/003/007/008/009, FR-AUD-001…003, FR-ORG-007
 **Stories:** US-007 – US-009 · **Depends on:** F01

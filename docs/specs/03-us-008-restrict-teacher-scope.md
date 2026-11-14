@@ -6,7 +6,7 @@
 | **User story** | US-008 |
 | **Feature** | [F02 · Organization and roles](03-f02-organization-roles.md) |
 | **Epic** | EPIC 2 — Organization and Roles ([user-stories.md](../user-stories.md)) |
-| **Status** | draft |
+| **Status** | Approved |
 | **Priority** | Not specified in the source documents (SRS, user-stories.md, feature specs). None is assigned here. |
 | **Split from** | `docs/specs/F02-organization-roles.md` on 2026-10-30 |
 

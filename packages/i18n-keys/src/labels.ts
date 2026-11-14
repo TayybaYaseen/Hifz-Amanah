@@ -1,15 +1,11 @@
 // Labels for canonical values. The value is what is stored; only its label changes with the language (FR-I18N-005,
 // NFR-MNT-003, F11-AC6). Domain terms come from the glossary. Wording other than the approved Quality Rating Scale is
 // a draft awaiting glossary approval (DEC-B39).
-import {
-  ATTENDANCE_STATUSES,
-  PARA_FRACTIONS,
-  QUALITY_SCORES,
-  QUANTITY_UNITS,
-  RECITATION_STATUSES,
-  SECTIONS,
-  type Locale,
-} from '@hifz/contracts';
+// The canonical values come from their single sources: contracts for stored vocabularies, packages/domain for the
+// Para presets and the Quality Rating Scale. Nothing here redefines them.
+import { ATTENDANCE_STATUSES, PORTION_STATUSES, QUANTITY_UNITS, SECTIONS, type Locale } from '@hifz/contracts';
+import { QUALITY_SCORES } from '@hifz/domain/quality';
+import { PARA_PRESET_KEYS } from '@hifz/domain/quantity';
 import type { MessageTree } from './catalogue.ts';
 import { term } from './glossary.ts';
 
@@ -17,8 +13,10 @@ import { term } from './glossary.ts';
 export const VALUE_GROUPS = {
   section: SECTIONS,
   unit: QUANTITY_UNITS,
-  fraction: PARA_FRACTIONS,
-  recitationStatus: RECITATION_STATUSES,
+  fraction: PARA_PRESET_KEYS,
+  // Every portion status, including ABSENT, NOT_ASSIGNED and PENDING (never failure); the label group keeps its
+  // `domain.recitationStatus.*` keys.
+  recitationStatus: PORTION_STATUSES,
   attendanceStatus: ATTENDANCE_STATUSES,
   quality: QUALITY_SCORES,
 } as const;

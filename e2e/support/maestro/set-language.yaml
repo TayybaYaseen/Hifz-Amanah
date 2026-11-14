@@ -1,7 +1,7 @@
 # Subflow: switch the interface language.
 # env: LOCALE = en | ur | ur-Latn
 # The picker shows its options inline (apps/mobile LanguagePicker); a collapsed picker is opened first if present.
-appId: ${APP_ID}
+appId: com.hifzamanah.app
 ---
 - runFlow:
     when:

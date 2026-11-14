@@ -1,5 +1,5 @@
 # Subflow: sign out from any screen, accepting the unsynced-changes warning if shown.
-appId: ${APP_ID}
+appId: com.hifzamanah.app
 ---
 - tapOn:
     id: "nav.more"

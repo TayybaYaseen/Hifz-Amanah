@@ -14,7 +14,9 @@ import {
 import type { Clock } from '../../platform/clock.ts';
 import type { Db } from '../../platform/db.ts';
 import { AppError, fieldError } from '../../platform/errors.ts';
+import { leavesAnAdmin } from '../access/policy.ts';
 import { recordAudit } from '../audit/audit.ts';
+import { activeMemberRoles } from '../organization/members.ts';
 import type { Actor } from './auth-service.ts';
 import { canManageAccount } from './rules.ts';
 import { hashPassword } from './secrets.ts';
@@ -51,6 +53,7 @@ export class AccountsService {
         'users.locked_until',
         'users.created_at',
         'memberships.role',
+        'memberships.all_classes',
         'user_totp.enabled_at',
       ])
       .where('users.organization_id', '=', organizationId)
@@ -66,6 +69,7 @@ export class AccountsService {
     locked_until: Date | null;
     created_at: Date;
     role: AccountResponse['role'];
+    all_classes: boolean;
     enabled_at: Date | null;
   }): AccountResponse {
     const now = this.clock.now();
@@ -78,16 +82,22 @@ export class AccountsService {
       status: row.status,
       lockedUntil: row.locked_until && row.locked_until > now ? row.locked_until.toISOString() : null,
       twoFactorEnabled: row.enabled_at !== null,
+      allClasses: row.role === 'TEACHER' && row.all_classes,
       createdAt: row.created_at.toISOString(),
     };
   }
 
   /** Loads an account in the actor's madrasa. Out of scope or missing is the same NOT_FOUND (F01-AC20). */
-  private async load(actor: Actor, id: string) {
+  async load(actor: Actor, id: string) {
     if (!isStaff(actor) || !UUID.test(id)) throw new AppError('NOT_FOUND');
     const row = await this.baseQuery(actor.organizationId).where('users.id', '=', id).executeTakeFirst();
     if (!row) throw new AppError('NOT_FOUND');
     return row;
+  }
+
+  /** The response shape for a row returned by `load`. */
+  respond(row: Awaited<ReturnType<AccountsService['load']>>): AccountResponse {
+    return this.toResponse(row);
   }
 
   suggestLoginId(actor: Actor): Promise<LoginIdSuggestionResponse> {
@@ -192,6 +202,8 @@ export class AccountsService {
     if (target.status === 'DEACTIVATED') return this.toResponse(target);
     const now = this.clock.now();
     await this.db.transaction().execute(async (tx) => {
+      // Never leave the madrasa without an Owner or Admin (F02 edge cases, FR-ORG-007).
+      if (!leavesAnAdmin(await activeMemberRoles(tx, actor.organizationId), id, null)) throw new AppError('LAST_ADMIN');
       await tx.updateTable('users').set({ status: 'DEACTIVATED', deactivated_at: now, updated_at: now }).where('id', '=', id).execute();
       await revokeSessions(tx, id, now, 'DEACTIVATED');
       await recordAudit(tx, {

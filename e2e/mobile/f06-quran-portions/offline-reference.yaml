@@ -1,0 +1,67 @@
+# F06 · Quran reference snapshot offline — mobile E2E (ADR-018; docs/specs/07-us-025-select-para-and-ayat-range.md)
+# Covers: F06-AC24
+# SYNTHETIC DATA ONLY: the madrasa gets the synthetic Quran fixture (20 Ayat per Surah; a test layout of 2 Ayat per line
+# for Surahs 1–3), which matches no real Mushaf.
+# Host screen: More → Quran references on this device (the isolated F06 host of the range fields, plan P4). F05's
+# Daily Entry will reuse the same RangeFields component; its own flows cover Sabaq entry.
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
+name: F06 offline reference — first sync online, then range checks and Total Lines offline
+tags:
+  - F06
+  - US-025
+---
+- runFlow: ../../support/maestro/reset.yaml
+- runScript:
+    file: ../../support/maestro/control.js
+    env:
+      ACTION: quranSeed
+# 1. Sign in online as teacher-a1; the snapshot downloads in the background and is verified.
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- tapOn: { id: "nav.more" }
+- tapOn: { id: "more.quranRef" }
+- extendedWaitUntil:
+    visible: { id: "quranRef.status.SYNCED" }
+    timeout: 60000
+- assertVisible: { id: "quranRef.version" }
+- assertVisible: { id: "quranRef.layout.AVAILABLE" }
+# 2. Go offline: the saved snapshot is used.
+- runFlow: ../../support/maestro/go-offline.yaml
+- extendedWaitUntil:
+    visible: { id: "quranRef.status.OFFLINE_CACHED" }
+    timeout: 30000
+# 3. Surah 1, Ayat 1–4, offline: valid, Para 1, Total Lines pre-filled from the saved layout (2 lines).     (F06-AC24)
+- tapOn: { id: "range.surah" }
+- inputText: "1"
+- tapOn: { id: "range.ayahStart" }
+- inputText: "1"
+- tapOn: { id: "range.ayahEnd" }
+- inputText: "4"
+- hideKeyboard
+- assertVisible: { id: "range.valid" }
+- assertVisible:
+    id: "range.para"
+    text: ".*1.*"
+- assertVisible:
+    id: "range.totalLines"
+    text: "2"
+- assertVisible: { id: "range.linesSource.LAYOUT" }
+# 4. A corrected count is kept and marked as entered by hand (FR-SAB-008).
+- tapOn: { id: "range.totalLines" }
+- eraseText: 4
+- inputText: "3"
+- hideKeyboard
+- assertVisible: { id: "range.linesSource.MANUAL" }
+# 5. Ayat 25 in a 20-Ayat Surah, offline: the field names the maximum.                                    (F06-AC24, AC6)
+- tapOn: { id: "range.ayahEnd" }
+- eraseText: 4
+- inputText: "25"
+- hideKeyboard
+- assertVisible: { id: "range.ayahEnd.error" }
+- assertNotVisible: { id: "range.valid" }
+# 6. Back online: the check runs again and stays up to date.
+- setAirplaneMode: disabled
+- extendedWaitUntil:
+    visible: { id: "quranRef.status.SYNCED" }
+    timeout: 60000

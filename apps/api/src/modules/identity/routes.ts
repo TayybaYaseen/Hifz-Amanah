@@ -27,7 +27,7 @@ export interface IdentityServices {
   profile: ProfileService;
 }
 
-function bearer(request: FastifyRequest): string | undefined {
+export function bearer(request: FastifyRequest): string | undefined {
   const header = request.headers.authorization;
   return header?.startsWith('Bearer ') ? header.slice(7) : undefined;
 }

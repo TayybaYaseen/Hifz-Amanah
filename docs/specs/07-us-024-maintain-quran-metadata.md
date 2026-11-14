@@ -26,7 +26,7 @@ Spec wording (from F06):
 > - Surahs, with Ayat counts
 > - Para boundaries
 >
-> The MVP supports the standard 15-line Mushaf only.
+> The MVP counts lines on the 16-line Indo-Pak Mushaf only (SRS §17 DEC-B70, 2026-11-09).
 >
 > Amounts must be exact and always carry a unit. A Para fraction is never added to lines.
 >
@@ -38,7 +38,7 @@ Spec wording (from F06):
 
 Requirements this story covers. SRS.md has no story-to-requirement table, so this list is derived from the requirement text and the criteria below.
 
-- **Functional:** FR-SAB-005, FR-I18N-006, FR-SAB-007
+- **Functional:** FR-SAB-005, FR-I18N-006, FR-SAB-007, FR-SAB-011, FR-SAB-013
 - **Non-functional:** NFR-MNT-003
 - **SRS acceptance tests cited:** None
 
@@ -52,7 +52,7 @@ Verbatim from [user-stories.md](../user-stories.md).
 
 1. The selected reference data and quantity are stored using canonical values independent of interface language.
 2. Rubu = 1/4, Half = 1/2, Salasah = 3/4, and Complete = 1 Para; incompatible units are not summed.
-3. MVP line-based portions follow the standard 15-line Mushaf and Admin-maintained Quran metadata.
+3. MVP line-based portions follow the 16-line Indo-Pak Mushaf and Admin-maintained Quran metadata.
 
 ### Detailed acceptance criteria
 
@@ -64,6 +64,9 @@ From the F06 feature spec. The original IDs are kept because tests cite them. Cr
 - **F06-AC4** — **(US-024) Given** a Para boundary whose end comes before its start, **when** the Admin saves, **then** it is rejected with a field error.
 - **F06-AC18** — **(US-024) Given** a newly created madrasa, **when** Quran metadata is opened, **then** it already contains 114 Surahs with their Ayat counts and 30 Para boundaries from the reviewed seed. *(Added 2026-10-30, DEC-B31.)*
 - **F06-AC19** — **(US-024) Given** records that use a Para boundary, **when** the Admin corrects that boundary, **then** the records keep their stored ranges, any range that is no longer valid is listed for Admin review, and the edit is audited. *(Added 2026-10-30, DEC-B32.)*
+- **F06-AC25** — **(US-024) Given** the same converted dataset, **when** it is converted, signed, and applied again, **then** converting the same source files gives the same seed checksum, re-applying changes nothing, the stored checksum and validation-report hash are the ones signed, and the same dataset version with changed content is refused. *(Added 2026-11-09, DEC-B71, DEC-B72; activated with its E2E test.)*
+- **F06-AC26** — **(US-024) Given** a seed citing a source that is unregistered, awaiting licence review, refused, or (for a layout) without the publisher's clearance, or a production seed citing a test source, **when** it is imported, **then** it is refused whole and nothing is stored (FR-SAB-011). *(Added 2026-11-09, DEC-B71, DEC-B72; activated with its E2E test.)*
+- **F06-AC27** — **(US-024) Given** a production seed, **when** it is imported, **then** it is refused unless it is format 2 with an approving validation report signed by the named reviewer on the approval date; an unsigned, rejected, or mismatched review is refused, and the sign step refuses an approval with a blocking finding; with a signed approval and cleared sources it is applied, and the import records the reviewer, decision, and report hash (FR-SAB-013). *(Added 2026-11-09, DEC-B71, DEC-B72; activated with its E2E test.)*
 
 ## Business rules
 
@@ -86,7 +89,7 @@ Rows from the F06 edge-case table that apply to this story (verbatim):
 
 **Out of scope for the whole feature** (verbatim from F06):
 
-- Mushaf editions other than the standard 15-line edition.
+- Offering users Mushaf editions other than the 16-line Indo-Pak edition (the data model allows more editions later; DEC-B70).
 - Any conversion between lines, Ayat, pages, and Para fractions.
 - Importing metadata from an external provider.
 - Showing Quran text or audio.
@@ -96,7 +99,7 @@ Rows from the F06 edge-case table that apply to this story (verbatim):
 - **Feature F06 depends on:** F02 (from the spec index)
 - **Features referenced by this story's criteria and edge cases:** None
 - **Other stories referenced:** None
-- **Other stories in F06:** [US-025](07-us-025-select-para-and-ayat-range.md), [US-026](07-us-026-use-15-line-mushaf.md), [US-027](07-us-027-select-portion-quantities.md)
+- **Other stories in F06:** [US-025](07-us-025-select-para-and-ayat-range.md), [US-026](07-us-026-use-16-line-indo-pak-mushaf.md), [US-027](07-us-027-select-portion-quantities.md)
 
 ## Related screens and UI
 
@@ -123,6 +126,9 @@ Nothing specific to this story in the source documents.
 
 **API (Playwright):**
 
+- [e2e/api/f06-quran-portions.spec.ts](../../e2e/api/f06-quran-portions.spec.ts) — F06-AC25 (US-024) converting and importing the same dataset again changes nothing, and the stored hashes are the ones signed
+- [e2e/api/f06-quran-portions.spec.ts](../../e2e/api/f06-quran-portions.spec.ts) — F06-AC26 (US-024) a seed citing an unregistered, uncleared, or refused source, or a layout without publisher clearance, is refused and nothing is stored
+- [e2e/api/f06-quran-portions.spec.ts](../../e2e/api/f06-quran-portions.spec.ts) — F06-AC27 (US-024) a production seed is imported only with an approving review signed by the named reviewer
 - [e2e/api/f06-quran-portions.spec.ts](../../e2e/api/f06-quran-portions.spec.ts) — F06-AC1 (US-024) Admin Surah and Para boundary edits are saved per madrasa and audited
 - [e2e/api/f06-quran-portions.spec.ts](../../e2e/api/f06-quran-portions.spec.ts) — F06-AC2 (US-024) a Teacher cannot edit Quran metadata
 - [e2e/api/f06-quran-portions.spec.ts](../../e2e/api/f06-quran-portions.spec.ts) — F06-AC3 (US-024) an Arabic Surah name is returned byte-identical in every locale
@@ -147,11 +153,13 @@ Open questions from F06 that apply to this story, with their resolutions (decisi
 - [x] Initial data source and governance for Quran metadata (SRS §13 #3). Can the app ship a reviewed seed? **Resolved:** Yes, a reviewed seed plus audited Admin edits (DEC-B31, FR-SAB-007).
 - [x] How are ranges reviewed when the Admin changes metadata that existing records use? **Resolved:** Records keep their ranges; invalid ones are listed for Admin review (DEC-B32, FR-SAB-007).
 
+- **2026-11-09, DEC-B71:** the target publisher is Taj Company. The exact printing, page count, and page/line layout are unverified, and every candidate dataset is `LICENSE_REVIEW_REQUIRED` (Taj Company's position is a prerequisite for Taj layout data). Criteria F06-AC25, F06-AC26, F06-AC27 were activated on 2026-11-09 with their E2E tests and the open decisions OD-QR-1…11 are listed in the [feature spec](07-f06-quran-portions-metadata.md#acceptance-criteria-f06-ac20ac27-activated-2026-11-09).
+
 ## Traceability
 
 - **Story:** US-024 → SPEC-US-024 (this file)
-- **Detailed criteria:** F06-AC1, F06-AC2, F06-AC3, F06-AC4, F06-AC18, F06-AC19
-- **Requirements:** FR-SAB-005, FR-I18N-006, NFR-MNT-003, FR-SAB-007
+- **Detailed criteria:** F06-AC1, F06-AC2, F06-AC3, F06-AC4, F06-AC18, F06-AC19, F06-AC25, F06-AC26, F06-AC27
+- **Requirements:** FR-SAB-005, FR-I18N-006, NFR-MNT-003, FR-SAB-007, FR-SAB-011, FR-SAB-013
 - **SRS acceptance tests:** None
 - **Business rules:** SRS §9 #15
 - **Design:** design.md §13; **Architecture:** ARCHITECTURE.md §18 epic 6

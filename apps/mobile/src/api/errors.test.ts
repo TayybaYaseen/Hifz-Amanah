@@ -1,7 +1,7 @@
 // F01 · Identity — mapping API failures to messages (apps/api/README.md conventions).
 import { describe, expect, it } from 'vitest';
 import { ApiFailure, request } from './client.ts';
-import { errorKeys } from './errors.ts';
+import { errorKeys, fieldLimits } from './errors.ts';
 
 describe('F01 · mobile errors', () => {
   it('F01-AC16 (US-004) field errors go to their fields; unknown issues become INVALID', () => {
@@ -11,6 +11,14 @@ describe('F01 · mobile errors', () => {
 
   it('F01-AC14 (US-003) a coded failure maps to its form message', () => {
     expect(errorKeys(new ApiFailure('LOGIN_ID_TAKEN', 409))).toEqual({ form: 'errors.LOGIN_ID_TAKEN', fields: {} });
+  });
+
+  it('F06-AC6 (US-025) an out-of-range field names its maximum; the limit key is not a field of its own', () => {
+    const failure = new ApiFailure('VALIDATION', 400, { end: 'OUT_OF_RANGE', 'end.max': '20', start: 'UNKNOWN_SURAH' });
+    expect(errorKeys(failure)).toEqual({ form: null, fields: { end: 'fields.OUT_OF_RANGE_MAX', start: 'fields.UNKNOWN_SURAH' } });
+    expect(fieldLimits(failure)).toEqual({ end: { max: 20 } });
+    expect(errorKeys(new ApiFailure('VALIDATION', 400, { end: 'END_BEFORE_START' })).fields).toEqual({ end: 'fields.END_BEFORE_START' });
+    expect(fieldLimits(new Error('x'))).toEqual({});
   });
 
   it('F01 unit: anything unexpected is a generic server message, never raw text', () => {

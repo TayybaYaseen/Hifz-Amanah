@@ -1,30 +1,46 @@
 // More menu (design.md §3.2). Accounts is shown to Owner/Admin only; the server enforces it regardless.
-import { useState } from 'react';
+// Madrasa settings is shown to everyone: editable for Owner/Admin, read-only for other roles (F02-AC4).
+// F03: Classes and Students for Owner/Admin/Teacher (a Teacher sees assigned classes only).
+// F04: Leave approvals (Owner/Admin) and Holidays (Owner/Admin manage; a Teacher views).
+// F06: Quran metadata for Owner/Admin (edit) and Teacher (read-only).
+// F12: Sync queue for Teacher/Admin/Owner; sign-out warns first while changes wait to sync (F12-AC10).
 import { useTranslation } from 'react-i18next';
 import type { MeResponse } from '@hifz/contracts';
-import { useSession } from '../../auth/SessionContext.tsx';
 import { AppScreen, Button } from '../../components/ui.tsx';
+import { useSync } from '../../sync/SyncContext.tsx';
 
-export function MoreScreen({ me, onProfile, onAccounts }: { me: MeResponse; onProfile: () => void; onAccounts: () => void }) {
+export function MoreScreen({ me, onProfile, onAccounts, onWorkspace, onClasses, onStudents, onSyncQueue, onLeave, onHolidays, onQuran, onQuranReference }: {
+  me: MeResponse;
+  onProfile: () => void;
+  onAccounts: () => void;
+  onWorkspace: () => void;
+  onClasses: () => void;
+  onStudents: () => void;
+  onSyncQueue: () => void;
+  onLeave: () => void;
+  onHolidays: () => void;
+  onQuran: () => void;
+  onQuranReference: () => void;
+}) {
   const { t } = useTranslation();
-  const { session } = useSession();
-  const [busy, setBusy] = useState(false);
+  const sync = useSync();
   const staff = me.role === 'OWNER' || me.role === 'ADMIN';
+  const roster = staff || me.role === 'TEACHER';
   return (
     <AppScreen testID="more.screen">
       <Button testID="more.profile" variant="secondary" label={t('more.profile')} onPress={onProfile} />
+      {roster ? <Button testID="more.classes" variant="secondary" label={t('more.classes')} onPress={onClasses} /> : null}
+      {roster ? <Button testID="more.students" variant="secondary" label={t('more.students')} onPress={onStudents} /> : null}
+      {/* F04: Leave approvals for Owner/Admin only (US-017); holidays are read-only for a Teacher (US-014). */}
+      {staff ? <Button testID="more.leave" variant="secondary" label={t('more.leave')} onPress={onLeave} /> : null}
+      {roster ? <Button testID="more.holidays" variant="secondary" label={t('more.holidays')} onPress={onHolidays} /> : null}
+      {roster ? <Button testID="more.quran" variant="secondary" label={t('more.quran')} onPress={onQuran} /> : null}
+      {/* F06: the offline reference snapshot exists only where F12 opened a workspace (staff; ADR-018). */}
+      {roster && sync.enabled ? <Button testID="more.quranRef" variant="secondary" label={t('more.quranRef')} onPress={onQuranReference} /> : null}
+      <Button testID="more.workspace" variant="secondary" label={t('more.workspace')} onPress={onWorkspace} />
       {staff ? <Button testID="more.accounts" variant="secondary" label={t('more.accounts')} onPress={onAccounts} /> : null}
-      {/* TODO(F12): warn before signing out while changes are waiting to sync (design.md §4.13). */}
-      <Button
-        testID="settings.signOut"
-        variant="destructive"
-        label={t('more.signOut')}
-        busy={busy}
-        onPress={() => {
-          setBusy(true);
-          void session.signOut();
-        }}
-      />
+      {sync.enabled ? <Button testID="more.syncQueue" variant="secondary" label={t('more.syncQueue')} onPress={onSyncQueue} /> : null}
+      <Button testID="settings.signOut" variant="destructive" label={t('more.signOut')} onPress={sync.requestSignOut} />
     </AppScreen>
   );
 }

@@ -1,6 +1,6 @@
 # F17 · Security, audit, and administration — mobile E2E (docs/specs/05-f17-security-audit-admin.md; design.md §3.2)
 # Covers: F17-AC6, F17-AC7, F17-AC8, F17-AC9
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F17 audit — Admin history, record history, other roles refused
 tags:
   - pending

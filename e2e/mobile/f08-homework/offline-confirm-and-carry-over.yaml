@@ -1,6 +1,6 @@
 # F08 · Homework and carry forward — mobile E2E (docs/specs/11-f08-homework-carry-forward.md; decision review 2026-10-30, SRS §17)
 # Covers: F08-AC19, F08-AC20
-appId: ${APP_ID} # DEFERRED: Android application ID (SRS §17 DEC-B55)
+appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F08 offline confirmation and carried-over homework
 tags:
   - pending
