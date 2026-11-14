@@ -1,0 +1,4 @@
+{
+  "//": "ES modules, so Node-based runners (Playwright API E2E) load these catalogues and their @hifz/domain import as ESM. Metro and Vitest are unaffected.",
+  "type": "module"
+}

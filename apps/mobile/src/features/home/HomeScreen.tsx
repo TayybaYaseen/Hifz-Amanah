@@ -23,7 +23,8 @@ export function HomeScreen({ me, onMore, onSyncQueue, onAttendance, onDailyEntry
       ) : null}
       <Card>
         <AppText role="screenTitle" color={colors.brandDeep} accessibilityRole="header" testID="home.greeting">
-          {t('home.greeting', { name: me.displayName })}
+          {/* A name in Urdu script inside an English greeting (or the reverse) keeps the punctuation in place. */}
+          {t('home.greeting', { name: isolate(me.displayName) })}
         </AppText>
         <AppText color={colors.textSecondary} testID={`home.role.${me.role}`}>
           {/* The madrasa name may be in Arabic or Latin script; isolate it so the line reads right in every locale. */}

@@ -1,5 +1,5 @@
 // F01 · Identity — mobile message catalogues: every key in all three locales, with valid ICU and matching
-// placeholders (AGENTS.md §8). The app-and-server catalogue check (F11-AC11) arrives with packages/i18n-keys.
+// placeholders (AGENTS.md §8). The app-and-server check (F11-AC11) is packages/i18n-keys/catalogue.test.ts.
 import { describe, expect, it } from 'vitest';
 import { IntlMessageFormat } from 'intl-messageformat';
 import { en } from './locales/en.ts';

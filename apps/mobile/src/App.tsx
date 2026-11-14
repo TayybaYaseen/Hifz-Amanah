@@ -13,7 +13,7 @@ import { NotoNaskhArabic_400Regular } from '@expo-google-fonts/noto-naskh-arabic
 import type { Locale } from '@hifz/contracts';
 import { SessionProvider } from './auth/SessionContext.tsx';
 import { initI18n } from './i18n/i18n.ts';
-import { LocaleProvider, initialLocale } from './i18n/LocaleContext.tsx';
+import { LocaleProvider, initialLocale, useLocale } from './i18n/LocaleContext.tsx';
 import { RootNavigator, navigationRef } from './navigation/RootNavigator.tsx';
 import { AppLockProvider } from './app-lock/AppLockContext.tsx';
 import { SyncProvider } from './sync/SyncContext.tsx';
@@ -40,9 +40,7 @@ export default function App() {
           <SyncProvider>
             <QuranReferenceProvider>
               <AppLockProvider>
-                <NavigationContainer ref={navigationRef}>
-                  <RootNavigator />
-                </NavigationContainer>
+                <DirectedNavigation />
               </AppLockProvider>
             </QuranReferenceProvider>
           </SyncProvider>
@@ -50,5 +48,18 @@ export default function App() {
       </LocaleProvider>
       <StatusBar style="dark" />
     </SafeAreaProvider>
+  );
+}
+
+/**
+ * Navigation in the locale's direction, so headers and the back chevron mirror in Urdu and switch in place, without
+ * the app reload that I18nManager.forceRTL would need (ADR-010, FR-I18N-005).
+ */
+function DirectedNavigation() {
+  const { direction } = useLocale();
+  return (
+    <NavigationContainer ref={navigationRef} direction={direction}>
+      <RootNavigator />
+    </NavigationContainer>
   );
 }

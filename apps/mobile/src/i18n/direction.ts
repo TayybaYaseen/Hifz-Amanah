@@ -1,6 +1,9 @@
 // Locale and text direction (FR-I18N, design.md §6). Plain TypeScript, tested with Vitest.
 import { LOCALES, type Locale } from '@hifz/contracts';
 
+// Bidi isolation is shared with the server (PDF, Excel, push), so every channel isolates mixed text the same way.
+export { isolate, isolateLtr, surahRange } from '@hifz/i18n-keys';
+
 export type Direction = 'ltr' | 'rtl';
 
 /** Urdu script is right to left; English and Roman Urdu are left to right. */
@@ -23,9 +26,4 @@ export function resolveLocale(deviceTags: readonly string[]): Locale {
     if (lower.startsWith('en')) return 'en';
   }
   return 'en';
-}
-
-/** First-strong-isolate marks, so mixed Arabic/Latin/number runs keep their own direction (FR-I18N-006). */
-export function isolate(text: string): string {
-  return `⁨${text}⁩`;
 }
