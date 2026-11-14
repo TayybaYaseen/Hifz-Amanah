@@ -104,3 +104,6 @@ to today's screens to make the gate pass.
 `IMPLEMENTATION_PLAN.md` merges a feature only after its gate passes. F11's gate cannot pass before F05, F13, and
 F14, while `packages/i18n-keys` is needed by those features. Merging F11 earlier, with the pending criteria above
 kept open, needs the user's explicit approval.
+
+**Exception approved 2026-11-14:** the product owner approved merging F11 into `main` with the gate PENDING (6 of 11
+E2E tests). The pending criteria above stay open; F11 is complete only when `npm run e2e:gate -- F11` passes.
