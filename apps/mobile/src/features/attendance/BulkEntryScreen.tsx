@@ -10,7 +10,7 @@
 // - Saves go to the device first, one transaction per row with its sync operation (F04-AC12, F12-AC1); the engine
 //   syncs them, and a retried send never duplicates (F04-AC10).
 // - Holidays, closures, and no-class days show a notice and record nothing (F04-AC5).
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { AttendanceSheetResponse, ClassListResponse, ClassResponse, DayKind, MeResponse } from '@hifz/contracts';
@@ -38,10 +38,12 @@ import { errorKeys } from '../../api/errors.ts';
 import { useSession } from '../../auth/SessionContext.tsx';
 import { AppScreen, AppText, Button, Card, Field, Notice } from '../../components/ui.tsx';
 import { isolate } from '../../i18n/direction.ts';
+import { latestRequests } from '../../api/latest.ts';
+import { cacheWriteFailed, readCacheToken } from '../../sync/cacheEpoch.ts';
 import { useSync } from '../../sync/SyncContext.tsx';
 import { colors, space } from '../../theme/tokens.ts';
 import { Chip, ChipRow } from '../roster/Chip.tsx';
-import { attendanceHandler, cacheRoster, cachedClasses, cachedRoster, readMarks, saveMark, type LocalMark } from './local.ts';
+import { attendanceHandler, cacheRoster, cachedClasses, cachedRoster, forgetRoster, keepRostersOf, readMarks, saveMark, type LocalMark } from './local.ts';
 
 interface SheetStudent {
   id: string;
@@ -86,6 +88,7 @@ export function BulkEntryScreen({ me, onRecordHifz }: { me: MeResponse; onRecord
   const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState<string[] | null>(null);
   const [summary, setSummary] = useState<BulkSummary | null>(null);
+  const sheetRequests = useRef(latestRequests()).current;
 
   // Classes: the server's list when online (a Teacher gets assigned classes only); the cached ones offline.
   useEffect(() => {
@@ -93,6 +96,8 @@ export function BulkEntryScreen({ me, onRecordHifz }: { me: MeResponse; onRecord
     void (async () => {
       try {
         const list = (await session.authorized<ClassListResponse>('/classes')).items.filter((c: ClassResponse) => c.status === 'ACTIVE');
+        // The server's list is the truth: cached rosters of classes no longer listed leave the device.
+        if (sync.db) await keepRostersOf(sync.db, list.map((c) => c.id));
         if (live) setClasses(list.map((c) => ({ id: c.id, name: c.name })));
       } catch (err) {
         if (err instanceof ApiFailure && err.code === 'NETWORK' && sync.db) {
@@ -106,6 +111,9 @@ export function BulkEntryScreen({ me, onRecordHifz }: { me: MeResponse; onRecord
   }, [session, sync.db, t]);
 
   const load = useCallback(async () => {
+    // Only the latest load sets the screen (re-review M2): a late answer for a class or date no longer selected only
+    // does its device-side work (guarded cache write, forgetRoster).
+    const current = sheetRequests.next();
     if (!classId || !sync.db) return;
     const db = sync.db;
     setLoadError(null);
@@ -113,8 +121,11 @@ export function BulkEntryScreen({ me, onRecordHifz }: { me: MeResponse; onRecord
     setRowErrors({});
     let next: Sheet | null = null;
     try {
+      // Read before the request: an answer that arrives after this class was dropped is not cached (sync/cacheEpoch.ts).
+      const token = await readCacheToken(db, classId);
       const res = await session.authorized<AttendanceSheetResponse>(`/attendance/sheet?classId=${classId}&date=${date}`);
-      await cacheRoster(db, classId, res.className, res.students, new Date().toISOString());
+      // A write to a workspace closed meanwhile (sign-out) is ignored, other faults are reported; the sheet is still shown.
+      await cacheRoster(db, token, classId, res.className, res.students, new Date().toISOString()).catch(cacheWriteFailed);
       // Server records the device has not pulled yet become local rows, so an edit can be queued against them.
       const local = await readMarks(db, classId, date);
       for (const s of res.students) {
@@ -124,14 +135,19 @@ export function BulkEntryScreen({ me, onRecordHifz }: { me: MeResponse; onRecord
         }
       }
       next = { className: res.className, today: res.today, day: res.day, students: res.students.map(({ id, name, externalStudentId, recited }) => ({ id, name, externalStudentId, recited })) };
+      if (!current()) return;
       setOffline(false);
     } catch (err) {
+      // Refused for this class: its cached roster must not be offered again from the device.
+      if (err instanceof ApiFailure && (err.code === 'FORBIDDEN' || err.code === 'NOT_FOUND')) await forgetRoster(db, classId);
+      if (!current()) return;
       if (!(err instanceof ApiFailure && err.code === 'NETWORK')) {
         setLoadError(t(errorKeys(err).form ?? 'errors.INTERNAL'));
         setSheet(null);
         return;
       }
       const cached = await cachedRoster(db, classId);
+      if (!current()) return;
       if (!cached) {
         setLoadError(t('attendance.offlineNoRoster'));
         setSheet(null);
@@ -141,9 +157,10 @@ export function BulkEntryScreen({ me, onRecordHifz }: { me: MeResponse; onRecord
       setOffline(true);
     }
     const marks = await readMarks(db, classId, date);
+    if (!current()) return;
     setSheet(next);
     setRows(next.students.map((s) => ({ studentId: s.id, saved: marks.get(s.id) ?? null, draft: null })));
-  }, [classId, date, session, sync.db, t, timeZone]);
+  }, [classId, date, session, sheetRequests, sync.db, t, timeZone]);
 
   useEffect(() => {
     void load();

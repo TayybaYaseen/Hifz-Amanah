@@ -6,25 +6,26 @@
 # The User ID field may be prefilled with the last User ID, so it is cleared first.
 appId: com.hifzamanah.app
 ---
-- tapOn:
-    id: "signin.userId"
-- eraseText: 64
-- inputText: ${USER_ID}
-- tapOn:
-    id: "signin.password"
-- inputText: ${PASSWORD || 'E2e-Test-Pass-1'}
+# Type only once each field has focus (focus-type.yaml), and check the User ID arrived whole.
+- runFlow: { file: focus-type.yaml, env: { ID: "signin.userId", TEXT: "${USER_ID}" } }
+- runFlow: { file: focus-type.yaml, env: { ID: "signin.password", TEXT: "${PASSWORD || 'E2e-Test-Pass-1'}" } }
+# Close the keyboard without Back (see dismiss-keyboard.yaml).
+- runFlow: dismiss-keyboard.yaml
+- assertVisible: { id: "signin.userId", text: "${USER_ID}" }
 - tapOn:
     id: "signin.submit"
-- assertVisible:
-    id: "twoFactor.screen"
+# The sign-in request can take several seconds on a slow emulator.
+- extendedWaitUntil:
+    visible: { id: "twoFactor.screen" }
+    timeout: 30000
 - runScript:
     file: control.js
     env:
       ACTION: totp
       LOGIN_ID: ${USER_ID}
-- tapOn:
-    id: "twoFactor.code"
-- inputText: ${output.totp}
+- runFlow: { file: focus-type.yaml, env: { ID: "twoFactor.code", TEXT: "${output.totp}" } }
+- runFlow: dismiss-keyboard.yaml
+- assertVisible: { id: "twoFactor.code", text: "${output.totp}" }
 - tapOn:
     id: "twoFactor.submit"
 # Owner/Admin must set an app-lock PIN on a new device (NFR-OFF-011): enter and confirm a synthetic test PIN, and

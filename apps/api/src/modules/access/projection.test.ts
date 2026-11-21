@@ -41,3 +41,86 @@ describe('F07 · mistake notes through projectFor()', () => {
     expect(projectFor('STUDENT', '__proto__', {})).toEqual({});
   });
 });
+
+describe('F09 · reports through projectFor()', async () => {
+  const { buildReport, classSummary, reportPeriod } = await import('@hifz/domain/reports');
+  const period = reportPeriod('WEEK', '2026-11-04');
+  const mistake = (note: string, noteVisibility: 'INTERNAL' | 'SHARED') => ({ category: 'TAJWEED' as const, severity: 'MAJOR' as const, repeated: false, note, noteVisibility });
+  const report = buildReport({
+    period,
+    today: '2026-11-20',
+    student: { id: 's1', name: 'Synthetic Student' },
+    enrollments: [{ id: 'e1', classId: 'c1', startDate: '2026-01-01', endDate: null }],
+    scope: null,
+    schedules: [{ classId: 'c1', effectiveFrom: '2026-01-01', weekdays: [1, 2, 3, 4, 5, 6] }],
+    exceptions: [],
+    attendance: [{ date: '2026-11-02', classId: 'c1', status: 'PRESENT', leaveStatus: 'NONE' }],
+    records: [
+      {
+        id: 'r1',
+        date: '2026-11-02',
+        classId: 'c1',
+        sessionLabel: null,
+        overallLabel: 'GOOD',
+        portions: [
+          {
+            id: 'p1',
+            section: 'SABQI',
+            position: 1,
+            isExtra: false,
+            paraNumber: 4,
+            range: null,
+            assigned: { unit: 'PARA', numerator: 1, denominator: 1 },
+            totalLines: null,
+            removed: false,
+            attempts: [
+              {
+                id: 'a1',
+                attemptNo: 1,
+                attemptedAt: '2026-11-02T06:00:00.000Z',
+                status: 'PARTIAL',
+                completed: { unit: 'PARA', numerator: 1, denominator: 2 },
+                quality: 3,
+                noMistakes: false,
+                mistakes: [mistake('Synthetic private mistake note', 'INTERNAL'), mistake('Synthetic shared mistake note', 'SHARED')],
+                remarks: 'Synthetic private remark',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    homework: [],
+  });
+  const fields = report as unknown as Record<string, unknown>;
+
+  it('F09-AC15 (US-039) internal notes and remarks are absent from a Student or Parent report payload, not just hidden', () => {
+    for (const audience of ['STUDENT', 'PARENT'] as const) {
+      const body = JSON.stringify(projectFor(audience, 'report', fields));
+      expect(body).not.toContain('Synthetic private remark');
+      expect(body).not.toContain('Synthetic private mistake note');
+      // A note the Teacher shared stays; the figures are unchanged.
+      expect(body).toContain('Synthetic shared mistake note');
+      const out = projectFor(audience, 'report', fields) as { quality: unknown; days: { portions: Record<string, unknown>[] }[] };
+      expect(out.quality).toEqual(report.quality);
+      expect(out.days[0]!.portions[0]).not.toHaveProperty('remarks');
+      expect(out.days[0]!.portions[0]!.mistakes).toEqual([
+        { category: 'TAJWEED', severity: 'MAJOR', repeated: false },
+        { category: 'TAJWEED', severity: 'MAJOR', repeated: false, note: 'Synthetic shared mistake note' },
+      ]);
+    }
+  });
+
+  it('F09 unit: staff receive the report as built, internal text included', () => {
+    const body = JSON.stringify(projectFor('STAFF', 'report', fields));
+    expect(body).toContain('Synthetic private remark');
+    expect(body).toContain('Synthetic private mistake note');
+  });
+
+  it('F09-AC19 (US-073) the class summary is never projected for a Student or Parent (staff only)', () => {
+    const summary = classSummary('c1', period, '2026-11-20', [report]) as unknown as Record<string, unknown>;
+    expect(projectFor('STUDENT', 'class_summary', summary)).toEqual({});
+    expect(projectFor('PARENT', 'class_summary', summary)).toEqual({});
+    expect(projectFor('STAFF', 'class_summary', summary)).toEqual(summary);
+  });
+});

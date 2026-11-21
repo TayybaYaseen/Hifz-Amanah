@@ -1,0 +1,27 @@
+# Subflow: clear a field and type a value, scrolling only when the field is off screen and without centring it.
+# Use it where type.yaml's centring scroll cannot settle: a field already in the upper half of a long form that is
+# scrolled to its end (seen on Daily Entry after save errors expand the Sabaq card). Clears 6 characters.
+# Usage: runFlow { file: ../../support/maestro/retype.yaml, env: { ID: "daily.sabaq.portion.1.ayahStart", TEXT: "5" } }
+appId: com.hifzamanah.app
+---
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      notVisible: { id: "${ID}" }
+    commands:
+      - scrollUntilVisible: { element: { id: "${ID}" }, direction: UP, timeout: 30000, optional: true }
+- runFlow:
+    when:
+      notVisible: { id: "${ID}" }
+    commands:
+      - scrollUntilVisible: { element: { id: "${ID}" }, direction: DOWN, timeout: 30000 }
+- tapOn: { id: "${ID}" }
+# Type only once the field has input focus (see focus-type.yaml): typing earlier can drop the first characters.
+- extendedWaitUntil:
+    visible: { id: "${ID}", focused: true }
+    timeout: 30000  # a slow emulator can take over 15 s to open the keyboard; ends as soon as the field has focus
+- eraseText: 6
+- inputText: ${TEXT}
+# Never `hideKeyboard` (it presses Back); see dismiss-keyboard.yaml.
+- runFlow: dismiss-keyboard.yaml
+- assertVisible: { id: "${ID}", text: "${TEXT}" }

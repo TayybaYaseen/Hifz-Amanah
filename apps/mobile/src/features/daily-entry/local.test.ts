@@ -296,7 +296,7 @@ describe('F07 · mistakes and quality on the device', () => {
       { entity: 'daily_record', entityId: id, opType: 'CREATE', baseVersion: null, fields: { studentId: STUDENT, classId: CLASS, reportDate: DATE, sessionLabel: null }, label: 'One' },
     );
     const snapshot = await db.all('SELECT * FROM outbox ORDER BY seq');
-    expect(await runMigrations(db, WORKSPACE_MIGRATIONS)).toEqual([7]);
+    expect(await runMigrations(db, WORKSPACE_MIGRATIONS.slice(0, 7))).toEqual([7]);
     expect(await schemaVersion(db)).toBe(7);
     expect(await db.all('SELECT * FROM outbox ORDER BY seq')).toEqual(snapshot);
     // Records saved before the migration have no overall label (never filled in from quality).

@@ -1,0 +1,19 @@
+# Subflow (F05): from Home, open Daily Entry for a student of class Hifz A1 today and mark them Present.
+# Sets output.today (the madrasa's today, YYYY-MM-DD).
+# Usage: runFlow { file: ../../support/maestro/daily-start.yaml, env: { STUDENT: EXT-A-001 } }
+appId: com.hifzamanah.app
+---
+- tapOn: { id: "nav.dailyEntry" }
+- extendedWaitUntil:
+    visible: { id: "daily.class.Hifz A1" }
+    timeout: 30000
+- copyTextFrom: { id: "daily.date" }
+- evalScript: ${output.today = maestro.copiedText.replace(/[^0-9-]/g, '')}
+- tapOn: { id: "daily.class.Hifz A1" }
+- extendedWaitUntil:
+    visible: { id: "daily.student.${STUDENT}" }
+    timeout: 30000
+- tapOn: { id: "daily.student.${STUDENT}" }
+- runFlow:
+    file: tap.yaml
+    env: { ID: "daily.attendance.PRESENT" }

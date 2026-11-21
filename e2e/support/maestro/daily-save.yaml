@@ -1,0 +1,8 @@
+# Subflow (F05): save the Daily Entry form and wait for the record screen.
+# daily-save-tap.yaml finds Save at the end of a long form and taps it.
+appId: com.hifzamanah.app
+---
+- runFlow: daily-save-tap.yaml
+- extendedWaitUntil:
+    visible: { id: "record.screen" }
+    timeout: 30000

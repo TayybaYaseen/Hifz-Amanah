@@ -1,14 +1,152 @@
 # F06 · Quran portions and metadata — mobile E2E (docs/specs/07-f06-quran-portions-metadata.md; decision review 2026-10-30, SRS §17)
 # Covers: F06-AC16, F06-AC19
+# SYNTHETIC DATA ONLY: the synthetic Quran fixture (20 Ayat per Surah; Para 1 = Surahs 1–3, Para 2 starts at Surah 4;
+# a test layout of 2 Ayat per line for Surahs 1–3). The boundary correction moves synthetic Surah 3 from Para 1 to
+# Para 2, as in the API test; nothing here is real Quran metadata.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F06 Extra portion and metadata corrections
 tags:
-  - pending
   - F06
   - US-027
   - US-024
 ---
-- launchApp:
-    clearState: true
-# 1. Given 1/2 Para assigned and 3/4 Para recited, when the Teacher records completed 1/2 and adds an Extra portion of 1/4, then both portions are saved with completed ≤ assigned, and reports show the 1/4 as extra work. Entering completed 3/4 on the original portion is refused. (F06-AC16)
-# 2. Given records that use a Para boundary, when the Admin corrects that boundary, then the records keep their stored ranges, any range that is no longer valid is listed for Admin review, and the edit is audited. (F06-AC19)
+- runFlow: ../../support/maestro/reset.yaml
+- runFlow: ../../support/maestro/ensure-class-day.yaml
+- runScript:
+    file: ../../support/maestro/control.js
+    env: { ACTION: quranSeed }
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- tapOn: { id: "nav.more" }
+- tapOn: { id: "more.quranRef" }
+- extendedWaitUntil:
+    visible: { id: "quranRef.status.SYNCED" }
+    timeout: 60000
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow:
+    file: ../../support/maestro/daily-start.yaml
+    env: { STUDENT: EXT-A-001 }
+# A Sabaq on synthetic Surah 3, Ayat 1–6 (derived Para 1; 3 lines from the layout), used by step 2.
+- runFlow:
+    file: ../../support/maestro/daily-sabaq.yaml
+    env: { SURAH: "3", FROM: "1", TO: "6", STATUS: COMPLETED, COMPLETED: "" }
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "daily.sabaq.portion.1.para", TEXT: ".*1.*" } }
+# 1. Given 1/2 Para assigned and 3/4 Para recited: entering completed 3/4 on the original portion is refused; the Teacher
+#    records completed 1/2 and adds an Extra portion of 1/4; both are saved with completed ≤ assigned.  (F06-AC16)
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.add" } }
+- runFlow:
+    when: { notVisible: { id: "daily.sabqi.portion.1.title" } }
+    commands:
+      - runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.add" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "daily.sabqi.portion.1.para", TEXT: "3" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.1.unit.HALF" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.1.status.PARTIAL" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.1.completed.SALASAH" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.1.mistakes.none" } }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- runFlow: ../../support/maestro/daily-save-tap.yaml
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "daily.sabqi.portion.1.completed.error", TEXT: ".*completed cannot be more than assigned — record extra work as an Extra portion.*" } }
+- assertNotVisible: { id: "record.screen" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.1.status.COMPLETED" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.1.completed.HALF" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.addExtra" } }
+- runFlow:
+    when: { notVisible: { id: "daily.sabqi.portion.2.title" } }
+    commands:
+      - runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.addExtra" } }
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "daily.sabqi.portion.2.extra" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "daily.sabqi.portion.2.para", TEXT: "3" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.2.unit.RUBU" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.2.status.COMPLETED" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.2.mistakes.none" } }
+- runFlow: ../../support/maestro/daily-save.yaml
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "record.sabqi.portion.1.assigned", TEXT: ".*.?1/2.? Para.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "record.sabqi.portion.1.completed", TEXT: ".*.?1/2.? Para.*" } }
+- assertNotVisible: { id: "record.sabqi.portion.1.extra" }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "record.sabqi.portion.2.extra" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "record.sabqi.portion.2.assigned", TEXT: ".*.?1/4.? Para.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "record.sabqi.portion.2.completed", TEXT: ".*.?1/4.? Para.*" } }
+# The sync status is at the top of the record screen (it cannot be centred), so scroll up to it plainly.
+- scrollUntilVisible: { element: { id: "record.sync.*" }, direction: UP, timeout: 60000 }
+- extendedWaitUntil:
+    visible: { id: "record.sync.SYNCED" }
+    timeout: 90000
+# Report output ("reports show the 1/4 as extra work"): covered by e2e/api/f06-quran-portions.spec.ts 'F06-AC16 (US-027)
+# extra work is a separate Extra portion; completed never exceeds assigned'; the report screen arrives with F09 (US-039).
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow: ../../support/maestro/sign-out.yaml
+# 2. Given records that use a Para boundary, when the Admin corrects that boundary, then the records keep their stored
+#    ranges, any range that is no longer valid is listed for Admin review, and the edit is audited.      (F06-AC19)
+- runFlow:
+    file: ../../support/maestro/sign-in-staff.yaml
+    env: { USER_ID: admin-a }
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.quran" } }
+- extendedWaitUntil:
+    visible: { id: "quran.review" }
+    timeout: 30000
+- tapOn: { id: "quran.review" }
+- extendedWaitUntil:
+    visible: { id: "quranReview.screen" }
+    timeout: 30000
+- assertNotVisible: { id: "quranReview.record\\..*" }
+- back
+- extendedWaitUntil:
+    visible: { id: "quran.tab.paras" }
+    timeout: 30000
+- tapOn: { id: "quran.tab.paras" }
+# Para 1 now ends at Surah 2, Ayat 20.
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "quran.para.1" } }
+- extendedWaitUntil:
+    visible: { id: "paraForm.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "paraForm.endSurah", TEXT: "2" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "paraForm.endAyah", TEXT: "20" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "paraForm.save" } }
+- extendedWaitUntil:
+    visible: { id: "quran.screen|paraForm.done" }
+    timeout: 30000
+- runFlow:
+    when: { visible: { id: "paraForm.done" } }
+    commands:
+      - tapOn: { id: "paraForm.done" }
+- extendedWaitUntil:
+    visible: { id: "quran.screen" }
+    timeout: 30000
+# Para 2 now starts at Surah 3, Ayat 1: the Surah 3 Sabaq (stored Para 1) no longer fits and is listed.
+- runFlow:
+    when: { notVisible: { id: "quran.para.2" } }
+    commands:
+      - tapOn: { id: "quran.tab.paras" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "quran.para.2" } }
+- extendedWaitUntil:
+    visible: { id: "paraForm.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "paraForm.startSurah", TEXT: "3" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "paraForm.startAyah", TEXT: "1" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "paraForm.save" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "quran.reviewNeeded", TEXT: ".*Records whose range no longer fits: 1\\..*" } }
+- tapOn: { id: "paraForm.done" }
+- extendedWaitUntil:
+    visible: { id: "quran.review" }
+    timeout: 30000
+- tapOn: { id: "quran.review" }
+- extendedWaitUntil:
+    visible: { id: "quranReview.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "quranReview.record\\..*", TEXT: "Range .?3:1–6.? no longer fits the Surah data\\." } }
+- runFlow: ../../support/maestro/back-home.yaml
+# The record keeps its stored range and Para.
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.students" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "students.item.EXT-A-001" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "studentProfile.record\\..*" } }
+- extendedWaitUntil:
+    visible: { id: "record.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "record.sabaq.portion.1.range", TEXT: ".*3.*1–6.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "record.sabaq.portion.1.para", TEXT: ".*1.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "record.sabqi.portion.2.extra" } }
+# The audit of each boundary edit is covered by e2e/api/f06-quran-portions.spec.ts 'F06-AC19 (US-024) a metadata
+# correction flags affected records and never changes them'.

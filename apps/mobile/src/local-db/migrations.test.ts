@@ -4,6 +4,14 @@ import { openNodeDriver } from './testing/nodeDriver.ts';
 import { DEVICE_MIGRATIONS, LocalSchemaTooNewError, WORKSPACE_MIGRATIONS, runMigrations, schemaVersion, type Migration } from './migrations.ts';
 import type { SqlDriver } from './driver.ts';
 import { FakeClock, makeOutbox, probeMigration, writeProbe } from '../sync/testing/probe.ts';
+import { EntityRegistry } from '../sync/registry.ts';
+import { registerDailyEntry } from '../features/daily-entry/local.ts';
+
+const dailyRegistry = () => {
+  const registry = new EntityRegistry();
+  registerDailyEntry(registry);
+  return registry;
+};
 
 /** Every outbox row, every column, in seq order. */
 const outboxSnapshot = (db: SqlDriver) => db.all<Record<string, unknown>>('SELECT * FROM outbox ORDER BY seq');
@@ -159,6 +167,72 @@ describe('F12 · local database upgrades', () => {
     expect(await schemaVersion(db)).toBe(base.length);
     expect(await db.get("SELECT name FROM sqlite_master WHERE name = 'half_done'")).toBeNull();
     expect(await outboxSnapshot(db)).toEqual(before);
+    await db.close();
+  });
+
+  it('F12-AC16, F08 (US-051, US-033) the version 7 → 8 upgrade (homework, next-class link, sync notices) keeps every queued daily-entry operation', async () => {
+    const db = openNodeDriver();
+    await runMigrations(db, WORKSPACE_MIGRATIONS.slice(0, 7));
+    const outbox = makeOutbox(db, new FakeClock(), dailyRegistry());
+    const states = ['PENDING', 'SYNCING', 'SYNCED', 'FAILED', 'ACTION_REQUIRED'];
+    const portionIds: string[] = [];
+    for (const [i, state] of states.entries()) {
+      const recordId = outbox.newEntityId();
+      const portionId = outbox.newEntityId();
+      portionIds.push(portionId);
+      const { opIds } = await outbox.saveWithOp(
+        async (tx) => {
+          await tx.run("INSERT INTO daily_records (id, row_version, student_id, class_id, report_date) VALUES (?, NULL, 's', 'c', '2026-11-13')", [recordId]);
+          await tx.run("INSERT INTO lesson_portions (id, row_version, daily_record_id, report_date, section, position) VALUES (?, NULL, ?, '2026-11-13', 'SABQI', 1)", [portionId, recordId]);
+        },
+        [
+          { entity: 'daily_record', entityId: recordId, opType: 'CREATE', baseVersion: null, fields: { studentId: 's', reportDate: '2026-11-13' }, label: `row ${i}` },
+          { entity: 'lesson_portion', entityId: portionId, opType: 'CREATE', baseVersion: null, fields: { dailyRecordId: recordId, section: 'SABQI', note: 'نوٹ' }, label: `row ${i}` },
+        ],
+      );
+      for (const op of opIds) await db.run('UPDATE outbox SET state = ? WHERE op_id = ?', [state, op]);
+    }
+    const before = await outboxSnapshot(db);
+    expect(before).toHaveLength(10);
+    expect(await runMigrations(db, WORKSPACE_MIGRATIONS.slice(0, 8))).toEqual([8]);
+    expect(await outboxSnapshot(db)).toEqual(before);
+    for (const table of ['homework_assignments', 'sync_notices', 'class_calendar_cache']) {
+      expect(await db.get("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", [table])).toEqual({ name: table });
+    }
+    // Portions saved before the upgrade have no homework link (never guessed).
+    expect(await db.all('SELECT homework_portion_id FROM lesson_portions ORDER BY id')).toEqual(portionIds.map(() => ({ homework_portion_id: null })));
+    expect((await makeOutbox(db, new FakeClock(), dailyRegistry()).list()).map((i) => i.status.state)).toEqual(states.flatMap((s) => [s, s]));
+    await db.close();
+  });
+
+  it('F12-AC16 (US-051, security review) the version 8 → 9 upgrade (per-class cache tokens) keeps every queued operation and the cached rosters', async () => {
+    const db = openNodeDriver();
+    await runMigrations(db, WORKSPACE_MIGRATIONS.slice(0, 8));
+    const outbox = makeOutbox(db, new FakeClock(), dailyRegistry());
+    const states = ['PENDING', 'SYNCING', 'SYNCED', 'FAILED', 'ACTION_REQUIRED'];
+    for (const [i, state] of states.entries()) {
+      const recordId = outbox.newEntityId();
+      const { opIds } = await outbox.saveWithOp(
+        async (tx) => {
+          await tx.run("INSERT INTO daily_records (id, row_version, student_id, class_id, report_date) VALUES (?, NULL, 's', 'c', '2026-11-16')", [recordId]);
+        },
+        { entity: 'daily_record', entityId: recordId, opType: 'CREATE', baseVersion: null, fields: { studentId: 's', reportDate: '2026-11-16', note: 'نوٹ — Arabic/Urdu text stays intact' }, label: `row ${i}` },
+      );
+      for (const op of opIds) await db.run('UPDATE outbox SET state = ?, attempts = ? WHERE op_id = ?', [state, i, op]);
+    }
+    await db.run("INSERT INTO class_roster_cache (class_id, class_name, students, fetched_at) VALUES ('c', 'Hifz A1', '[]', '2026-11-16T00:00:00.000Z')");
+    await db.run("UPDATE sync_meta SET last_pull_cursor = 'cursor-8' WHERE id = 1");
+    const before = await outboxSnapshot(db);
+    expect(before).toHaveLength(5);
+    expect(await runMigrations(db, WORKSPACE_MIGRATIONS)).toEqual([9]);
+    // Every outbox row and value is byte-identical; nothing else in sync_meta or the caches moved.
+    expect(await outboxSnapshot(db)).toEqual(before);
+    expect(await db.get('SELECT cache_epoch, allowed_seq, last_pull_cursor FROM sync_meta')).toEqual({ cache_epoch: 0, allowed_seq: 0, last_pull_cursor: 'cursor-8' });
+    for (const table of ['cache_class_epoch', 'cache_allowed_classes']) expect(await db.all(`SELECT * FROM ${table}`)).toEqual([]);
+    expect(await db.all('SELECT class_id FROM class_roster_cache')).toEqual([{ class_id: 'c' }]);
+    const items = await makeOutbox(db, new FakeClock(), dailyRegistry()).list();
+    expect(items.map((i) => i.status.state)).toEqual(states);
+    expect(items[0]!.fields.note).toBe('نوٹ — Arabic/Urdu text stays intact');
     await db.close();
   });
 

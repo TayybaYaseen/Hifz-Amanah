@@ -24,7 +24,7 @@ tags:
 - inputText: "teacher.a1@example.test"
 - tapOn: { id: "signin.password" }
 - inputText: "E2e-Test-Pass-1"
-- hideKeyboard
+- runFlow: ../../support/maestro/dismiss-keyboard.yaml
 - tapOn: { id: "signin.submit" }
 - assertVisible: { id: "signin.error" }
 - copyTextFrom: { id: "signin.error" }
@@ -35,7 +35,7 @@ tags:
 - inputText: "teacher-a1"
 - tapOn: { id: "signin.password" }
 - inputText: "Not-The-Password-1"
-- hideKeyboard
+- runFlow: ../../support/maestro/dismiss-keyboard.yaml
 - tapOn: { id: "signin.submit" }
 - assertVisible: { id: "signin.error", text: "${output.emailRefusal}" }
 - assertVisible: { id: "signin.userId", text: "teacher-a1" }
@@ -45,7 +45,7 @@ tags:
 - inputText: "no-such-user"
 - tapOn: { id: "signin.password" }
 - inputText: "Not-The-Password-1"
-- hideKeyboard
+- runFlow: ../../support/maestro/dismiss-keyboard.yaml
 - tapOn: { id: "signin.submit" }
 - assertVisible: { id: "signin.error", text: "${output.emailRefusal}" }
 # 5. Sign in as teacher-a1 → Teacher Home in Madrasa A; no change-password prompt.             (F01-AC1, F01-AC17)

@@ -402,6 +402,14 @@ export class SyncEngine {
                   [result.rowVersion, item.entityId, result.rowVersion],
                 );
               }
+              // F08: facts the server attached (e.g. CONFIRMED_HOMEWORK_UNCHANGED after a source correction, F08-AC14,
+              // F05-AC4) are kept for the screen of that row; a replayed result does not add them twice.
+              for (const notice of result.notices ?? []) {
+                await tx.run(
+                  'INSERT INTO sync_notices (op_id, notice, entity, entity_id, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (op_id, notice) DO NOTHING',
+                  [item.opId, notice, item.entity, item.entityId, this.nowIso()],
+                );
+              }
               await this.markRowSynced(tx, item);
               // An operation on this row was applied, so the row has no open conflict any more.
               await this.rowSettled(tx, item.entity, item.entityId);
@@ -508,7 +516,7 @@ export class SyncEngine {
         // NFR-OFF-010, plan Q8: the scope changed. Drop every synced row and start again from a snapshot of the
         // new scope. Rows with unsynced changes stay; the server answers NOT_FOUND if they are now out of scope.
         await this.d.db.transaction(async (tx) => {
-          await purgeSynced(tx, this.d.registry, { keepQueueHistory: true });
+          await purgeSynced(tx, this.d.registry, { keepQueueHistory: true, scopeChanged: true });
           await noteServerTime(tx, response.serverTime);
         });
         await checkpoint(this.d.db);

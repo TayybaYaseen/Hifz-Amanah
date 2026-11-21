@@ -3,9 +3,10 @@
 import { describe, expect, it } from 'vitest';
 import { WORKSPACE_MIGRATIONS, runMigrations } from '../../local-db/migrations.ts';
 import { openNodeDriver } from '../../local-db/testing/nodeDriver.ts';
+import { readCacheToken } from '../../sync/cacheEpoch.ts';
 import { EntityRegistry } from '../../sync/registry.ts';
 import { FakeClock, makeOutbox } from '../../sync/testing/probe.ts';
-import { attendanceHandler, cacheRoster, cachedClasses, cachedRoster, readMarks, registerAttendance, saveMark } from './local.ts';
+import { attendanceHandler, cacheRoster, cachedClasses, cachedRoster, forgetRoster, keepRostersOf, readMarks, registerAttendance, saveMark } from './local.ts';
 
 const CLASS = '0190f5c0-0000-7000-8000-00000000c1a5';
 const S1 = '0190f5c0-0000-7000-8000-0000000000s1'.replace('s1', 'a1');
@@ -72,9 +73,35 @@ describe('F04 · attendance on the device', () => {
   it('F04-AC12 (US-015) the roster cache lets Bulk Entry open offline, and holds no notes', async () => {
     const { db } = await setup();
     expect(await cachedRoster(db, CLASS)).toBeNull();
-    await cacheRoster(db, CLASS, 'Hifz A1', [{ id: S1, name: 'Test Student One', externalStudentId: 'R-1', record: null, recited: false } as never], '2026-11-08T06:00:00.000Z');
+    await cacheRoster(db, await readCacheToken(db, CLASS), CLASS, 'Hifz A1', [{ id: S1, name: 'Test Student One', externalStudentId: 'R-1', record: null, recited: false } as never], '2026-11-08T06:00:00.000Z');
     expect(await cachedRoster(db, CLASS)).toEqual({ className: 'Hifz A1', students: [{ id: S1, name: 'Test Student One', externalStudentId: 'R-1' }], fetchedAt: '2026-11-08T06:00:00.000Z' });
     expect(await cachedClasses(db)).toEqual([{ id: CLASS, name: 'Hifz A1' }]);
+  });
+
+  it('F04 unit (security re-review): the server class list and a refused class remove cached rosters', async () => {
+    const { db } = await setup();
+    const OTHER = '0190f5c0-0000-7000-8000-0000000c1a22';
+    const roster = [{ id: S1, name: 'Test Student One', externalStudentId: 'R-1' }];
+    const calendars = async () => (await db.all<{ class_id: string }>('SELECT class_id FROM class_calendar_cache ORDER BY class_id')).map((r) => r.class_id);
+    for (const id of [CLASS, OTHER]) {
+      await db.run("INSERT INTO class_calendar_cache (class_id, versions, exceptions, fetched_at) VALUES (?, '[]', '[]', '2026-11-08T06:00:00.000Z')", [id]);
+    }
+    await cacheRoster(db, await readCacheToken(db, CLASS), CLASS, 'Hifz A1', roster, '2026-11-08T06:00:00.000Z');
+    await cacheRoster(db, await readCacheToken(db, OTHER), OTHER, 'Hifz A2', roster, '2026-11-08T06:00:00.000Z');
+    // The server lists only Hifz A1 now (unassigned from A2): A2's roster and calendar leave the device, A1's stay for
+    // offline use.
+    await keepRostersOf(db, [CLASS]);
+    expect(await cachedClasses(db)).toEqual([{ id: CLASS, name: 'Hifz A1' }]);
+    expect(await cachedRoster(db, OTHER)).toBeNull();
+    expect(await calendars()).toEqual([CLASS]);
+    // A refused class (FORBIDDEN / NOT_FOUND) is forgotten at once, calendar included.
+    await forgetRoster(db, CLASS);
+    expect(await cachedRoster(db, CLASS)).toBeNull();
+    expect(await calendars()).toEqual([]);
+    // No classes at all: nothing stays.
+    await cacheRoster(db, await readCacheToken(db, OTHER), OTHER, 'Hifz A2', roster, '2026-11-08T06:00:00.000Z');
+    await keepRostersOf(db, []);
+    expect(await cachedClasses(db)).toEqual([]);
   });
 
   it('F04 unit: the Sync Queue label never carries a reason or note', () => {

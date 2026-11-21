@@ -1,6 +1,6 @@
 # F01 · Identity and authentication — mobile E2E (docs/specs/01-f01-identity-authentication.md; decision review 2026-10-30, SRS §17)
 # Covers: F01-AC24, F01-AC26, F01-AC27, F01-AC28, F01-AC30
-# Android's Back first closes the keyboard, so `hideKeyboard` comes before every navigating `back`.
+# The keyboard is closed by tapping the page margin (dismiss-keyboard.yaml), never with Back, so every `back` navigates.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F01 profile, User ID rules, Admin reset, and Owner/Admin two-factor sign-in
 tags:
@@ -19,22 +19,16 @@ tags:
 - tapOn: { id: "more.accounts" }
 - tapOn: { id: "accounts.add" }
 - assertVisible: { id: "accountCreate.userId", text: "ALIF-" }
-- tapOn: { id: "accountCreate.userId" }
-- eraseText: 40
-- inputText: "TEACHER-A1"
-- tapOn: { id: "accountCreate.name" }
-- inputText: "Case Only"
-- tapOn: { id: "accountCreate.password" }
-- inputText: "Fresh-Pass-2026"
-- hideKeyboard
-- tapOn: { id: "accountCreate.submit" }
-- assertVisible: { id: "accountCreate.userId.error" }
-- tapOn: { id: "accountCreate.userId" }
-- eraseText: 40
-- inputText: "bad.id"
-- hideKeyboard
-- tapOn: { id: "accountCreate.submit" }
-- assertVisible: { id: "accountCreate.userId.error" }
+# The form is taller than the screen with the keyboard open, so fields are typed through type.yaml (scrolls the field
+# into view, types, closes the keyboard without Back) and the submit/error through tap.yaml/see.yaml.
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "accountCreate.userId", TEXT: "TEACHER-A1" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "accountCreate.name", TEXT: "Case Only" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "accountCreate.password", TEXT: "Fresh-Pass-2026" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "accountCreate.submit" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "accountCreate.userId.error" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "accountCreate.userId", TEXT: "bad.id" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "accountCreate.submit" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "accountCreate.userId.error" } }
 - back            # New account → Accounts
 # 2. The Admin sets a Teacher's password; the Owner's account offers no password reset to an Admin. (F01-AC26)
 - scrollUntilVisible:
@@ -42,7 +36,7 @@ tags:
 - tapOn: { id: "accounts.item.teacher-a1" }
 - tapOn: { id: "accountDetail.newPassword" }
 - inputText: "Admin-Set-2026"
-- hideKeyboard
+- runFlow: ../../support/maestro/dismiss-keyboard.yaml
 - tapOn: { id: "accountDetail.resetPassword" }
 - assertVisible: { id: "accountDetail.status.success" }
 - back            # Account → Accounts
@@ -63,24 +57,22 @@ tags:
 - tapOn: { id: "profile.displayName" }
 - eraseText: 60
 - inputText: "Admin Alif"
-- hideKeyboard
+- runFlow: ../../support/maestro/dismiss-keyboard.yaml
 - tapOn: { id: "profile.save" }
 - assertVisible: { id: "profile.status.success" }
 # 4. Change password: a wrong current password is refused; the right one succeeds.             (F01-AC28)
-- scrollUntilVisible:
-    element: { id: "profile.changePassword" }
-- tapOn: { id: "profile.currentPassword" }
-- inputText: "Not-The-Password-1"
-- tapOn: { id: "profile.newPassword" }
-- inputText: "Admin-Fresh-2026"
-- hideKeyboard
-- tapOn: { id: "profile.changePassword" }
-- assertVisible: { id: "profile.passwordStatus.error" }
-- tapOn: { id: "profile.currentPassword" }
-- inputText: "E2e-Test-Pass-1"
-- hideKeyboard
-- tapOn: { id: "profile.changePassword" }
-- assertVisible: { id: "profile.passwordStatus.success" }
+# Each field is scrolled to the middle before it is typed into (scrolling only until the button shows can leave the
+# current-password field under the header, so the tap misses it), and cleared first, so the retry replaces the wrong
+# password instead of appending to it.
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "profile.currentPassword", TEXT: "Not-The-Password-1" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "profile.newPassword", TEXT: "Admin-Fresh-2026" } }
+# The result shows at the top of the password card (above the fields), and the screen clears the current password after
+# every attempt, so the status is scrolled into view before it is checked.
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "profile.changePassword" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "profile.passwordStatus.error" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "profile.currentPassword", TEXT: "E2e-Test-Pass-1" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "profile.changePassword" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "profile.passwordStatus.success" } }
 - back            # Profile → More
 - back            # More → Home
 - runFlow: ../../support/maestro/sign-out.yaml
@@ -111,7 +103,7 @@ tags:
 - inputText: "admin-a"
 - tapOn: { id: "signin.password" }
 - inputText: "Admin-Fresh-2026"
-- hideKeyboard
+- runFlow: ../../support/maestro/dismiss-keyboard.yaml
 - tapOn: { id: "signin.submit" }
 - assertVisible: { id: "twoFactorSetup.screen" }
 - assertVisible: { id: "twoFactorSetup.key" }
@@ -122,7 +114,7 @@ tags:
     element: { id: "twoFactorSetup.code" }
 - tapOn: { id: "twoFactorSetup.code" }
 - inputText: ${output.totp}
-- hideKeyboard
+- runFlow: ../../support/maestro/dismiss-keyboard.yaml
 - scrollUntilVisible:
     element: { id: "twoFactorSetup.submit" }
 - tapOn: { id: "twoFactorSetup.submit" }

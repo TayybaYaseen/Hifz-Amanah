@@ -19,11 +19,12 @@ import { colors, space } from '../../theme/tokens.ts';
 import { cachedClasses } from '../attendance/local.ts';
 import { useQuranReference } from '../quran/QuranReferenceContext.tsx';
 import { SECTION_LIST, sectionSlug } from './form.ts';
-import { readRecord, recordSyncState, storeDetail, type LocalAttempt, type LocalPortion, type LocalRecord } from './local.ts';
+import { readRecord, recordEntityIds, recordSyncState, storeDetail, type LocalAttempt, type LocalPortion, type LocalRecord } from './local.ts';
+import { dismissNotices, noticesFor } from '../homework/local.ts';
 import { portionTitle, useAmount } from './PortionCard.tsx';
 import { recordRejections } from './rejections.ts';
 
-export function DailyRecordScreen({ me, recordId, edited, onEdit, onAddAttempt, onSyncQueue, onOpenRecord }: {
+export function DailyRecordScreen({ me, recordId, edited, onEdit, onAddAttempt, onSyncQueue, onOpenRecord, onHomework }: {
   me: MeResponse;
   recordId: string;
   edited: boolean;
@@ -31,6 +32,8 @@ export function DailyRecordScreen({ me, recordId, edited, onEdit, onAddAttempt, 
   onAddAttempt: (portionId: string) => void;
   onSyncQueue: () => void;
   onOpenRecord: (recordId: string) => void;
+  /** F08: the student's homework (the notice's "View homework"). */
+  onHomework?: (studentId: string, classId: string) => void;
 }) {
   const { t } = useTranslation();
   const { session } = useSession();
@@ -43,11 +46,14 @@ export function DailyRecordScreen({ me, recordId, edited, onEdit, onAddAttempt, 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<{ key: string; denied: boolean; notOnDevice: boolean } | null>(null);
   const [history, setHistory] = useState<Record<string, boolean>>({});
+  // F08-AC14, F05-AC4: the server applied a correction and left confirmed homework from this record unchanged.
+  const [notices, setNotices] = useState<Array<{ opId: string; notice: string }>>([]);
 
   const readLocal = useCallback(async () => {
     if (!sync.db) return null;
     const local = await readRecord(sync.db, recordId);
     setRecord(local);
+    setNotices(local ? (await noticesFor(sync.db, recordEntityIds(local))).filter((n) => n.notice === 'CONFIRMED_HOMEWORK_UNCHANGED') : []);
     if (local && !local.className) {
       const cls = (await cachedClasses(sync.db)).find((c) => c.id === local.classId);
       setClassName(cls?.name ?? null);
@@ -133,6 +139,8 @@ export function DailyRecordScreen({ me, recordId, edited, onEdit, onAddAttempt, 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space[2] }}>
           <AppText role="cardTitle" testID={`${prefix}.title`}>{portionTitle(t, p.section, n)}</AppText>
           {p.isExtra ? <AppText role="helper" color={colors.info} testID={`${prefix}.extra`}>{`＋ ${t('daily.extra')}`}</AppText> : null}
+          {/* F08-AC16: recorded against a confirmed homework portion (FR-HW-015). */}
+          {p.homeworkPortionId ? <AppText role="helper" color={colors.info} testID={`${prefix}.homeworkLink`}>{`⇢ ${t('homework.linked')}`}</AppText> : null}
           {progress?.currentStatus ? <StatusChip status={progress.currentStatus} testID={`${prefix}.status.${progress.currentStatus}`} /> : null}
         </View>
         {p.section === 'SABAQ' && p.range ? (
@@ -220,6 +228,20 @@ export function DailyRecordScreen({ me, recordId, edited, onEdit, onAddAttempt, 
         </>
       ) : null}
       {edited ? <Notice tone="info" testID="record.homeworkNotice">{t('dailyRecord.homeworkUnchanged')}</Notice> : null}
+      {notices.length ? (
+        <View style={{ gap: space[2] }}>
+          <Notice tone="info" testID="record.homeworkConfirmedUnchanged">{t(me.role === 'TEACHER' ? 'homework.notice.unchangedTeacher' : 'homework.notice.unchanged')}</Notice>
+          {onHomework ? <Button testID="record.homeworkNotice.open" variant="secondary" label={t(me.role === 'TEACHER' ? 'homework.notice.open' : 'homework.notice.revise')} onPress={() => onHomework(record.studentId, record.classId)} /> : null}
+          <Button
+            testID="record.homeworkNotice.dismiss"
+            variant="tertiary"
+            label={t('homework.notice.dismiss')}
+            onPress={() => {
+              if (sync.db) void dismissNotices(sync.db, notices.map((n) => n.opId), new Date().toISOString()).then(readLocal);
+            }}
+          />
+        </View>
+      ) : null}
 
       <Card>
         <AppText role="cardTitle" testID="record.student">{isolate(record.studentName ?? '')}</AppText>

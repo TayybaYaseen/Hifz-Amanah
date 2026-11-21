@@ -1,22 +1,198 @@
 # F08 · Homework and carry forward — mobile E2E (docs/specs/11-f08-homework-carry-forward.md; design.md §4.9, §5.7)
 # Covers: F08-AC3, F08-AC4, F08-AC5, F08-AC6, F08-AC7, F08-AC8, F08-AC9
+# SYNTHETIC DATA ONLY: seeded personas and the synthetic Quran fixture (2 Ayat per line for Surahs 1–3), so Surah 2
+# Ayat 1–20 stands in for "Al-Baqarah 1–10" with its 10 lines.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F08 suggestions — eligible portions, draft label, review edits, reject
 tags:
-  - pending
   - F08
   - US-034
   - US-035
   - US-036
 ---
-- launchApp:
-    clearState: true
-# 1. Sign in as teacher.a1 → Daily Entry S1: Sabaq Al-Baqarah 1–10, 10 of 10 lines, 6 completed, Partial; Sabqi Para 3 Not Remembered;
-#    Manzil Para 1 Completed; Manzil Para 2 Pending; Manzil Para 3 Not Assigned; save.
-# 2. Homework → Suggested: Sabaq Al-Baqarah 1–10 · 4 of 10 lines and Sabqi Para 3 only, each with its source attempt date.    (F08-AC3, F08-AC5, F08-AC6)
-# 3. Each card shows "Suggestion — not confirmed" and is not styled as confirmed.                      (F08-AC7)
-# 4. Seed a portion with assigned Half and completed 6 lines → its suggestion shows no remaining
-#    and a "Review units" flag.                                                                        (F08-AC4)
-# 5. Review: edit a quantity, remove one portion, add Manzil Para 4, change the due date; save draft;
-#    reopen → changes kept; portions labelled Suggested / Edited / Added.                              (F08-AC8)
-# 6. For S2, reject the draft → it leaves Suggested and is not counted as homework.                    (F08-AC9)
+- runFlow: ../../support/maestro/reset.yaml
+- runFlow: ../../support/maestro/ensure-class-day.yaml
+- runScript:
+    file: ../../support/maestro/control.js
+    env:
+      ACTION: quranSeed
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+# 1. teacher-a1 → Daily Entry S1: Sabaq Surah 2 Ayat 1–20 (10 lines), 6 completed, Partial; Sabqi Para 3 Salasah Not
+#    Remembered; Manzil Para 1 Completed; Manzil Para 2 Pending; Manzil Para 3 Not Assigned; save.
+- runFlow:
+    file: ../../support/maestro/daily-start.yaml
+    env: { STUDENT: EXT-A-001 }
+- runFlow:
+    file: ../../support/maestro/daily-sabaq.yaml
+    env: { SURAH: "2", FROM: "1", TO: "20", STATUS: PARTIAL, COMPLETED: "6" }
+- runFlow:
+    file: ../../support/maestro/daily-revision-portion.yaml
+    env: { SECTION: sabqi, N: "1", PARA: "3", UNIT: SALASAH, STATUS: NOT_REMEMBERED, COMPLETED: "" }
+- runFlow:
+    file: ../../support/maestro/daily-revision-portion.yaml
+    env: { SECTION: manzil, N: "1", PARA: "1", UNIT: COMPLETE, STATUS: COMPLETED, COMPLETED: "" }
+- runFlow:
+    file: ../../support/maestro/daily-revision-portion.yaml
+    env: { SECTION: manzil, N: "2", PARA: "2", UNIT: COMPLETE, STATUS: PENDING, COMPLETED: "" }
+- runFlow:
+    file: ../../support/maestro/daily-revision-portion.yaml
+    env: { SECTION: manzil, N: "3", PARA: "3", UNIT: COMPLETE, STATUS: NOT_ASSIGNED, COMPLETED: "" }
+- runFlow: ../../support/maestro/daily-save.yaml
+- extendedWaitUntil:
+    visible: { id: "record.sync.SYNCED" }
+    timeout: 90000
+- runFlow: ../../support/maestro/back-home.yaml
+# 2. Homework → Suggested: the Sabaq "4 of 10 lines" and Sabqi Para 3 only, each with its source date.  (F08-AC3, AC5, AC6)
+- runFlow:
+    file: ../../support/maestro/homework-open.yaml
+    env: { STUDENT: EXT-A-001 }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "homework.draft.1.portion.1", TEXT: ".*Sabaq.*Ayat.*1–20.*4.* of .*10.* lines.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "homework.draft.1.portion.2", TEXT: ".*Sabqi.*Para.*3.*3/4.*Para.*" }
+- assertNotVisible: { id: "homework.draft.1.portion.3" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "homework.draft.1.source", TEXT: ".*${output.today}.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "homework.draft.1.portion.1.why" }
+# 3. The card says "Suggestion — not confirmed" and is not listed as confirmed homework.                    (F08-AC7)
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "homework.draft.1.label", TEXT: ".*Suggestion — not confirmed.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "homework.draft.1.portion.1.origin.SUGGESTED" }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "homework.tab.confirmed" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "homework.empty.confirmed" }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "homework.tab.suggested" }
+# 4. Review: edit the Sabaq quantity, remove the Sabqi portion, add Manzil Para 4, move the due date; save the draft;
+#    reopen → the changes are kept; portions are labelled Edited / Added (they were Suggested above).          (F08-AC8)
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "homework.draft.1.review" }
+- extendedWaitUntil:
+    visible: { id: "hwEdit.draftLabel" }
+    timeout: 30000
+- runFlow:
+    file: ../../support/maestro/type.yaml
+    env: { ID: "hwEdit.sabaq.portion.1.assigned", TEXT: "3" }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "hwEdit.sabqi.portion.1.remove" }
+- assertNotVisible: { id: "hwEdit.sabqi.portion.1.title" }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "hwEdit.manzil.add" }
+- runFlow:
+    file: ../../support/maestro/type.yaml
+    env: { ID: "hwEdit.manzil.portion.1.para", TEXT: "4" }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "hwEdit.manzil.portion.1.unit.COMPLETE" }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "hwEdit.due.next" }
+- copyTextFrom: { id: "hwEdit.due" }
+- evalScript: ${output.due = maestro.copiedText.replace(/[^0-9-]/g, '')}
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "hwEdit.save" }
+- extendedWaitUntil:
+    visible: { id: "homework.screen" }
+    timeout: 30000
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "homework.draft.1.portion.1", TEXT: ".*3.* of .*10.* lines.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "homework.draft.1.portion.1.origin.TEACHER_EDITED" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "homework.draft.1.portion.2", TEXT: ".*Manzil.*Para.*4.*1.*Para.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "homework.draft.1.portion.2.origin.TEACHER_ADDED" }
+- assertNotVisible: { id: "homework.draft.1.portion.3" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "homework.draft.1.due", TEXT: ".*${output.due}.*" }
+# The server accepted the edited draft (no refusal shown once synced).
+- extendedWaitUntil:
+    notVisible: { id: "homework.draft.1.sync.PENDING" }
+    timeout: 90000
+- assertNotVisible: { id: "homework.draft.1.rejected" }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "homework.draft.1.review" }
+- extendedWaitUntil:
+    visible: { id: "hwEdit.draftLabel" }
+    timeout: 30000
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "hwEdit.due", TEXT: "${output.due}" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "hwEdit.sabaq.portion.1.origin.TEACHER_EDITED" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "hwEdit.manzil.portion.1.origin.TEACHER_ADDED" }
+- back
+- runFlow: ../../support/maestro/back-home.yaml
+# 5. S2: Sabqi Para 5, Salasah assigned, Half completed → the suggestion assigns 1/4 Para.                   (F08-AC3)
+- runFlow:
+    file: ../../support/maestro/daily-start.yaml
+    env: { STUDENT: EXT-A-002 }
+- runFlow:
+    file: ../../support/maestro/daily-revision-portion.yaml
+    env: { SECTION: sabqi, N: "1", PARA: "5", UNIT: SALASAH, STATUS: PARTIAL, COMPLETED: HALF }
+- runFlow: ../../support/maestro/daily-save.yaml
+- extendedWaitUntil:
+    visible: { id: "record.sync.SYNCED" }
+    timeout: 90000
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow:
+    file: ../../support/maestro/homework-open.yaml
+    env: { STUDENT: EXT-A-002 }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "homework.draft.1.portion.1", TEXT: ".*Para.*5.*1/4.*Para.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "homework.counts", TEXT: "Suggestions: .*1.* · Confirmed: .*0.* · .*" }
+# 6. Reject S2's draft → it leaves Suggested and is not counted as homework.                                   (F08-AC9)
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "homework.draft.1.reject" }
+- tapOn: { id: "homework.reject.confirm" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "homework.empty.suggested" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "homework.counts", TEXT: "Suggestions: .*0.* · Confirmed: .*0.* · .*" }
+# 7. A legacy attempt whose completed amount is 6 lines against the Para assignment (test control): building the
+#    suggestion again shows no remaining amount and a "Review units" flag.                                     (F08-AC4)
+- runScript:
+    file: ../../support/maestro/control.js
+    env: { ACTION: legacyAttempt, ORG_CODE: ALIF, STUDENT: EXT-A-002, SECTION: SABQI, PARA: "5", STATUS: PARTIAL, UNIT: LINES, AMOUNT: "6" }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "homework.buildFrom.${output.today}" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "homework.draft.1.portion.1.reviewUnits" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "homework.draft.1.portion.1", TEXT: ".*Para.*5.*no amount yet.*" }

@@ -86,7 +86,7 @@ When you implement a criterion:
 
 ## testID contract
 
-Maestro selects elements by `testID`, named `<screen>.<element>`, for example `signin.userId`, `signin.submit`, `home.screen`, `nav.more`, `settings.signOut`, `signout.unsyncedWarning`, `sync.banner.synced`, and `language.option.ur`. Add a testID to every control a flow uses. Never select by visible text, so flows run in every locale.
+Maestro selects elements by `testID`, named `<screen>.<element>`, for example `signin.userId`, `signin.submit`, `home.screen`, `nav.more`, `settings.signOut`, `signout.unsyncedWarning`, `sync.banner.state.SYNCED`, and `language.option.ur`. Add a testID to every control a flow uses. Never select by visible text, so flows run in every locale.
 
 ## Decisions the suite depends on (closed 2026-10-30, SRS §17)
 

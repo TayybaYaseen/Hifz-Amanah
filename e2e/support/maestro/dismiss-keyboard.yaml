@@ -1,0 +1,11 @@
+# Subflow: close the on-screen keyboard without pressing Back.
+# Maestro's `hideKeyboard` presses Android Back. When Gboard is collapsed (an emulator that reports a physical keyboard)
+# Back is not consumed by the keyboard and leaves the screen instead. This taps the empty page margin: AppScreen's
+# ScrollView uses keyboardShouldPersistTaps="handled", so a tap that no control handles dismisses the keyboard, and
+# with no keyboard open it does nothing. The margin (16 dp gutter) holds no controls on any screen.
+# Usage: - runFlow: ../../support/maestro/dismiss-keyboard.yaml
+appId: com.hifzamanah.app
+---
+- tapOn:
+    point: "1%,30%"
+- waitForAnimationToEnd

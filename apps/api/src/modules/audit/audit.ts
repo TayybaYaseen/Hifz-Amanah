@@ -70,7 +70,9 @@ export type AuditAction =
   | 'HOMEWORK_REJECTED'
   | 'HOMEWORK_CONFIRMED'
   | 'HOMEWORK_REVISED'
-  | 'HOMEWORK_SUPERSEDED';
+  | 'HOMEWORK_SUPERSEDED'
+  // F09-AC20: a class summary exported as a file (ARCHITECTURE §15 "import/export jobs"). Target CLASS.
+  | 'CLASS_SUMMARY_EXPORTED';
 
 export interface AuditEvent {
   organizationId: string | null;

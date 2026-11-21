@@ -1,14 +1,126 @@
 # F08 · Homework and carry forward — mobile E2E (docs/specs/11-f08-homework-carry-forward.md; decision review 2026-10-30, SRS §17)
 # Covers: F08-AC19, F08-AC20
+# SYNTHETIC DATA ONLY: seeded personas. The server clock is moved forward with test control; the device keeps its own.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F08 offline confirmation and carried-over homework
 tags:
-  - pending
   - F08
   - US-038
   - US-037
 ---
-- launchApp:
-    clearState: true
-# 1. Given confirmed homework due on a day the student is Absent or on Leave, or that becomes a holiday, when the next class day comes, then the same homework is shown as outstanding and labelled "carried over — absent/holiday". It is not counted as failed, and the confirmed assignment is unchanged. (F08-AC19)
-# 2. Given no internet connection, when the Teacher confirms a draft, then it shows "Confirmed on device — waiting to sync", and after sync it becomes Confirmed with the Teacher and the original confirmation time. (F08-AC20)
+- runFlow: ../../support/maestro/reset.yaml
+- runFlow: ../../support/maestro/ensure-class-day.yaml
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+# 1. Confirmed homework due today (Manzil Para 2); S1 is marked Absent today; the next day the same homework is shown
+#    as outstanding and labelled "carried over — absent". Never "failed"; the assignment is unchanged.         (F08-AC19)
+- runFlow:
+    file: ../../support/maestro/homework-open.yaml
+    env: { STUDENT: EXT-A-001 }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.new" } }
+- extendedWaitUntil:
+    visible: { id: "hwEdit.assigned" }
+    timeout: 30000
+- copyTextFrom: { id: "hwEdit.assigned" }
+- evalScript: ${output.today = maestro.copiedText.replace(/[^0-9-]/g, '')}
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "hwEdit.manzil.add" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "hwEdit.manzil.portion.1.para", TEXT: "2" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "hwEdit.manzil.portion.1.unit.COMPLETE" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "hwEdit.due", TEXT: "${output.today}" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "hwEdit.confirm" } }
+- extendedWaitUntil:
+    visible: { id: "hwEdit.confirmSheet.summary" }
+    timeout: 15000
+- tapOn: { id: "hwEdit.confirmSheet.accept" }
+- extendedWaitUntil:
+    visible: { id: "homework.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.tab.confirmed" } }
+- extendedWaitUntil:
+    visible: { id: "homework.confirmed.1.state" }
+    timeout: 90000
+- runFlow: ../../support/maestro/back-home.yaml
+# S1 is Absent on the due day (attendance only).
+- tapOn: { id: "nav.dailyEntry" }
+- extendedWaitUntil:
+    visible: { id: "daily.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "daily.class.Hifz A1" }
+- extendedWaitUntil:
+    visible: { id: "daily.student.EXT-A-001" }
+    timeout: 30000
+- tapOn: { id: "daily.student.EXT-A-001" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.attendance.ABSENT" } }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.save" } }
+- extendedWaitUntil:
+    visible: { id: "sync.savedOnDevice" }
+    timeout: 30000
+- runFlow: ../../support/maestro/back-home.yaml
+- extendedWaitUntil:
+    visible: { id: "sync.banner.state.SYNCED" }
+    timeout: 90000
+# The next day (server clock + 1 day).
+- runScript:
+    file: ../../support/maestro/control.js
+    env: { ACTION: clock, ADVANCE_MS: "86400000" }
+- runFlow:
+    file: ../../support/maestro/homework-open.yaml
+    env: { STUDENT: EXT-A-001 }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.tab.confirmed" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.confirmed.1.state", TEXT: ".*Carried over — absent.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.confirmed.1.nowDue" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.confirmed.1.due", TEXT: ".*${output.today}.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.confirmed.1.portion.1", TEXT: ".*Manzil.*Para.*2.*1.*Para.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.counts", TEXT: ".*Confirmed: .*1.* · Carried over: .*1.*" } }
+- assertNotVisible: { text: ".*[Ff]ailed.*" }
+- runFlow: ../../support/maestro/back-home.yaml
+# 2. No connection: the Teacher confirms a draft → "Confirmed on device — waiting to sync"; after sync it is Confirmed
+#    with the Teacher and the original confirmation time.                                                       (F08-AC20)
+- runFlow:
+    file: ../../support/maestro/homework-open.yaml
+    env: { STUDENT: EXT-A-001 }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.new" } }
+- extendedWaitUntil:
+    visible: { id: "hwEdit.assigned" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "hwEdit.sabqi.add" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "hwEdit.sabqi.portion.1.para", TEXT: "6" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "hwEdit.sabqi.portion.1.unit.COMPLETE" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "hwEdit.save" } }
+- extendedWaitUntil:
+    visible: { id: "homework.draft.1.label" }
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible: { id: "homework.draft.1.sync.PENDING" }
+    timeout: 90000
+- runFlow: ../../support/maestro/go-offline.yaml
+# The list re-reads offline and adds its offline notice (shifting the cards); tap Review only once it shows.
+- extendedWaitUntil:
+    visible: { id: "homework.offline" }
+    timeout: 30000
+- waitForAnimationToEnd
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.draft.1.review" } }
+- extendedWaitUntil:
+    visible: { id: "hwEdit.draftLabel" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "hwEdit.confirm" } }
+- extendedWaitUntil:
+    visible: { id: "hwEdit.confirmSheet.summary" }
+    timeout: 15000
+- tapOn: { id: "hwEdit.confirmSheet.accept" }
+- extendedWaitUntil:
+    visible: { id: "homework.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.tab.confirmed" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.confirmed.1.onDevice", TEXT: ".*Confirmed on device — waiting to sync.*" } }
+- copyTextFrom: { id: "homework.confirmed.1.by" }
+- evalScript: ${output.by = maestro.copiedText}
+- runFlow: ../../support/maestro/go-online.yaml
+- extendedWaitUntil:
+    notVisible: { id: "homework.confirmed.1.onDevice" }
+    timeout: 90000
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.confirmed.1.state" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.confirmed.1.portion.1", TEXT: ".*Sabqi.*Para.*6.*" } }
+- assertVisible: { id: "homework.confirmed.1.by", text: "${output.by}" }

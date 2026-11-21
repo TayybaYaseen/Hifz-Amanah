@@ -6,7 +6,7 @@
 | **User story** | US-073 |
 | **Feature** | [F09 · Weekly and monthly reports](12-f09-weekly-monthly-reports.md) |
 | **Epic** | EPIC 9 — Weekly and Monthly Reports ([user-stories.md](../user-stories.md)) |
-| **Status** | draft |
+| **Status** | Approved |
 | **Priority** | Not specified in the source documents (SRS, user-stories.md, feature specs). None is assigned here. |
 | **Origin** | Added by the decision review of 2026-10-30 (SRS §17) |
 

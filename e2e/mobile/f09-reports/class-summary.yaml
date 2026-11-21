@@ -1,12 +1,41 @@
 # F09 · Weekly and monthly reports — mobile E2E (docs/specs/12-f09-weekly-monthly-reports.md; decision review 2026-10-30, SRS §17)
 # Covers: F09-AC18
+# SYNTHETIC DATA ONLY: the SUMMARY scenario of apps/api/src/testing/report-seed.ts (last week: S1 Present with Sabaq
+# 10/10 lines rated 1; S2 Late one day and Absent the next).
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F09 class summary report
 tags:
-  - pending
   - F09
   - US-073
 ---
-- launchApp:
-    clearState: true
+- runFlow: ../../support/maestro/reset.yaml
+- runScript: { file: ../../support/maestro/control.js, env: { ACTION: quranSeed } }
+- runScript: { file: ../../support/maestro/control.js, env: { ACTION: reportSeed, SCENARIO: SUMMARY } }
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
 # 1. Given a class and a week or month, when the class summary opens, then it has one row per student enrolled during the period with attendance counts (Present, Late, Half day, Leave, Absent), portions completed per section by unit, average quality with the number of ratings, and outstanding confirmed homework, all derived from source records. (F09-AC18)
+- runFlow:
+    file: ../../support/maestro/reports-open.yaml
+    env: { STUDENT: "", KIND: week, PREV: "1" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.summary.row.1.name", TEXT: ".*Test Student One.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.summary.row.1.attendance", TEXT: ".*Present .*1.*Late .*0.*Half day .*0.*Leave .*0.*Absent .*0.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.summary.row.1.SABAQ", TEXT: ".*10.*lines.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.summary.row.1.quality", TEXT: ".*1[.]0.*Excellent.*[(]1 rating[)].*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.summary.row.1.homework", TEXT: ".*: .*0.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.summary.row.2.attendance", TEXT: ".*Present .*0.*Late .*1.*Absent .*1.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.summary.row.2.quality", TEXT: ".*Not recorded.*" }

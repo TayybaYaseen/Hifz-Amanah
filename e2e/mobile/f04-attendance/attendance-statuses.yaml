@@ -1,17 +1,172 @@
 # F04 · Calendar and attendance — mobile E2E (docs/specs/08-f04-calendar-attendance.md; decision review 2026-10-30, SRS §17)
 # Covers: F04-AC18, F04-AC19, F04-AC20, F04-AC21
+# SYNTHETIC DATA ONLY: seeded personas (class Hifz A1: Test Student One = S1, Test Student Two = S2); made-up reasons.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F04 Late, Half day, Leave in Bulk Entry; Absent after reciting; late holiday
 tags:
-  - pending
   - F04
   - US-015
   - US-014
   - US-016
 ---
-- launchApp:
-    clearState: true
-# 1. Given a student already saved as Absent, when the Teacher changes them to Late, or changes a Present student to Half day, then the record changes, the change is audited, and Hifz portions can be recorded for that student that day. (F04-AC18)
-# 2. Given a student who already has recited portions saved for the date, when the Teacher marks them Absent in Bulk Entry, then the row suggests "Mark Late instead". If the Teacher keeps Absent, the row cannot save until an internal note with the reason is entered, and the recited portions are unchanged. (F04-AC19)
-# 3. Given attendance or daily records already saved for a date, when the Admin declares a holiday on it, then the Admin is warned with the number of records and must confirm. After confirming, the date is not a working day, those records are excluded from reports and homework suggestions but kept in history, and new entries for that date are refused. (F04-AC20)
-# 4. Given Bulk Entry, when the Teacher chooses Leave for a student, then a reason is required on that row, and after saving the row shows "Leave — awaiting approval". (F04-AC21)
+- runFlow: ../../support/maestro/reset.yaml
+- runFlow: ../../support/maestro/ensure-class-day.yaml
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- tapOn: { id: "nav.attendance" }
+- extendedWaitUntil:
+    visible: { id: "bulk.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "bulk.class.Hifz A1" }
+- extendedWaitUntil:
+    visible: { id: "bulk.row.Test Student One.unmarked" }
+    timeout: 30000
+- copyTextFrom: { id: "bulk.date" }
+- evalScript: ${output.day = maestro.copiedText.replace(/[^0-9-]/g, '')}
+# 1. Given S1 saved as Absent and S2 saved as Present, when the Teacher changes S1 to Late and S2 to Half day, then the
+#    records change and Hifz portions can be recorded for S1 that day.                                     (F04-AC18)
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.row.Test Student One.ABSENT" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.row.Test Student Two.PRESENT" } }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.save" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.summary", TEXT: "Saved on this device: 2\\. Needs correction: 0\\. Not marked: 0\\." } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student One.saved", TEXT: "○ Absent.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student Two.saved", TEXT: "● Present.*" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.row.Test Student One.LATE" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.row.Test Student Two.HALF_DAY" } }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.save" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.summary", TEXT: "Saved on this device: 2\\. Needs correction: 0\\. Not marked: 0\\." } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student One.saved", TEXT: "● Late.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student Two.saved", TEXT: "● Half day.*" } }
+# The audit entry for each change is covered by e2e/api/f04-attendance.spec.ts
+# 'F04-AC18 (US-015) Absent can become Late and Present can become Half day, audited'.
+# S1 (now Late) gets a Sabqi portion in Daily Entry.
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.row.Test Student One.recordHifz" } }
+- extendedWaitUntil:
+    visible: { id: "daily.attendance.current" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "daily.attendance.current", TEXT: "● Late.*" } }
+- assertNotVisible: { id: "daily.attendance.blocked" }
+- runFlow:
+    file: ../../support/maestro/daily-revision-portion.yaml
+    env: { SECTION: sabqi, N: "1", PARA: "3", UNIT: HALF, STATUS: COMPLETED, COMPLETED: "" }
+- runFlow: ../../support/maestro/daily-save.yaml
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "record.sabqi.portion.1.status.COMPLETED" } }
+- runFlow: ../../support/maestro/back-home.yaml
+# S2 (Half day) can record portions too.
+- tapOn: { id: "nav.dailyEntry" }
+- extendedWaitUntil:
+    visible: { id: "daily.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "daily.class.Hifz A1" }
+- extendedWaitUntil:
+    visible: { id: "daily.student.EXT-A-002" }
+    timeout: 30000
+- tapOn: { id: "daily.student.EXT-A-002" }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "daily.attendance.current", TEXT: "● Half day.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "daily.sabqi.add" } }
+- assertNotVisible: { id: "daily.attendance.blocked" }
+- runFlow: ../../support/maestro/back-home.yaml
+- extendedWaitUntil:
+    visible: { id: "sync.banner.state.SYNCED" }
+    timeout: 90000
+# 2. S1 already has recited portions saved for today. Marking S1 Absent in Bulk Entry suggests "Mark Late instead";
+#    keeping Absent, the row cannot save until an internal note is entered; the recited portions are unchanged. (F04-AC19)
+- tapOn: { id: "nav.attendance" }
+- extendedWaitUntil:
+    visible: { id: "bulk.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "bulk.class.Hifz A1" }
+- extendedWaitUntil:
+    visible: { id: "bulk.row.Test Student One.saved" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.row.Test Student One.ABSENT" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student One.markLate" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student One.absentNote" } }
+- assertVisible: { text: "This student already recited today. Mark Late instead?" }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.save" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.summary", TEXT: "Saved on this device: 0\\. Needs correction: 1\\. Not marked: 0\\." } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student One.error" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student One.saved", TEXT: "● Late.*" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "bulk.row.Test Student One.absentNote", TEXT: "Left after Sabqi" } }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.save" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.summary", TEXT: "Saved on this device: 1\\. Needs correction: 0\\. Not marked: 0\\." } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student One.saved", TEXT: "○ Absent.*" } }
+- assertNotVisible: { id: "bulk.row.Test Student One.error" }
+# 4. Bulk Entry: Leave for S2 needs a reason on that row; after saving, the row shows "Leave — awaiting approval". (F04-AC21)
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.row.Test Student Two.LEAVE" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student Two.reason" } }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.save" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.summary", TEXT: "Saved on this device: 0\\. Needs correction: 1\\. Not marked: 0\\." } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student Two.error", TEXT: ".*Enter the reason for Leave.*" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "bulk.row.Test Student Two.reason", TEXT: "Family visit" } }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.save" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.summary", TEXT: "Saved on this device: 1\\. Needs correction: 0\\. Not marked: 0\\." } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student Two.saved", TEXT: "◐ Leave — awaiting approval.*" } }
+- runFlow: ../../support/maestro/back-home.yaml
+- extendedWaitUntil:
+    visible: { id: "sync.banner.state.SYNCED" }
+    timeout: 90000
+# The recited portion is unchanged after S1 was kept Absent (its record still holds the completed Sabqi portion).
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.students" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "students.item.EXT-A-001" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "studentProfile.record.${output.day}" } }
+- extendedWaitUntil:
+    visible: { id: "record.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "record.sabqi.portion.1.status.COMPLETED" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "record.sabqi.portion.1.attemptCount" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "record.portionCount", TEXT: ".*1.*" } }
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow: ../../support/maestro/sign-out.yaml
+# 3. Today already has attendance (S1, S2) and a daily record (S1). The Admin declares a holiday on it → warned with the
+#    number of records (3) and must confirm. After confirming, the date is not a working day, the records are kept in
+#    history, and new entries for that date are refused.                                                   (F04-AC20)
+- runFlow:
+    file: ../../support/maestro/sign-in-staff.yaml
+    env: { USER_ID: admin-a }
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.holidays" } }
+- extendedWaitUntil:
+    visible: { id: "holidays.add" }
+    timeout: 30000
+- tapOn: { id: "holidays.add" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "holidays.kind.HOLIDAY" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "holidays.date", TEXT: "${output.day}" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "holidays.label", TEXT: "Late holiday" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "holidays.save" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "holidays.recordsWarning", TEXT: "Records already saved on this date: 3\\..*" } }
+- assertNotVisible: { id: "holidays.item.${output.day}.HOLIDAY" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "holidays.confirm" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "holidays.notice" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "holidays.item.${output.day}.HOLIDAY" } }
+- runFlow: ../../support/maestro/back-home.yaml
+# Report exclusion: covered by e2e/api/f04-attendance.spec.ts 'F04-AC20 (US-014) a holiday declared on a recorded date
+# excludes its records and refuses new ones'; the report screen arrives with F09 (US-039).
+# New entries are refused: Bulk Entry for the date shows the holiday and offers no rows and no Save.
+- tapOn: { id: "nav.attendance" }
+- extendedWaitUntil:
+    visible: { id: "bulk.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "bulk.class.Hifz A1" }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.day.HOLIDAY", TEXT: "Holiday: Late holiday\\. No absence is recorded\\." } }
+- assertNotVisible: { id: "bulk.save" }
+- assertNotVisible: { id: "bulk.markAllPresent" }
+- assertNotVisible: { id: "bulk.row.Test Student One.PRESENT" }
+- runFlow: ../../support/maestro/back-home.yaml
+# Kept in history: S1's record for the date is still listed and opens with its portion.
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.students" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "students.item.EXT-A-001" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "studentProfile.record.${output.day}" } }
+- extendedWaitUntil:
+    visible: { id: "record.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "record.sabqi.portion.1.status.COMPLETED" } }
