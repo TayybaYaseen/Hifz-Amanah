@@ -1,18 +1,178 @@
 # F04 · Calendar and attendance — mobile E2E (docs/specs/08-f04-calendar-attendance.md; design.md §4.7, §4.14)
 # Covers: F04-AC13, F04-AC14, F04-AC15, F04-AC16, F04-AC17
+# SYNTHETIC DATA ONLY: seeded personas; the Leave reasons are made-up test text.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F04 Leave — Teacher marks Leave with a reason, Admin approves and rejects
 tags:
-  - pending
   - F04
   - US-016
   - US-017
 ---
-- launchApp:
-    clearState: true
-# 1. Sign in as teacher.a1 → Daily Entry S2 → choose Leave, enter a reason → "Leave — awaiting approval".   (F04-AC13)
+- runFlow: ../../support/maestro/reset.yaml
+- runFlow: ../../support/maestro/ensure-class-day.yaml
+# 1. Sign in as teacher-a1 → Daily Entry S2 → choose Leave, enter a reason → "Leave — awaiting approval".   (F04-AC13)
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- tapOn: { id: "nav.dailyEntry" }
+- extendedWaitUntil:
+    visible: { id: "daily.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "daily.class.Hifz A1" }
+- extendedWaitUntil:
+    visible: { id: "daily.student.EXT-A-002" }
+    timeout: 30000
+- tapOn: { id: "daily.student.EXT-A-002" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.attendance.LEAVE" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "daily.attendance.reason", TEXT: "Family visit" } }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.save" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "sync.savedOnDevice" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "daily.attendance.current", TEXT: ".*Leave — awaiting approval.*" } }
+- runFlow: ../../support/maestro/back-home.yaml
 # 2. Choose Leave for S1 with an empty reason → the reason field shows an error; nothing saved.             (F04-AC14)
-# 3. No approve/reject control is visible to teacher.a1.                                                     (F04-AC17)
-# 4. Mark Leave for S1 on another date with a reason.
-# 5. Sign in as admin.a → Leave approvals: two items → approve S2 (confirm), reject S1 (confirm).           (F04-AC15, F04-AC16)
-# 6. Weekly report: 1 Leave and 1 normal absence; teacher.a1 sees "Leave rejected" on S1.                    (F04-AC15, F04-AC16)
+- tapOn: { id: "nav.dailyEntry" }
+- extendedWaitUntil:
+    visible: { id: "daily.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "daily.class.Hifz A1" }
+- extendedWaitUntil:
+    visible: { id: "daily.student.EXT-A-001" }
+    timeout: 30000
+- tapOn: { id: "daily.student.EXT-A-001" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.attendance.LEAVE" } }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.save" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "daily.attendance.reason.error", TEXT: ".*reason for Leave.*" } }
+- assertNotVisible: { id: "sync.savedOnDevice" }
+- assertNotVisible: { id: "daily.attendance.current", text: ".*awaiting approval.*" }
+- runFlow: ../../support/maestro/back-home.yaml
+# Nothing was queued for S1: only S2's Leave is waiting or synced, and once synced nothing remains.
+- extendedWaitUntil:
+    visible: { id: "sync.banner.state.SYNCED" }
+    timeout: 90000
+- tapOn: { id: "sync.banner" }
+- extendedWaitUntil:
+    visible: { id: "syncQueue.screen" }
+    timeout: 30000
+- assertVisible: { id: "syncQueue.summary", text: "Waiting: 0 · Failed: 0 · Action required: 0" }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "syncQueue.section.SYNCED" } }
+- assertVisible: { text: "Synced in the last 24 hours: 1" }
+- runFlow: ../../support/maestro/back-home.yaml
+# 3. No approve/reject control is visible to teacher-a1 (the API refusal is covered by e2e/api/f04-attendance.spec.ts
+#    'F04-AC17 (US-017) a Teacher cannot approve or reject a Leave').                                         (F04-AC17)
+- tapOn: { id: "nav.more" }
+- extendedWaitUntil:
+    visible: { id: "more.holidays" }
+    timeout: 30000
+- assertNotVisible: { id: "more.leave" }
+- runFlow: ../../support/maestro/back-home.yaml
+# 4. Mark Leave for S1 on another date (the latest earlier class day) with a reason.
+- tapOn: { id: "nav.dailyEntry" }
+- extendedWaitUntil:
+    visible: { id: "daily.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "daily.prevDay" }
+- tapOn: { id: "daily.class.Hifz A1" }
+- extendedWaitUntil:
+    visible: { id: "daily.student.EXT-A-001" }
+    timeout: 30000
+# Yesterday may be a Sunday (no class for the Mon–Sat fixture): then go one more day back.
+- runFlow:
+    when: { visible: { id: "daily.day.UNSCHEDULED" } }
+    commands:
+      - tapOn: { id: "daily.prevDay" }
+      - waitForAnimationToEnd
+      - assertNotVisible: { id: "daily.day.UNSCHEDULED" }
+- copyTextFrom: { id: "daily.date" }
+- evalScript: ${output.leaveDate = maestro.copiedText.replace(/[^0-9-]/g, '')}
+- tapOn: { id: "daily.student.EXT-A-001" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.attendance.LEAVE" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "daily.attendance.reason", TEXT: "Doctor visit" } }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.save" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "sync.savedOnDevice" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "daily.attendance.current", TEXT: ".*Leave — awaiting approval.*" } }
+- runFlow: ../../support/maestro/back-home.yaml
+- extendedWaitUntil:
+    visible: { id: "sync.banner.state.SYNCED" }
+    timeout: 90000
+- runFlow: ../../support/maestro/sign-out.yaml
+# 5. Sign in as admin-a → Leave approvals: two items → approve S2 (confirm), reject S1 (confirm).           (F04-AC15, F04-AC16)
+- runFlow:
+    file: ../../support/maestro/sign-in-staff.yaml
+    env: { USER_ID: admin-a }
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.leave" } }
+- extendedWaitUntil:
+    visible: { id: "leave.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "leave.item.Test Student Two.reason", TEXT: ".*Family visit.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "leave.item.Test Student One.reason", TEXT: ".*Doctor visit.*" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "leave.item.Test Student Two.approve" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "leave.item.Test Student Two.confirm" } }
+- extendedWaitUntil:
+    visible: { id: "leave.done", text: ".*Leave approved for Test Student Two.*" }
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible: { id: "leave.item.Test Student Two.approve" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "leave.item.Test Student One.reject" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "leave.item.Test Student One.confirm" } }
+- extendedWaitUntil:
+    visible: { id: "leave.done", text: ".*Leave rejected for Test Student One.*" }
+    timeout: 30000
+- extendedWaitUntil:
+    visible: { id: "leave.empty" }
+    timeout: 30000
+# The decisions are listed with the Admin who made them (the audit entry with the time is covered by
+# e2e/api/f04-attendance.spec.ts 'F04-AC15 (US-017) Admin approval counts as Leave and is audited').
+- tapOn: { id: "leave.filter.APPROVED" }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "leave.item.Test Student Two.reason" } }
+- assertVisible: { text: "Decided by .*" }
+- assertNotVisible: { id: "leave.item.Test Student One.reason" }
+- tapOn: { id: "leave.filter.REJECTED" }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "leave.item.Test Student One.reason" } }
+- assertVisible: { text: "Decided by .*" }
+- assertNotVisible: { id: "leave.item.Test Student Two.reason" }
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow: ../../support/maestro/sign-out.yaml
+# 6. Weekly report: 1 Leave and 1 normal absence.                                                             (F04-AC15, F04-AC16)
+# Report output: covered by e2e/api/f04-attendance.spec.ts 'F04-AC15 (US-017) Admin approval counts as Leave and is
+# audited' and 'F04-AC16 (US-017) Admin rejection of a Leave counts as a normal absence'; the report screen arrives
+# with F09 (US-039).
+# teacher-a1 sees "Leave rejected" on S1's record for that date, and "Leave — approved" on S2's.               (F04-AC16)
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- extendedWaitUntil:
+    visible: { id: "sync.banner.state.SYNCED" }
+    timeout: 90000
+- tapOn: { id: "nav.dailyEntry" }
+- extendedWaitUntil:
+    visible: { id: "daily.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "daily.class.Hifz A1" }
+- extendedWaitUntil:
+    visible: { id: "daily.student.EXT-A-002" }
+    timeout: 30000
+- tapOn: { id: "daily.student.EXT-A-002" }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "daily.attendance.current", TEXT: ".*Leave — approved.*" } }
+- runFlow: ../../support/maestro/back-home.yaml
+- tapOn: { id: "nav.dailyEntry" }
+- extendedWaitUntil:
+    visible: { id: "daily.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "daily.prevDay" }
+- tapOn: { id: "daily.class.Hifz A1" }
+- extendedWaitUntil:
+    visible: { id: "daily.student.EXT-A-001" }
+    timeout: 30000
+- runFlow:
+    when: { visible: { id: "daily.day.UNSCHEDULED" } }
+    commands:
+      - tapOn: { id: "daily.prevDay" }
+      - waitForAnimationToEnd
+- assertVisible: { id: "daily.date", text: ".*${output.leaveDate}.*" }
+- tapOn: { id: "daily.student.EXT-A-001" }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "daily.attendance.current", TEXT: ".*Leave rejected.*" } }

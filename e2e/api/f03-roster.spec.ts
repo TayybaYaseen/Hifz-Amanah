@@ -1,9 +1,53 @@
 // F03 · Classes and students — API E2E (docs/specs/06-f03-classes-students.md)
 // Screen journeys: e2e/mobile/f03-roster/.
-// Criteria parts that need daily records, attempts, homework (F05/F08), or reports (F09) stay test.fixme until those
-// features exist; their roster parts are covered by apps/api/test/roster/roster.test.ts (docs/handover/F03-plan.md).
+// Daily records, attempts, and homework (F05/F08) are written through POST /sync/push (support/daily-entry.ts). Criteria
+// parts that need reports (F09) stay test.fixme until F09 exists; the roster parts are also covered by
+// apps/api/test/roster/roster.test.ts (docs/handover/F03-plan.md).
 import type { APIRequestContext } from '@playwright/test';
+import {
+  applied,
+  classDay,
+  classDayBefore,
+  confirmOp,
+  draftOp,
+  getJson,
+  homeworkDetail,
+  para,
+  presentRecord,
+  recite,
+  recordDetail,
+  sourcesOf,
+  suggestedPortion,
+  today,
+  type Ids,
+  type StudentKey,
+  type ClassKey,
+} from './support/daily-entry';
 import { expect, test } from './support/fixtures';
+
+/** A record with a partial Sabqi attempt and confirmed homework carrying it forward, plus a later draft. */
+async function history(api: APIRequestContext, ids: Ids, student: StudentKey, day: string, classKey: ClassKey = 'A1') {
+  const recordId = await presentRecord(api, ids, student, day, classKey);
+  const sabqi = await recite(api, recordId, { section: 'SABQI', paraNumber: 3, assigned: para(3, 4) }, { status: 'PARTIAL', completed: para(1, 2) });
+  const manzil = await recite(api, recordId, { section: 'MANZIL', position: 1, paraNumber: 9, assigned: para(1) }, { status: 'NOT_REMEMBERED' });
+  const confirmed = await applied(api, draftOp(ids, student, { assignedDate: day, sourceDailyRecordId: recordId, portions: [suggestedPortion(sabqi.attemptId)] }));
+  await applied(api, confirmOp(confirmed.id, confirmed.rowVersion, await sourcesOf(api, recordId)));
+  const draft = await applied(api, draftOp(ids, student, { assignedDate: day, sourceDailyRecordId: recordId, portions: [suggestedPortion(manzil.attemptId, { section: 'MANZIL' })] }));
+  return { recordId, sabqi, manzil, confirmedId: confirmed.id, draftId: draft.id };
+}
+
+/** Everything the student's history holds, as staff read it: records (with portions and attempts) and homework. */
+async function snapshot(api: APIRequestContext, ids: Ids, student: StudentKey, from: string, to: string) {
+  const records = (await getJson(api, `/hifz/daily-records?studentId=${ids.students[student]}&from=${from}&to=${to}`)).items as Array<{ id: string }>;
+  const homework = await getJson(api, `/homework/assignments?studentId=${ids.students[student]}`);
+  const strip = (h: Record<string, unknown>) => ({ ...h, state: undefined, carriedOver: undefined });
+  return {
+    records: await Promise.all(records.map((r) => recordDetail(api, r.id))),
+    homework: await Promise.all((homework.items as Array<{ id: string }>).map(async (h) => strip(await homeworkDetail(api, h.id)))),
+  };
+}
+
+const pickerStudents = async (api: APIRequestContext, classId: string) => ((await getJson(api, `/entry/classes/${classId}/students?date=${today()}`)).items as Array<{ id: string }>).map((s) => s.id);
 
 type Student = { id: string; name: string; externalStudentId: string | null; status: string; currentClass: { id: string } | null };
 type Page = { items: Student[]; nextCursor: string | null };
@@ -74,10 +118,31 @@ test.describe('F03 · Classes and students', { tag: '@F03' }, () => {
     expect(await classNames(await as('admin.a'))).toEqual(['Hifz A1', 'Hifz A2']);
   });
 
-  test.fixme('F03-AC4 (US-010) a deactivated class leaves pickers but keeps its history', async () => {
-    // Waits for daily records (F05) and reports (F09). The picker part passes in apps/api/test/roster (F03-AC4).
-    // Seed records in A2; admin.a deactivates A2.
-    // Entry pickers exclude A2; past A2 reports still return the records.
+  test('F03-AC4 (US-010) a deactivated class leaves pickers but keeps its records', async ({ as, control }) => {
+    // Seed attendance, a record, attempts, and homework in A2; admin.a deactivates A2.
+    // Entry pickers exclude A2; the past A2 records and homework are still returned unchanged.
+    const ids = await control.rosterIds();
+    const day = classDay(1);
+    const seeded = await history(await as('teacher.a2'), ids, 'S3', day, 'A2');
+    const admin = await as('admin.a');
+    const entryClasses = async () => ((await getJson(admin, '/entry/classes')).items as Array<{ id: string }>).map((c) => c.id);
+    expect(await entryClasses()).toContain(ids.classes.A2);
+    const before = await snapshot(admin, ids, 'S3', day, day);
+    expect(before.records.map((r) => r.record.id)).toEqual([seeded.recordId]);
+
+    expect((await admin.post(`/classes/${ids.classes.A2}/deactivate`)).status()).toBe(200);
+    expect(await entryClasses()).not.toContain(ids.classes.A2);
+    expect(await entryClasses()).toContain(ids.classes.A1);
+    expect(await snapshot(admin, ids, 'S3', day, day)).toEqual(before);
+    expect((await getJson(admin, `/hifz/daily-records?classId=${ids.classes.A2}&date=${day}`)).items.map((r: { id: string }) => r.id)).toEqual([seeded.recordId]);
+    // Bulk Entry no longer offers the class; its past attendance is still counted.
+    expect((await admin.get(`/attendance/sheet?classId=${ids.classes.A2}&date=${day}`)).status()).toBe(404);
+    const summary = await getJson(admin, `/attendance/summary?classId=${ids.classes.A2}&from=${day}&to=${day}`);
+    expect((summary.students as Array<{ studentId: string; counts: Record<string, number> }>).find((s) => s.studentId === ids.students.S3)!.counts).toMatchObject({ present: 1, attended: 1 });
+  });
+
+  test.fixme('F03-AC4 (US-010) past reports of a deactivated class still return its records', async () => {
+    // Waits for F09 (weekly/monthly reports). Seed records in A2; admin.a deactivates A2; a past A2 report still returns them.
   });
 
   test('F03-AC6 (US-011) a new student is saved in the active madrasa and audited', async ({ as, control }) => {
@@ -137,16 +202,59 @@ test.describe('F03 · Classes and students', { tag: '@F03' }, () => {
     expect((await allPages(admin, `classId=${classes.A1}&q=Test`)).map((s) => s.id)).toEqual([students.S1]);
   });
 
-  test.fixme('F03-AC9 (US-011) deactivating a student deletes nothing', async () => {
-    // Waits for daily records, attempts (F05), homework (F08), and reports (F09). The roster part (status, enrollment
-    // history, entry picker) passes in apps/api/test/roster (F03-AC9).
-    // Deactivate S2 (with records, attempts, homework); all are still returned for earlier periods.
+  test('F03-AC9 (US-011) deactivating a student deletes nothing', async ({ as, control }) => {
+    // Deactivate S2 (with records, attempts, homework); S2 leaves the entry pickers and all of it is still returned for
+    // earlier periods.
+    const ids = await control.rosterIds();
+    const teacher = await as('teacher.a1');
+    const d2 = classDay(1);
+    const d1 = classDayBefore(d2);
+    const first = await history(teacher, ids, 'S2', d1);
+    await presentRecord(teacher, ids, 'S2', d2);
+    const admin = await as('admin.a');
+    const before = await snapshot(admin, ids, 'S2', d1, d2);
+    expect(before.records).toHaveLength(2);
+    expect(before.records.flatMap((r) => r.portions.flatMap((p: { attempts: unknown[] }) => p.attempts))).toHaveLength(2);
+    expect(before.homework.map((h) => [h.id, h.status])).toEqual(expect.arrayContaining([[first.confirmedId, 'CONFIRMED'], [first.draftId, 'DRAFT']]));
+    expect(await pickerStudents(admin, ids.classes.A1)).toContain(ids.students.S2);
+
+    const res = await admin.post(`/students/${ids.students.S2}/deactivate`);
+    expect(res.status(), await res.text()).toBe(200);
+    expect((await res.json()).status).toBe('INACTIVE');
+    expect(await pickerStudents(admin, ids.classes.A1)).not.toContain(ids.students.S2);
+    expect(await pickerStudents(teacher, ids.classes.A1)).toEqual([ids.students.S1]);
+    // Records, attempts, and homework are all still returned, unchanged.
+    expect(await snapshot(admin, ids, 'S2', d1, d2)).toEqual(before);
+    expect(await snapshot(teacher, ids, 'S2', d1, d2)).toEqual(before);
   });
 
-  test.fixme('F03-AC10 (US-011) reactivating a student restores them to pickers with history intact', async () => {
-    // Waits for daily records (F05): "history counts" are record counts. The picker and enrollment-history parts pass
-    // in apps/api/test/roster (F03-AC10).
-    // Reactivate S2; pickers include S2; history counts match those before deactivation.
+  test.fixme('F03-AC9 (US-011) a deactivated student stays in reports for earlier periods', async () => {
+    // Waits for F09 (weekly/monthly reports). Deactivate S2; a report for an earlier period still includes S2's records.
+  });
+
+  test('F03-AC10 (US-011) reactivating a student restores them to pickers with history intact', async ({ as, control }) => {
+    // Reactivate S2; pickers include S2; records, attempts, and homework match those before deactivation.
+    const ids = await control.rosterIds();
+    const teacher = await as('teacher.a1');
+    const d2 = classDay(1);
+    const d1 = classDayBefore(d2);
+    await history(teacher, ids, 'S2', d1);
+    await presentRecord(teacher, ids, 'S2', d2);
+    const admin = await as('admin.a');
+    const before = await snapshot(admin, ids, 'S2', d1, d2);
+    const counts = (await getJson(admin, `/homework/assignments?studentId=${ids.students.S2}`)).counts;
+    expect((await admin.post(`/students/${ids.students.S2}/deactivate`)).status()).toBe(200);
+    expect(await pickerStudents(admin, ids.classes.A1)).not.toContain(ids.students.S2);
+
+    const res = await admin.post(`/students/${ids.students.S2}/reactivate`);
+    expect(res.status(), await res.text()).toBe(200);
+    expect((await res.json()).status).toBe('ACTIVE');
+    expect(await pickerStudents(admin, ids.classes.A1)).toContain(ids.students.S2);
+    expect(await pickerStudents(teacher, ids.classes.A1)).toEqual(expect.arrayContaining([ids.students.S1, ids.students.S2]));
+    const after = await snapshot(admin, ids, 'S2', d1, d2);
+    expect(after).toEqual(before);
+    expect(after.records).toHaveLength(2);
+    expect((await getJson(admin, `/homework/assignments?studentId=${ids.students.S2}`)).counts).toEqual(counts);
   });
 
   test('F03-AC11 (US-012) moving a student ends the old enrollment the day before', async ({ as, control }) => {
@@ -163,10 +271,33 @@ test.describe('F03 · Classes and students', { tag: '@F03' }, () => {
     expect(enrollments[1]!.startDate).toBe(d);
   });
 
-  test.fixme('F03-AC12 (US-012) records before a move still show the old class', async () => {
-    // Waits for reports (F09). The class-on-date rule is unit-tested and the entry picker for an earlier date passes
-    // in apps/api/test/roster (F03-AC12).
-    // A report for a period before D shows S2 in A1.
+  test('F03-AC12 (US-012) records before a move still show the old class', async ({ as, control }) => {
+    // S2 has a record, attempts, and homework in A1 on an earlier day; admin.a moves S2 to A2 from today.
+    // The record, its homework, and the entry picker for the earlier date still show A1; the new class starts today.
+    const ids = await control.rosterIds();
+    const day = classDay(1);
+    const seeded = await history(await as('teacher.a1'), ids, 'S2', day);
+    const admin = await as('admin.a');
+    const before = await snapshot(admin, ids, 'S2', day, day);
+    const moved = await admin.post(`/students/${ids.students.S2}/enrollments`, { data: { classId: ids.classes.A2, startDate: today() } });
+    expect(moved.status(), await moved.text()).toBe(200);
+    expect((await moved.json()).currentClass.id).toBe(ids.classes.A2);
+
+    const after = await snapshot(admin, ids, 'S2', day, day);
+    expect(after).toEqual(before);
+    expect(after.records.map((r) => r.record.classId)).toEqual([ids.classes.A1]);
+    expect(after.homework.map((h) => h.classId)).toEqual([ids.classes.A1, ids.classes.A1]);
+    expect((await getJson(admin, `/hifz/daily-records?classId=${ids.classes.A1}&date=${day}`)).items.map((r: { id: string }) => r.id)).toEqual([seeded.recordId]);
+    expect((await getJson(admin, `/hifz/daily-records?classId=${ids.classes.A2}&date=${day}`)).items).toEqual([]);
+    // On the earlier date S2 is still in A1's picker, not A2's; from today it is in A2's.
+    const picker = async (classId: string, date: string) => ((await getJson(admin, `/entry/classes/${classId}/students?date=${date}`)).items as Array<{ id: string }>).map((s) => s.id);
+    expect(await picker(ids.classes.A1, day)).toContain(ids.students.S2);
+    expect(await picker(ids.classes.A2, day)).not.toContain(ids.students.S2);
+    expect(await picker(ids.classes.A2, today())).toContain(ids.students.S2);
+  });
+
+  test.fixme('F03-AC12 (US-012) a report for a period before the move shows the old class', async () => {
+    // Waits for F09 (weekly/monthly reports). A report for a period before D shows S2 in A1.
   });
 
   // Added by the decision review of 2026-10-30 (SRS §17).

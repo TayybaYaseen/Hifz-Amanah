@@ -579,4 +579,44 @@ describe('F05 · authorization, tenancy, sync safety (AC-SEC-01…05, FR-SYNC-00
     // The stored portion is never rewritten (FR-SAB-007).
     expect((await detail(h, teacher, recordId)).portions[0]).toMatchObject({ range: SABAQ_2_1_10, totalLines: 10 });
   });
+
+  it('F06-AC19 (US-024) a Para-boundary correction lists Sabaq portions whose stored Para no longer matches; nothing changes', async () => {
+    // Synthetic fixture: Para 1 covers Surahs 1–3; a Sabaq on Surah 3 derives Para 1. Para 2 is moved to start at Surah 3.
+    await seedQuran(h);
+    const teacher = await h.signIn('teacher.a1');
+    const recordId = await presentRecord(h, teacher, ids, 'S1', classDay(h, 1));
+    const range = { surahStart: 3, ayahStart: 1, surahEnd: 3, ayahEnd: 6 };
+    const p = await applied(h, teacher, portionOp(recordId, { section: 'SABAQ', range, totalLines: 3, assigned: lines(3) }));
+    const before = await detail(h, teacher, recordId);
+    expect(before.portions[0].paraNumber).toBe(1);
+    const admin = await h.signIn('admin.a');
+    const paras = (await h.call('GET', '/quran/paras', admin)).json().items as Array<{ number: number; start: unknown; end: unknown; rowVersion: number }>;
+    const [p1, p2] = [paras.find((x) => x.number === 1)!, paras.find((x) => x.number === 2)!];
+    const shrink = await h.call('PUT', '/quran/paras/1', admin, { start: p1.start, end: { surah: 2, ayah: 20 }, rowVersion: p1.rowVersion });
+    expect(shrink.statusCode, shrink.body).toBe(200);
+    // Surah 3 is now in no Para: listed with no derived Para (never guessed).
+    expect(shrink.json().recordsNeedingReview).toBe(1);
+    expect((await h.call('GET', '/quran/review', admin)).json().records[0].issues).toEqual([{ field: 'paraNumber', code: 'PARA_CHANGED', derived: null }]);
+    const moved = await h.call('PUT', '/quran/paras/2', admin, { start: { surah: 3, ayah: 1 }, end: p2.end, rowVersion: p2.rowVersion });
+    expect(moved.statusCode, moved.body).toBe(200);
+    expect((await h.call('GET', '/quran/review', admin)).json().records).toEqual([
+      { kind: 'SABAQ_PORTION', id: p.id, range: { surah: 3, ayahStart: 1, ayahEnd: 6 }, paraNumber: 1, issues: [{ field: 'paraNumber', code: 'PARA_CHANGED', derived: 2 }] },
+    ]);
+    expect(await detail(h, teacher, recordId)).toEqual(before);
+  });
+
+  it('F02-AC10 (US-009) a mistake-note visibility change is one audited correction with note counts, never the text', async () => {
+    const teacher = await h.signIn('teacher.a1');
+    const recordId = await presentRecord(h, teacher, ids, 'S1', classDay(h, 1));
+    const p = await applied(h, teacher, portionOp(recordId, { section: 'SABQI', paraNumber: 3, assigned: para(1) }));
+    const mistake = { category: 'TAJWEED', severity: 'MINOR', repeated: false, note: 'Synthetic audit note F02' };
+    const a = await applied(h, teacher, attemptOp(p.id, { status: 'PARTIAL', completed: para(1, 2), mistakes: [mistake] }));
+    await applied(h, teacher, attemptUpdateOp(a.id, 1, { status: 'PARTIAL', completed: para(1, 2), quality: null, noMistakes: false, mistakes: [{ ...mistake, noteVisibility: 'SHARED' }] }));
+    const rows = await audit(a.id);
+    expect(rows.map((r) => [r.action, r.summary.mistakeVisibility])).toEqual([
+      ['PORTION_ATTEMPT_CREATED', { internal: 1, shared: 0 }],
+      ['PORTION_ATTEMPT_CORRECTED', { internal: 0, shared: 1 }],
+    ]);
+    expect(JSON.stringify(rows)).not.toContain('Synthetic audit note');
+  });
 });

@@ -1,15 +1,81 @@
 # F04 · Calendar and attendance — mobile E2E (docs/specs/08-f04-calendar-attendance.md; design.md §4.8, §4.13)
 # Covers: F04-AC10, F04-AC12
+# SYNTHETIC DATA ONLY: seeded personas. Test control drops one sync acknowledgement after the server committed it.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F04 bulk entry offline — saved on device, synced once
 tags:
-  - pending
   - F04
   - US-015
 ---
-- launchApp:
-    clearState: true
-# 1. Sign in as teacher.a1; go offline (support/maestro/go-offline.yaml).
-# 2. Bulk Entry A1: mark all; save → "Saved on this device — waiting to sync"; queue shows pending.    (F04-AC12)
-# 3. Test control drops the server acknowledgement once; go online; the app retries.
-# 4. Items reach Synced; API check: one attendance record per student.                                 (F04-AC10)
+- runFlow: ../../support/maestro/reset.yaml
+- runFlow: ../../support/maestro/ensure-class-day.yaml
+# 1. Sign in as teacher-a1; open Bulk Entry for A1 once online (so the roster is on the device); go offline.
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- tapOn: { id: "nav.attendance" }
+- extendedWaitUntil:
+    visible: { id: "bulk.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "bulk.class.Hifz A1" }
+- extendedWaitUntil:
+    visible: { id: "bulk.row.Test Student One.unmarked" }
+    timeout: 30000
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow: ../../support/maestro/go-offline.yaml
+# 2. Bulk Entry A1 offline: mark all; save → "Saved on this device — waiting to sync"; the queue shows them pending.  (F04-AC12)
+- tapOn: { id: "nav.attendance" }
+- extendedWaitUntil:
+    visible: { id: "bulk.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "bulk.class.Hifz A1" }
+- extendedWaitUntil:
+    visible: { id: "bulk.offline" }
+    timeout: 30000
+- copyTextFrom: { id: "bulk.date" }
+- evalScript: ${output.day = maestro.copiedText.replace(/[^0-9-]/g, '')}
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.markAllPresent" } }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.save" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.summary", TEXT: "Saved on this device: 2\\. Needs correction: 0\\. Not marked: 0\\." } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student One.saved", TEXT: ".*Present · Saved on this device — waiting to sync.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student Two.saved", TEXT: ".*Present · Saved on this device — waiting to sync.*" } }
+- runFlow: ../../support/maestro/back-home.yaml
+- extendedWaitUntil:
+    visible: { id: "sync.banner.state.OFFLINE" }
+    timeout: 30000
+- assertVisible: { id: "sync.banner.count", text: "Waiting on this phone: 2" }
+- tapOn: { id: "sync.banner" }
+- extendedWaitUntil:
+    visible: { id: "syncQueue.screen" }
+    timeout: 30000
+- assertVisible: { id: "syncQueue.summary", text: "Waiting: 2 · Failed: 0 · Action required: 0" }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "syncQueue.section.PENDING" } }
+- assertNotVisible: { id: "syncQueue.section.SYNCED" }
+- runFlow: ../../support/maestro/back-home.yaml
+# 3. Test control drops the server acknowledgement once; go online; the server commits the save but the app is told
+#    it failed, so it retries the same operations.
+- runScript:
+    file: ../../support/maestro/control.js
+    env: { ACTION: dropAckNext, COUNT: "1" }
+- setAirplaneMode: disabled
+# 4. Items reach Synced; API check: one attendance record per student, recorded once.                    (F04-AC10)
+- extendedWaitUntil:
+    visible: { id: "sync.banner.state.SYNCED" }
+    timeout: 180000
+- runScript:
+    file: ../../support/maestro/control.js
+    env: { ACTION: dropAckLeft }
+# The lost acknowledgement was met (so the save was retried after the server had committed it).
+- assertTrue: ${output.dropAckLeft === 0}
+- runScript:
+    file: ../../support/maestro/control.js
+    env: { ACTION: attendanceRecords, ORG_CODE: ALIF, CLASS_NAME: "Hifz A1", DATE: "${output.day}" }
+- assertTrue: ${output.attendance === 'EXT-A-001:PRESENT:1,EXT-A-002:PRESENT:1'}
+- tapOn: { id: "sync.banner" }
+- extendedWaitUntil:
+    visible: { id: "syncQueue.screen" }
+    timeout: 30000
+- assertVisible: { id: "syncQueue.summary", text: "Waiting: 0 · Failed: 0 · Action required: 0" }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "syncQueue.section.SYNCED" } }
+- assertVisible: { text: "Synced in the last 24 hours: 2" }

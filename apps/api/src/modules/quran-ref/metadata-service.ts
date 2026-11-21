@@ -25,6 +25,7 @@ import {
   countLines,
   evaluateRange,
   metadataFindings,
+  recordReviewIssues,
   validateAyahRange,
   validateParaBoundary,
   validateSurah,
@@ -45,9 +46,10 @@ import { blockReason, loadImportStates, productionVerified } from './distributio
 
 /**
  * Stored records that carry a Quran range, for the review list (F06-AC19): F05 supplies the Sabaq portions
- * (hifz/shared.ts `sabaqRanges`); F08 adds homework ranges.
+ * (hifz/shared.ts `sabaqRanges`) with the Para each stored (derived from its range, FR-SAB-001), so a Para-boundary
+ * correction that moves a range into another Para lists it too. Records without a stored derived Para omit it.
  */
-export type RangeRecordSource = (db: Executor, organizationId: string) => Promise<{ kind: string; id: string; range: AyahRange }[]>;
+export type RangeRecordSource = (db: Executor, organizationId: string) => Promise<{ kind: string; id: string; range: AyahRange; paraNumber?: number | null }[]>;
 
 type SurahRow = { id: string; number: number; name_ar: string; name_translit: string; ayah_count: number; source: 'SEED' | 'ADMIN'; row_version: string; updated_at: Date };
 type ParaRow = { id: string; number: number; start_surah: number; start_ayah: number; end_surah: number; end_ayah: number; source: 'SEED' | 'ADMIN'; row_version: string; updated_at: Date };
@@ -390,10 +392,11 @@ export class QuranMetadataService {
 
   private async reviewRecords(tx: Tx, organizationId: string, surahs?: SurahMeta[]): Promise<ReviewRecordView[]> {
     const meta = surahs ?? (await this.surahMeta(tx, organizationId));
+    const paras = await this.paraBoundaries(tx, organizationId);
     const out: ReviewRecordView[] = [];
     for (const r of await this.rangeRecords(tx, organizationId)) {
-      const issues = validateAyahRange(r.range, meta);
-      if (issues.length) out.push({ kind: r.kind, id: r.id, range: r.range, issues });
+      const issues = recordReviewIssues(r, meta, paras);
+      if (issues.length) out.push({ kind: r.kind, id: r.id, range: r.range, ...(r.paraNumber !== undefined ? { paraNumber: r.paraNumber } : {}), issues });
     }
     return out;
   }

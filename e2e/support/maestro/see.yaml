@@ -1,0 +1,17 @@
+# Subflow: scroll until an element is visible (below first, then above). With TEXT, its text must match (regex).
+# Usage: runFlow { file: ../../support/maestro/see.yaml, env: { ID: "homework.draft.1.label", TEXT: ".*not confirmed.*" } }
+# The downward search only runs when the element is not already on screen (see tap.yaml).
+appId: com.hifzamanah.app
+---
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      notVisible: { id: "${ID}" }
+    commands:
+      - scrollUntilVisible: { element: { id: "${ID}" }, direction: DOWN, timeout: 30000, centerElement: true, optional: true }
+- scrollUntilVisible: { element: { id: "${ID}" }, direction: UP, timeout: 30000, centerElement: true }
+- runFlow:
+    when:
+      true: ${typeof TEXT !== 'undefined' && TEXT !== ''}
+    commands:
+      - assertVisible: { id: "${ID}", text: "${TEXT}" }

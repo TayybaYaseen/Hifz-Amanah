@@ -1,18 +1,117 @@
 # F04 · Calendar and attendance — mobile E2E (docs/specs/08-f04-calendar-attendance.md; design.md §4.8)
 # Covers: F04-AC6, F04-AC7, F04-AC8, F04-AC9, F04-AC11
+# SYNTHETIC DATA ONLY: seeded personas (class Hifz A1: Test Student One = S1, Test Student Two = S2).
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F04 bulk entry — attendance only, Mark all Present, unmarked, partial save
 tags:
-  - pending
   - F04
   - US-015
 ---
-- launchApp:
-    clearState: true
-# 1. Sign in as teacher.a1 → Bulk Entry → A1, a scheduled date.
+- runFlow: ../../support/maestro/reset.yaml
+- runFlow: ../../support/maestro/ensure-class-day.yaml
+# 1. Sign in as teacher-a1 → Bulk Entry → A1, a scheduled date (today).
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- tapOn: { id: "nav.attendance" }
+- extendedWaitUntil:
+    visible: { id: "bulk.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "bulk.class.Hifz A1" }
+- extendedWaitUntil:
+    visible: { id: "bulk.row.Test Student One.unmarked" }
+    timeout: 30000
 # 2. Each student has only Present / Late / Half day / Leave / Absent; no Sabaq, Sabqi, Manzil, mistake, or quality field;
 #    the "Attendance only" note and a "Record Hifz" link per student are shown.                        (F04-AC6)
-# 3. Mark S2 Absent; tap "Mark all Present" → S2 stays Absent.                                          (F04-AC7)
-# 4. Leave S1 unmarked; save → "1 student not marked" dialog → Go back → nothing saved for S1; save again → Mark them Absent → S1 Absent. (F04-AC8)
-# 5. Test control makes one row fail → summary shows saved and needs correction; valid rows kept.       (F04-AC9)
-# 6. Open S2's Daily Entry for that date → Absent, no portions, no quality.                             (F04-AC11)
+- assertVisible: { id: "bulk.attendanceOnly" }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student One.PRESENT" } }
+- assertVisible: { id: "bulk.row.Test Student One.LATE" }
+- assertVisible: { id: "bulk.row.Test Student One.HALF_DAY" }
+- assertVisible: { id: "bulk.row.Test Student One.LEAVE" }
+- assertVisible: { id: "bulk.row.Test Student One.ABSENT" }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student One.recordHifz" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student Two.PRESENT" } }
+- assertVisible: { id: "bulk.row.Test Student Two.LATE" }
+- assertVisible: { id: "bulk.row.Test Student Two.HALF_DAY" }
+- assertVisible: { id: "bulk.row.Test Student Two.LEAVE" }
+- assertVisible: { id: "bulk.row.Test Student Two.ABSENT" }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student Two.recordHifz" } }
+# No Hifz control of any kind on the screen (portion, quantity, mistakes, quality).
+- assertNotVisible: { id: "daily\\..*" }
+- assertNotVisible: { id: ".*\\.(sabaq|sabqi|manzil|quality|mistakes?|portion|unit|completed|assigned)(\\..*)?" }
+- assertNotVisible: { text: "(Add Sabaq|Add Sabqi|Add Manzil|Quality|Mistakes|No mistakes).*" }
+# 4 (first part). Mark S2 Absent and leave S1 unmarked; save → "1 student not marked" dialog → Go back → nothing is
+#    saved, for S1 or anyone.                                                                            (F04-AC8)
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.row.Test Student Two.ABSENT" } }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.save" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.unmarked.title", TEXT: "Students not marked: 1" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.unmarked.absent" } }
+- assertVisible: { id: "bulk.unmarked.back" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.unmarked.back" } }
+- assertNotVisible: { id: "bulk.unmarked.title" }
+- assertNotVisible: { id: "bulk.summary" }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student One.unmarked" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student Two.unmarked" } }
+# 3. S2 is marked Absent; tap "Mark all Present" → S1 becomes Present, S2 stays Absent.                  (F04-AC7)
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.markAllPresent" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student One.PRESENT" } }
+- assertVisible: { id: "bulk.row.Test Student One.PRESENT", selected: true }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student Two.ABSENT" } }
+- assertVisible: { id: "bulk.row.Test Student Two.ABSENT", selected: true }
+- assertVisible: { id: "bulk.row.Test Student Two.PRESENT", selected: false }
+# 5. One row fails validation (S1 changed to Leave with no reason) → the valid row (S2 Absent) is saved, the failed
+#    row shows its error and keeps what was entered, and the summary counts saved and needs-correction rows. (F04-AC9)
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.row.Test Student One.LEAVE" } }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.save" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.summary", TEXT: "Saved on this device: 1\\. Needs correction: 1\\. Not marked: 0\\." } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student One.error", TEXT: ".*Enter the reason for Leave.*" } }
+- assertVisible: { id: "bulk.row.Test Student One.LEAVE", selected: true }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student One.unmarked" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student Two.saved", TEXT: "○ Absent.*" } }
+# The corrected row then saves on its own.
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "bulk.row.Test Student One.reason", TEXT: "Family visit" } }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.save" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.summary", TEXT: "Saved on this device: 1\\. Needs correction: 0\\. Not marked: 0\\." } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student One.saved", TEXT: "◐ Leave — awaiting approval.*" } }
+- assertNotVisible: { id: "bulk.row.Test Student One.error" }
+# 4 (second part). On the previous class day, mark only S2 Present; save → "1 student not marked" → Mark them Absent →
+#    S1 is saved as an explicit Absent by this Teacher.                                                 (F04-AC8)
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.prevDay" } }
+- extendedWaitUntil:
+    visible: { id: "bulk.row.Test Student One.unmarked|bulk.day.UNSCHEDULED" }
+    timeout: 30000
+# Yesterday may be a Sunday (no class for the Mon–Sat fixture): then go one more day back.
+- runFlow:
+    when: { visible: { id: "bulk.day.UNSCHEDULED" } }
+    commands:
+      - tapOn: { id: "bulk.prevDay" }
+      - extendedWaitUntil:
+          visible: { id: "bulk.row.Test Student One.unmarked" }
+          timeout: 30000
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.row.Test Student Two.PRESENT" } }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.save" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.unmarked.title", TEXT: "Students not marked: 1" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.unmarked.absent" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.summary", TEXT: "Saved on this device: 2\\. Needs correction: 0\\. Not marked: 0\\." } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student One.saved", TEXT: "○ Absent.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student Two.saved", TEXT: "● Present.*" } }
+# 6. Open S2's Daily Entry for today (Absent) → Absent, no portions, no quality.                          (F04-AC11)
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.today" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.row.Test Student Two.saved", TEXT: "○ Absent.*" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.row.Test Student Two.recordHifz" } }
+- extendedWaitUntil:
+    visible: { id: "daily.attendance.current" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "daily.attendance.current", TEXT: "○ Absent.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "daily.attendance.blocked" } }
+- assertNotVisible: { id: "daily.sabaq.add" }
+- assertNotVisible: { id: "daily.sabqi.add" }
+- assertNotVisible: { id: "daily.manzil.add" }
+- assertNotVisible: { id: "daily\\.(sabaq|sabqi|manzil)\\.portion\\..*" }
+- assertNotVisible: { id: ".*\\.quality\\..*" }
+# The attempt, failure, and quality counts on the server are covered by e2e/api/f04-attendance.spec.ts
+# 'F04-AC11 (US-015) an Absent mark creates no attempt, failure, or quality'.

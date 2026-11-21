@@ -1,9 +1,28 @@
 // F02 · Organization and roles — API E2E (docs/specs/03-f02-organization-roles.md)
 // Screen journeys: e2e/mobile/f02-organization/.
-// Criteria parts that need classes and students (F03), daily records (F05), reports (F09), or guardian links and
-// note visibility (F10, F05/F07) stay test.fixme until those features exist (docs/handover/F02-plan.md).
+// Daily records, attempts, and homework come from F05/F07/F08 through POST /sync/push (support/daily-entry.ts).
+// Criteria parts that need reports (F09) or guardian links (F10) stay test.fixme until those features exist
+// (docs/handover/F02-plan.md).
 import { randomUUID } from 'node:crypto';
 import type { APIRequestContext } from '@playwright/test';
+import {
+  DEVICE,
+  applied,
+  classDay,
+  confirmOp,
+  correctAttemptOp,
+  draftOp,
+  getJson,
+  para,
+  presentRecord,
+  pullAll,
+  push,
+  recite,
+  recordDetail,
+  recordOp,
+  sourcesOf,
+  suggestedPortion,
+} from './support/daily-entry';
 import { expect, test } from './support/fixtures';
 
 type AuditRow = { action: string; actor_user_id: string | null; target_id: string | null; summary: Record<string, unknown>; created_at: string };
@@ -72,8 +91,25 @@ test.describe('F02 · Organization and roles', { tag: '@F02' }, () => {
     expect(await settings(await as('owner.a'))).toEqual(before);
   });
 
-  test.fixme('F02-AC5 (US-007) changing the timezone never changes stored report_date values', async () => {
-    // Waits for daily records (F05). Record S1 on a known date; admin.a changes the timezone; the record still has that report_date.
+  test('F02-AC5 (US-007) changing the timezone never changes stored report_date values', async ({ as, control }) => {
+    // Record S1 on a known date; admin.a changes the timezone; the record still has that report_date.
+    const ids = await control.rosterIds();
+    const teacher = await as('teacher.a1');
+    const day = classDay(1);
+    const recordId = await presentRecord(teacher, ids, 'S1', day);
+    const before = await recordDetail(teacher, recordId);
+    expect(before.record.reportDate).toBe(day);
+
+    const admin = await as('admin.a');
+    const res = await admin.patch('/organization', { data: { timezone: 'Pacific/Kiritimati' } });
+    expect(res.status(), await res.text()).toBe(200);
+    expect((await settings(admin)).timezone).toBe('Pacific/Kiritimati');
+
+    const after = await recordDetail(teacher, recordId);
+    expect(after.record).toEqual(before.record);
+    // Found under the same date, never shifted to another one.
+    const list = await getJson(teacher, `/hifz/daily-records?date=${day}`);
+    expect(list.items.map((r: { id: string; reportDate: string }) => [r.id, r.reportDate])).toEqual([[recordId, day]]);
   });
 
   test('F02-AC6 (US-008) a Teacher lists only students of assigned classes', async ({ as }) => {
@@ -83,13 +119,80 @@ test.describe('F02 · Organization and roles', { tag: '@F02' }, () => {
     expect(((await res.json()).items as Array<{ name: string }>).map((s) => s.name)).toEqual(['Test Student One', 'Test Student Two']);
   });
 
-  test.fixme('F02-AC7 (US-008) out-of-scope student, record, and report IDs return not found', async () => {
-    // Waits for F03/F05/F09. As teacher.a1 request S3, an S3 record, and an S3 report by ID; compare with random IDs → identical not found.
+  test('F02-AC7 (US-008) out-of-scope student, record, and homework IDs return not found', async ({ as, control }) => {
+    // teacher.a2 records S3 (Class A2) with a portion, an attempt, and confirmed homework. As teacher.a1 request each by
+    // ID and compare with random IDs → identical not found. The report part waits for F09 (below).
+    await control.seedSyntheticQuran();
+    const ids = await control.rosterIds();
+    const teacherA2 = await as('teacher.a2');
+    const day = classDay(1);
+    const recordId = await presentRecord(teacherA2, ids, 'S3', day, 'A2');
+    const sabqi = await recite(teacherA2, recordId, { section: 'SABQI', paraNumber: 3, assigned: para(3, 4) }, { status: 'PARTIAL', completed: para(1, 2) });
+    const draft = await applied(teacherA2, draftOp(ids, 'S3', { assignedDate: day, sourceDailyRecordId: recordId, portions: [suggestedPortion(sabqi.attemptId)] }));
+    await applied(teacherA2, confirmOp(draft.id, draft.rowVersion, await sourcesOf(teacherA2, recordId)));
+
+    const teacher = await as('teacher.a1');
+    const probes: Array<[string, string]> = [
+      ['/students/', ids.students.S3!],
+      ['/hifz/daily-records/', recordId],
+      ['/homework/assignments/', draft.id],
+    ];
+    for (const [path, id] of probes) {
+      const outOfScope = await teacher.get(`${path}${id}`);
+      const missing = await teacher.get(`${path}${randomUUID()}`);
+      expect(outOfScope.status(), path).toBe(404);
+      expect(missing.status(), path).toBe(404);
+      expect(await outOfScope.json(), path).toEqual(await missing.json());
+    }
+    // Filtering a list by the out-of-scope student is refused the same way, and leaks nothing.
+    const byStudent = await teacher.get(`/hifz/daily-records?studentId=${ids.students.S3}&date=${day}`);
+    const byRandom = await teacher.get(`/hifz/daily-records?studentId=${randomUUID()}&date=${day}`);
+    expect(byStudent.status()).toBe(byRandom.status());
+    expect(await byStudent.json()).toEqual(await byRandom.json());
+    // The owning Teacher still reads them.
+    expect((await teacherA2.get(`/hifz/daily-records/${recordId}`)).status()).toBe(200);
+    expect((await teacherA2.get(`/homework/assignments/${draft.id}`)).status()).toBe(200);
   });
 
-  test.fixme('F02-AC8 (US-008) a Teacher removed from a class loses its data but stays recorder of old records', async () => {
-    // Waits for F03/F05. teacher.a1 records S1; admin.a removes teacher.a1 from A1.
+  test.fixme('F02-AC7 (US-008) an out-of-scope report ID returns not found', async () => {
+    // Waits for F09 (weekly/monthly reports). As teacher.a1 request an S3 report by ID; compare with a random ID → identical not found.
+  });
+
+  test('F02-AC8 (US-008) a Teacher removed from a class loses its data but stays recorder of old records', async ({ as, control }) => {
+    // teacher.a1 records S1; admin.a removes teacher.a1 from A1.
     // teacher.a1 list/pull returns no A1 data; as admin.a the old record still names teacher.a1 as recorder.
+    const ids = await control.rosterIds();
+    const teacherId = await control.userIdOf('teacher.a1');
+    const teacher = await as('teacher.a1');
+    const day = classDay(1);
+    const recordId = await presentRecord(teacher, ids, 'S1', day);
+    const { portionId, attemptId } = await recite(teacher, recordId, { section: 'SABQI', paraNumber: 3, assigned: para(1) }, { status: 'COMPLETED' });
+    const a1Ids = new Set([ids.classes.A1, ids.students.S1, ids.students.S2, recordId, portionId, attemptId]);
+    const touchesA1 = (c: { entityId: string; fields?: Record<string, unknown> }) =>
+      a1Ids.has(c.entityId) || [c.fields?.classId, c.fields?.studentId].some((v) => typeof v === 'string' && a1Ids.has(v));
+    // Before the removal the Teacher's pull carries the record (so the check below is meaningful).
+    expect((await pullAll(teacher)).filter(touchesA1).map((c) => c.entityId)).toEqual(expect.arrayContaining([recordId, portionId, attemptId]));
+
+    const admin = await as('admin.a');
+    const removed = await admin.patch(`/classes/${ids.classes.A1}`, { data: { teacherIds: [] } });
+    expect(removed.status(), await removed.text()).toBe(200);
+
+    // The next requests and the next sync return no Class A1 data.
+    expect((await teacher.get(`/hifz/daily-records/${recordId}`)).status()).toBe(404);
+    expect((await getJson(teacher, `/hifz/daily-records?date=${day}`)).items).toEqual([]);
+    expect((await getJson(teacher, '/students?status=ALL')).items).toEqual([]);
+    expect((await teacher.get(`/students/${ids.students.S1}`)).status()).toBe(404);
+    expect((await getJson(teacher, '/classes')).items).toEqual([]);
+    expect((await pullAll(teacher)).filter(touchesA1)).toEqual([]);
+    // Writing to the class is refused too.
+    const [refused] = await push(teacher, [recordOp(ids, 'S1', classDay(2))]);
+    expect(refused!.status).toBe('REJECTED');
+
+    // The old record, portion, and attempt remain, with teacher.a1 still the recorder.
+    const d = await recordDetail(admin, recordId);
+    expect(d.record).toMatchObject({ id: recordId, reportDate: day, recordedBy: { userId: teacherId } });
+    expect(d.portions.map((p: { id: string }) => p.id)).toEqual([portionId]);
+    expect(d.portions[0].attempts.map((x: { id: string; recordedBy: { userId: string } }) => [x.id, x.recordedBy.userId])).toEqual([[attemptId, teacherId]]);
   });
 
   test('F02-AC9 (US-008) client-sent organization_id or role is rejected and grants nothing', async ({ as }) => {
@@ -109,9 +212,35 @@ test.describe('F02 · Organization and roles', { tag: '@F02' }, () => {
     expect((await (await teacher.get('/me')).json()).role).toBe('TEACHER');
   });
 
-  test.fixme('F02-AC9 (US-008) a record sent for a class the Teacher is not assigned to is rejected', async () => {
-    // Waits for F03/F05. As teacher.a1 send a record for S1 with organization_id = Madrasa B, role ADMIN, class A2.
+  test('F02-AC9 (US-008) a record sent for a class the Teacher is not assigned to is rejected', async ({ as, control }) => {
+    // As teacher.a1 send a record for S1 with organization_id = Madrasa B, role ADMIN, class A2.
     // The record lands in Madrasa A with class A1, or is rejected; no privilege is gained.
+    const ids = await control.rosterIds();
+    const teacher = await as('teacher.a1');
+    const otherOrg = (await settings(await as('admin.b'))).id as string;
+    const day = classDay(1);
+    // A class the Teacher is not assigned to: each operation is refused.
+    const results = await push(teacher, [recordOp(ids, 'S1', day, 'A2'), recordOp(ids, 'S3', day, 'A2')]);
+    expect(results.map((r) => r.status), JSON.stringify(results)).toEqual(['REJECTED', 'REJECTED']);
+    // A client-sent organization or role is not an accepted field: the whole push is refused and nothing is applied.
+    for (const extra of [{ organizationId: otherOrg }, { organization_id: otherOrg }, { role: 'ADMIN' }, { organizationId: otherOrg, role: 'ADMIN' }]) {
+      for (const classKey of ['A1', 'A2'] as const) {
+        const res = await teacher.post('/sync/push', { data: { protocolVersion: 1, deviceId: DEVICE, ops: [recordOp(ids, 'S1', day, classKey, extra)] } });
+        expect(res.status(), JSON.stringify(extra)).toBe(400);
+        expect((await res.json()).error).toMatchObject({ code: 'VALIDATION', fields: { 'ops.0.fields': 'INVALID' } });
+      }
+    }
+    // Nothing was stored anywhere: not in Madrasa A (any class) and not in Madrasa B.
+    const admin = await as('admin.a');
+    expect((await getJson(admin, `/hifz/daily-records?date=${day}`)).items).toEqual([]);
+    expect((await getJson(await as('admin.b'), `/hifz/daily-records?date=${day}`)).items).toEqual([]);
+    // No privilege was gained: still a Teacher, still limited to Class A1.
+    expect((await (await teacher.get('/me')).json()).role).toBe('TEACHER');
+    expect((await getJson(teacher, '/classes')).items.map((c: { id: string }) => c.id)).toEqual([ids.classes.A1]);
+    expect((await teacher.get(`/students/${ids.students.S3}`)).status()).toBe(404);
+    // A plain record in the Teacher's own scope is accepted and lands in Madrasa A, Class A1.
+    const own = await applied(teacher, recordOp(ids, 'S1', day));
+    expect((await recordDetail(admin, own.id)).record).toMatchObject({ classId: ids.classes.A1 });
   });
 
   test('F02-AC10 (US-009) account create, deactivate, role change, membership change, and password reset each write one audit record', async ({ as, control }) => {
@@ -134,8 +263,34 @@ test.describe('F02 · Organization and roles', { tag: '@F02' }, () => {
     }
   });
 
-  test.fixme('F02-AC10 (US-009) guardian link and note-visibility changes each write one audit record', async () => {
-    // Waits for guardian links (F10) and note visibility (F05/F07).
+  test('F02-AC10 (US-009) a note-visibility change writes one audit record', async ({ as, control }) => {
+    // F07: a mistake note is INTERNAL by default; the Teacher marks it SHARED (FR-ATT-012). Exactly one audit record is
+    // written for the change, with actor, action, target, time, and a safe summary that never holds the note text.
+    const ids = await control.rosterIds();
+    const teacher = await as('teacher.a1');
+    const recordId = await presentRecord(teacher, ids, 'S1', classDay(1));
+    const note = 'Synthetic visibility note F02';
+    const mistake = { category: 'TAJWEED', severity: 'MINOR', repeated: false, note };
+    const { attemptId } = await recite(teacher, recordId, { section: 'SABQI', paraNumber: 3, assigned: para(1) }, { status: 'PARTIAL', completed: para(1, 2), mistakes: [mistake] });
+    const before = (await control.auditForTarget(attemptId)) as AuditRow[];
+    expect(before.map((r) => r.action)).toEqual(['PORTION_ATTEMPT_CREATED']);
+    expect(before[0]!.summary).toMatchObject({ mistakeVisibility: { internal: 1, shared: 0 } });
+
+    await applied(teacher, correctAttemptOp(attemptId, 1, { status: 'PARTIAL', completed: para(1, 2), mistakes: [{ ...mistake, noteVisibility: 'SHARED' }] }));
+    const shared = (await recordDetail(teacher, recordId)).portions[0].attempts[0].mistakes[0];
+    expect(shared).toMatchObject({ note, noteVisibility: 'SHARED' });
+
+    const after = (await control.auditForTarget(attemptId)) as AuditRow[];
+    expect(after.slice(before.length)).toHaveLength(1);
+    const row = after.at(-1)!;
+    expect(row).toMatchObject({ action: 'PORTION_ATTEMPT_CORRECTED', actor_user_id: await control.userIdOf('teacher.a1'), target_id: attemptId });
+    expect(Date.parse(row.created_at)).not.toBeNaN();
+    expect(row.summary).toMatchObject({ fields: ['mistakes'], mistakeVisibility: { internal: 0, shared: 1 } });
+    expect(JSON.stringify(after)).not.toContain(note);
+  });
+
+  test.fixme('F02-AC10 (US-009) a guardian link change writes one audit record', async () => {
+    // Waits for F10 (guardian links). Link, verify, and revoke a guardian link; each writes exactly one audit record.
   });
 
   test('F02-AC11 (US-009) reset and creation audits contain no password, OTP, or token', async ({ as, anon, control }) => {
@@ -203,9 +358,28 @@ test.describe('F02 · Organization and roles', { tag: '@F02' }, () => {
     expect((await teacher.get('/accounts')).status()).toBe(403);
   });
 
-  test.fixme('F02-AC14 (US-008) with the flag, a Teacher lists students and reads records of every class', async () => {
-    // Waits for classes, students, and records (F03/F05). Given a Teacher whose Owner or Admin set the "all classes" flag,
-    // when they list students or request any class's records, then every class in the madrasa is available.
+  test('F02-AC14 (US-008) with the flag, a Teacher lists students and reads records of every class', async ({ as, control }) => {
+    // Given a Teacher whose Owner or Admin set the "all classes" flag, when they list students or request any class's
+    // records, then every class in the madrasa is available, with Teacher permissions only.
+    const ids = await control.rosterIds();
+    const day = classDay(1);
+    const a2Record = await presentRecord(await as('teacher.a2'), ids, 'S3', day, 'A2');
+    const teacher = await as('teacher.a1');
+    const names = async () => ((await getJson(teacher, '/students?status=ALL')).items as Array<{ name: string }>).map((s) => s.name);
+    expect(await names()).toEqual(['Test Student One', 'Test Student Two']);
+    expect((await teacher.get(`/hifz/daily-records/${a2Record}`)).status()).toBe(404);
+
+    const id = await control.userIdOf('teacher.a1');
+    expect((await (await as('admin.a')).post(`/accounts/${id}/all-classes`, { data: { allClasses: true } })).status()).toBe(200);
+    const flagged = await as('teacher.a1');
+    expect(((await getJson(flagged, '/students?status=ALL')).items as Array<{ name: string }>).map((s) => s.name)).toEqual(['Test Student One', 'Test Student Three', 'Test Student Two']);
+    expect((await getJson(flagged, '/classes')).items.map((c: { name: string }) => c.name)).toEqual(['Hifz A1', 'Hifz A2']);
+    expect((await recordDetail(flagged, a2Record)).record).toMatchObject({ id: a2Record, classId: ids.classes.A2 });
+    expect((await getJson(flagged, `/hifz/daily-records?classId=${ids.classes.A2}&date=${day}`)).items.map((r: { id: string }) => r.id)).toEqual([a2Record]);
+    expect((await pullAll(flagged)).map((c) => c.entityId)).toContain(a2Record);
+    // Teacher permissions only: no Admin action, and still nothing outside the madrasa.
+    expect((await flagged.post(`/students/${ids.students.S3}/deactivate`)).status()).toBe(403);
+    expect((await flagged.get(`/students/${ids.students.SB1}`)).status()).toBe(404);
   });
 
   test('F02-AC15 (US-007) only the Owner adds or removes Admins and transfers ownership', async ({ as, control, anon }) => {

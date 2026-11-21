@@ -409,6 +409,12 @@ export function portionAttemptSyncHandler(deps: PortionAttemptSyncDeps = {}): Sy
           completed: quantityOf(a.completed_unit, a.completed_num, a.completed_den),
           quality: a.quality,
           mistakeCount: mistakeCount({ noMistakes: a.no_mistakes, mistakes }),
+          // Mistake notes by visibility, counts only (never the text), so a note-visibility change is visible in the
+          // audit trail (F02-AC10, FR-ATT-012). The key avoids "note": audit redaction drops any key naming one.
+          mistakeVisibility: {
+            internal: mistakes.filter((m) => m.note !== null && m.noteVisibility === 'INTERNAL').length,
+            shared: mistakes.filter((m) => m.note !== null && m.noteVisibility === 'SHARED').length,
+          },
           rowVersion: change.rowVersion,
           // Field names only for remarks: internal staff text (ARCHITECTURE.md §15).
           fields: Object.keys(change.changes).sort(),

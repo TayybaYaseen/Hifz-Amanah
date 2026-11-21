@@ -2,3 +2,12 @@
 appId: com.hifzamanah.app
 ---
 - setAirplaneMode: enabled
+# Let the app settle into its offline state before the next tap: the banner switches to Offline (on screens that show
+# it; optional, so screens without the banner do not wait it out) and the layout may shift.
+- extendedWaitUntil:
+    visible: { id: "sync.banner.state.OFFLINE" }
+    timeout: 15000
+    optional: true
+# A development build also loses Metro and shows its LogBox toast, which can cover a bottom button.
+- runFlow: dismiss-dev-warning.yaml
+- waitForAnimationToEnd

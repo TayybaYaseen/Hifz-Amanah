@@ -1,17 +1,140 @@
 # F04 · Calendar and attendance — mobile E2E (docs/specs/08-f04-calendar-attendance.md; design.md §4.14)
 # Covers: F04-AC1, F04-AC3, F04-AC4, F04-AC5
+# SYNTHETIC DATA ONLY: seeded personas (Hifz A1 and Hifz A2 meet Monday–Saturday); made-up holiday labels.
+# Dates are derived on the device, never hard-coded: H is today; X is the latest earlier Monday–Saturday date.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F04 calendar — schedule, holiday, class exception, holiday notice in Bulk Entry
 tags:
-  - pending
   - F04
   - US-013
   - US-014
 ---
-- launchApp:
-    clearState: true
-# 1. Sign in as admin.a → Timetable: A1 Monday–Saturday.
-# 2. Holidays → add a madrasa holiday on date H; add a no-class exception for A1 on date X.
+- runFlow: ../../support/maestro/reset.yaml
+# 1. Sign in as admin-a → Timetable: A1 meets Monday–Saturday; Sunday is a no-class day.                  (F04-AC1)
+- runFlow:
+    file: ../../support/maestro/sign-in-staff.yaml
+    env: { USER_ID: admin-a }
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.classes" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "classes.item.Hifz A1" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "classDetail.timetable" } }
+- extendedWaitUntil:
+    visible: { id: "timetable.current" }
+    timeout: 30000
+- assertVisible: { id: "timetable.current", text: "Monday, Tuesday, Wednesday, Thursday, Friday, Saturday" }
+- runFlow: ../../support/maestro/back-home.yaml
+# In Bulk Entry the latest Sunday is a no-class day for A1: no rows, nothing to save, no absence recorded.  (F04-AC1)
+- tapOn: { id: "nav.attendance" }
+- extendedWaitUntil:
+    visible: { id: "bulk.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "bulk.class.Hifz A1" }
+- copyTextFrom: { id: "bulk.date" }
+- evalScript: ${output.h = maestro.copiedText.replace(/[^0-9-]/g, '')}
+- extendedWaitUntil:
+    visible: { id: "bulk.row.Test Student One.unmarked|bulk.day.UNSCHEDULED" }
+    timeout: 30000
+- repeat:
+    while:
+      notVisible: { id: "bulk.day.UNSCHEDULED" }
+    times: 7
+    commands:
+      - tapOn: { id: "bulk.prevDay" }
+      - extendedWaitUntil:
+          visible: { id: "bulk.row.Test Student One.unmarked|bulk.day.UNSCHEDULED" }
+          timeout: 30000
+- assertVisible: { id: "bulk.day.UNSCHEDULED", text: "This class does not meet on this day\\. No absence is recorded\\." }
+- assertNotVisible: { id: "bulk.save" }
+- assertNotVisible: { id: "bulk.row.Test Student One.ABSENT" }
+# Weekly report (Sunday shown as no class): covered by e2e/api/f04-attendance.spec.ts 'F04-AC1 (US-013) a Monday–Saturday
+# class has Sunday as a no-class day'; the report screen arrives with F09 (US-039).
+# X: the latest Monday–Saturday date before today.
+# (On a Sunday the latest Sunday is today, and the Today button is not shown.)
+- runFlow:
+    when: { visible: { id: "bulk.today" } }
+    commands:
+      - runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.today" } }
+- assertVisible: { id: "bulk.date", text: ".*${output.h}.*" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.prevDay" } }
+- extendedWaitUntil:
+    visible: { id: "bulk.row.Test Student One.unmarked|bulk.day.UNSCHEDULED" }
+    timeout: 30000
+- runFlow:
+    when: { visible: { id: "bulk.day.UNSCHEDULED" } }
+    commands:
+      - tapOn: { id: "bulk.prevDay" }
+      - extendedWaitUntil:
+          visible: { id: "bulk.row.Test Student One.unmarked" }
+          timeout: 30000
+- copyTextFrom: { id: "bulk.date" }
+- evalScript: ${output.x = maestro.copiedText.replace(/[^0-9-]/g, '')}
+- runFlow: ../../support/maestro/back-home.yaml
+# 2. Holidays → add a madrasa holiday on date H (today); add a no-class exception for A1 on date X.
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.holidays" } }
+- extendedWaitUntil:
+    visible: { id: "holidays.add" }
+    timeout: 30000
+- tapOn: { id: "holidays.add" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "holidays.kind.HOLIDAY" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "holidays.date", TEXT: "${output.h}" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "holidays.label", TEXT: "Test holiday" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "holidays.save" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "holidays.notice" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "holidays.item.${output.h}.HOLIDAY" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "holidays.add" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "holidays.kind.NO_CLASS" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "holidays.class.Hifz A1" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "holidays.date", TEXT: "${output.x}" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "holidays.label", TEXT: "Teacher training" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "holidays.save" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "holidays.notice" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "holidays.item.${output.x}.NO_CLASS" } }
+- runFlow: ../../support/maestro/back-home.yaml
 # 3. Weekly report for A1: Sunday shown as no class; H shown as holiday; nobody absent on H.           (F04-AC1, F04-AC3)
+# Report output: covered by e2e/api/f04-attendance.spec.ts 'F04-AC1 (US-013) a Monday–Saturday class has Sunday as a
+# no-class day' and 'F04-AC3 (US-014) a madrasa holiday is shown as a holiday with no absences'; the report screen
+# arrives with F09 (US-039).
+# On H every class shows the holiday and records no absence (A2 as well as A1).                        (F04-AC3)
+- tapOn: { id: "nav.attendance" }
+- extendedWaitUntil:
+    visible: { id: "bulk.class.Hifz A2" }
+    timeout: 30000
+- tapOn: { id: "bulk.class.Hifz A2" }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.day.HOLIDAY", TEXT: "Holiday: Test holiday\\. No absence is recorded\\." } }
+- assertNotVisible: { id: "bulk.save" }
+- assertNotVisible: { id: "bulk.row.Test Student Three.ABSENT" }
 # 4. On X, A1 students show "no class"; A2 students do not.                                            (F04-AC4)
-# 5. Sign in as teacher.a1 → Bulk Entry for H → notice: holiday, no absence is recorded automatically. (F04-AC5)
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.prevDay" } }
+- runFlow:
+    when: { notVisible: { id: "bulk.date", text: ".*${output.x}.*" } }
+    commands:
+      - tapOn: { id: "bulk.prevDay" }
+- assertVisible: { id: "bulk.date", text: ".*${output.x}.*" }
+- extendedWaitUntil:
+    visible: { id: "bulk.row.Test Student Three.unmarked" }
+    timeout: 30000
+- assertNotVisible: { id: "bulk.day.NO_CLASS" }
+- assertVisible: { id: "bulk.row.Test Student Three.ABSENT" }
+- assertVisible: { id: "bulk.save" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "bulk.class.Hifz A1" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.day.NO_CLASS", TEXT: "No class: Teacher training\\. No absence is recorded\\." } }
+- assertVisible: { id: "bulk.date", text: ".*${output.x}.*" }
+- assertNotVisible: { id: "bulk.save" }
+- assertNotVisible: { id: "bulk.row.Test Student One.ABSENT" }
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow: ../../support/maestro/sign-out.yaml
+# 5. Sign in as teacher-a1 → Bulk Entry for H → notice: holiday, no absence is recorded automatically.  (F04-AC5)
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- tapOn: { id: "nav.attendance" }
+- extendedWaitUntil:
+    visible: { id: "bulk.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "bulk.class.Hifz A1" }
+- assertVisible: { id: "bulk.date", text: ".*${output.h}.*" }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "bulk.day.HOLIDAY", TEXT: "Holiday: Test holiday\\. No absence is recorded\\." } }
+- assertNotVisible: { id: "bulk.save" }
+- assertNotVisible: { id: "bulk.markAllPresent" }
+- assertNotVisible: { id: "bulk.row.Test Student One.ABSENT" }

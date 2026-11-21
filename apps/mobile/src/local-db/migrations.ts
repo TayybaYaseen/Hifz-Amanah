@@ -11,6 +11,8 @@ import { PROTOCOL_VERSION } from '@hifz/contracts';
 import { attendanceMigration } from '../features/attendance/local.ts';
 import { quranReferenceMigration } from '../features/quran/referenceCache.ts';
 import { dailyEntryMigration, mistakesQualityMigration } from '../features/daily-entry/local.ts';
+import { homeworkMigration } from '../features/homework/local.ts';
+import { cacheEpochMigration } from '../sync/cacheEpoch.ts';
 import type { SqlDriver, SqlExecutor } from './driver.ts';
 
 export interface Migration {
@@ -148,6 +150,11 @@ export const WORKSPACE_MIGRATIONS: readonly Migration[] = [
   dailyEntryMigration(6),
   // F07: daily_records.overall_label (mistake notes live in the attempt's mistakes JSON).
   mistakesQualityMigration(7),
+  // F08: homework_assignments, lesson_portions.homework_portion_id, sync_notices, class_calendar_cache.
+  homeworkMigration(8),
+  // Security review: cache tokens (sync_meta.cache_epoch, allowed_seq; cache_class_epoch; cache_allowed_classes), so a late
+  // server answer never re-caches a dropped class (sync/cacheEpoch.ts).
+  cacheEpochMigration(9),
 ];
 
 /** The device index: which workspace databases exist on this phone, and the device ID. */

@@ -8,8 +8,9 @@
 // mark when it syncs and refuses a mark on a non-working day, which then shows in the Sync Queue.
 import type { AttendanceSheetStudent, AttendanceStatus, AttendanceSyncFields, LeaveStatus } from '@hifz/contracts';
 import { ATTENDANCE_FIELDS, leaveStatusAfter, normalizeMark, type Mark, type MarkingRole } from '@hifz/domain/calendar';
-import type { SqlExecutor } from '../../local-db/driver.ts';
+import type { SqlDriver, SqlExecutor } from '../../local-db/driver.ts';
 import type { Migration } from '../../local-db/migrations.ts';
+import { bumpClassEpoch, cacheWriteGuard, replaceAllowedClasses, type CacheToken } from '../../sync/cacheEpoch.ts';
 import type { Outbox } from '../../sync/outbox.ts';
 import type { EntityRegistry, LocalEntityHandler } from '../../sync/registry.ts';
 import { DAILY_RECORD_RETENTION_DAYS } from '../../sync/retention.ts';
@@ -130,18 +131,64 @@ export interface CachedRoster {
   fetchedAt: string;
 }
 
-export async function cacheRoster(db: SqlExecutor, classId: string, className: string, students: CachedRoster['students'], at: string): Promise<void> {
-  await db.run(
-    `INSERT INTO class_roster_cache (class_id, class_name, students, fetched_at) VALUES (?, ?, ?, ?)
+/**
+ * Caches a class roster fetched online, only if the class was not dropped since the fetch began: `token` is what
+ * readCacheToken returned for this class BEFORE the request was sent (security review: a late answer never writes back
+ * a class that keepRostersOf, forgetRoster, or a purge just removed; sync/cacheEpoch.ts). One conditional statement,
+ * so the check and the write are atomic. Returns true when written; false when the class was dropped meanwhile.
+ */
+export async function cacheRoster(
+  db: SqlExecutor,
+  token: CacheToken,
+  classId: string,
+  className: string,
+  students: CachedRoster['students'],
+  at: string,
+): Promise<boolean> {
+  const guard = cacheWriteGuard(token, classId);
+  const result = await db.run(
+    `INSERT INTO class_roster_cache (class_id, class_name, students, fetched_at) SELECT ?, ?, ?, ? WHERE ${guard.sql}
      ON CONFLICT (class_id) DO UPDATE SET class_name = excluded.class_name, students = excluded.students, fetched_at = excluded.fetched_at`,
-    [classId, className, JSON.stringify(students.map(({ id, name, externalStudentId }) => ({ id, name, externalStudentId }))), at],
+    [classId, className, JSON.stringify(students.map(({ id, name, externalStudentId }) => ({ id, name, externalStudentId }))), at, ...guard.params],
   );
+  return result.changes > 0;
 }
 
 /** Classes whose roster this device has cached, by name: Bulk Entry's class list when offline. */
 export async function cachedClasses(db: SqlExecutor): Promise<Array<{ id: string; name: string }>> {
   const rows = await db.all<{ class_id: string; class_name: string }>('SELECT class_id, class_name FROM class_roster_cache ORDER BY class_name');
   return rows.map((r) => ({ id: r.class_id, name: r.class_name }));
+}
+
+/** The per-class caches: the roster (student names and IDs, F04) and the class calendar (F08). */
+const PER_CLASS_CACHES = ['class_roster_cache', 'class_calendar_cache'] as const;
+
+/**
+ * The server answered the class list (online): drop the cached roster and calendar of every class it no longer lists,
+ * so a class the user was unassigned from is never offered from the device again (FR-SEC-003; the server stays the
+ * authority). The list is stored as the allow-list in the same transaction, so a sheet still in flight for a class
+ * not listed is not cached either, even one never cached before; classes still listed are not affected
+ * (sync/cacheEpoch.ts). `classIds` must be the complete list: GET /classes is not paginated today. If it ever is, prune only from
+ * a complete answer, or this would drop the classes on later pages.
+ */
+export async function keepRostersOf(db: SqlDriver, classIds: readonly string[]): Promise<void> {
+  await db.transaction(async (tx) => {
+    // Stored every time, even when nothing was cached yet: a sheet for a class now missing may still be in flight.
+    await replaceAllowedClasses(tx, classIds);
+    for (const table of PER_CLASS_CACHES) {
+      if (classIds.length === 0) await tx.run(`DELETE FROM ${table}`);
+      else await tx.run(`DELETE FROM ${table} WHERE class_id NOT IN (${classIds.map(() => '?').join(', ')})`, [...classIds]);
+    }
+  });
+}
+
+/** The server refused one class (FORBIDDEN or NOT_FOUND): its cached roster and calendar leave the device at once. */
+export async function forgetRoster(db: SqlDriver, classId: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    // Only this class's writes in flight are refused; other classes are not affected.
+    await bumpClassEpoch(tx, classId);
+    for (const table of PER_CLASS_CACHES) await tx.run(`DELETE FROM ${table} WHERE class_id = ?`, [classId]);
+  });
 }
 
 export async function cachedRoster(db: SqlExecutor, classId: string): Promise<CachedRoster | null> {

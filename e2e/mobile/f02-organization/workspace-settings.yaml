@@ -18,11 +18,16 @@ tags:
 - assertVisible: { id: "workspace.nameInput" }
 - assertVisible: { id: "workspace.timezoneInput", text: "Asia/Karachi" }
 - assertVisible: { id: "workspace.weekStart.MONDAY", selected: true }
-- assertVisible: "Daily reports: One report per student per date"
+# Default daily-report mode: the "Daily reports" control has the SINGLE choice ("One report per student per date")
+# selected. The label and the choice are separate elements on screen, so each is asserted.
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "workspace.reportMode", TEXT: "Daily reports" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "workspace.reportMode.SINGLE", TEXT: ".*One report per student per date.*" } }
+- assertVisible: { id: "workspace.reportMode.SINGLE", selected: true }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "workspace.nameInput" } }
 # 2. Clear the name and save → name field error; nothing saved.                                        (F02-AC3)
 - tapOn: { id: "workspace.nameInput" }
 - eraseText: 120
-- hideKeyboard
+- runFlow: ../../support/maestro/dismiss-keyboard.yaml  # not hideKeyboard: it presses Back
 - tapOn: { id: "workspace.save" }
 - assertVisible: { id: "workspace.nameInput.error" }
 - back
@@ -32,7 +37,7 @@ tags:
 - tapOn: { id: "workspace.timezoneInput" }
 - eraseText: 64
 - inputText: "Asia/Dubai"
-- hideKeyboard
+- runFlow: ../../support/maestro/dismiss-keyboard.yaml  # not hideKeyboard: it presses Back
 - tapOn: { id: "workspace.weekStart.SATURDAY" }
 - tapOn: { id: "workspace.save" }
 - assertVisible: { id: "workspace.status.success" }

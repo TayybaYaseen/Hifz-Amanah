@@ -170,8 +170,8 @@ async function partialLesson(api: APIRequestContext, ids: Ids, day = classDay(1)
 }
 
 /** A confirmed assignment carrying S1's partial Sabqi forward. */
-async function confirmedHomework(api: APIRequestContext, ids: Ids) {
-  const lesson = await partialLesson(api, ids);
+async function confirmedHomework(api: APIRequestContext, ids: Ids, day = classDay(1)) {
+  const lesson = await partialLesson(api, ids, day);
   const portion = suggested(lesson.sabqi.attemptId);
   const draft = await applied(api, draftOp(ids, 'S1', { assignedDate: lesson.day, sourceDailyRecordId: lesson.recordId, portions: [portion] }));
   const confirmed = await applied(api, confirmOp(draft.id, draft.rowVersion, await sourcesOf(api, lesson.recordId)));
@@ -442,8 +442,13 @@ test.describe('F08 · Homework and carry forward', { tag: '@F08' }, () => {
     // Record an attempt on the due homework portion; the attempt references that homework portion ID.
     const ids = await control.rosterIds();
     const teacher = await as('teacher.a1');
-    const hw = await confirmedHomework(teacher, ids);
-    const recordId = await presentRecord(teacher, ids, 'S1', today() === hw.day ? today() : classDay(0));
+    // The next class is the latest class day up to today; the homework comes from the class day before it. (On a Sunday,
+    // classDay(1) and classDay(0) are both Saturday, so they cannot be used as two different days.)
+    const nextClass = classDay(0);
+    let lessonDay = addDays(nextClass, -1);
+    while (weekday(lessonDay) === 7) lessonDay = addDays(lessonDay, -1);
+    const hw = await confirmedHomework(teacher, ids, lessonDay);
+    const recordId = await presentRecord(teacher, ids, 'S1', nextClass);
     const portion = await applied(teacher, portionOp(recordId, { section: 'SABQI', paraNumber: 3, assigned: para(1, 4), homeworkPortionId: hw.portionId }));
     const attempt = await applied(teacher, attemptOp(portion.id, 'COMPLETED'));
     const d = await record(teacher, recordId);

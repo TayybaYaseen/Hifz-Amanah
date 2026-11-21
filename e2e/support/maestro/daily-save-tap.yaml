@@ -1,0 +1,16 @@
+# Subflow (F05/F06): tap Daily Entry's Save without waiting for the record screen, for steps that expect the save to
+# be refused with field errors. daily-save.yaml uses it and then waits for the record screen.
+# Save is always at the end of the form. With several portion cards the form is long, and on a slow emulator each
+# scroll step takes several seconds, so tap.yaml's 30 s search can run out before reaching it. This searches
+# downwards for longer first (it stops as soon as Save is on screen); tap.yaml then centres and taps it.
+appId: com.hifzamanah.app
+---
+- runFlow: dismiss-dev-warning.yaml
+- runFlow:
+    when:
+      notVisible: { id: "daily.save" }
+    commands:
+      - scrollUntilVisible: { element: { id: "daily.save" }, direction: DOWN, timeout: 120000 }
+- runFlow:
+    file: tap.yaml
+    env: { ID: "daily.save" }

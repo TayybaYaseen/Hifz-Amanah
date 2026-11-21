@@ -85,11 +85,17 @@ Teacher, Admin, and Owner only; Student and Parent stay online-only and read-onl
   `PRAGMA user_version` bump. They never rewrite or delete `outbox` rows, only add columns. The unit tests run
   every migration over a populated outbox. v1: `outbox`, `sync_meta`, `conflicts`, `discards`. v2: `outbox.sent_count`,
   `sync_meta.last_server_time`, `discards.reason`, `deferred_changes`. v3: `row_sync_marks`,
-  `sync_meta.refetch_requested` / `refetch_done`, `conflicts.last_checked_at`.
+  `sync_meta.refetch_requested` / `refetch_done`, `conflicts.last_checked_at`. v4 attendance (F04), v5 Quran reference
+  cache (F06), v6 daily records (F05), v7 `daily_records.overall_label` (F07), v8 F08: `homework_assignments` (portions
+  as JSON on the row), `lesson_portions.homework_portion_id`, `sync_notices`, `class_calendar_cache`.
 - **Saving edits:** a CREATE or COMMAND uses `outbox.saveWithOp`; every edit of an existing row **must** use
   `outbox.saveWithUpdate` (or `enqueueUpdate` inside a transaction). It derives the base version (the row's
   acknowledged `row_version`, or 1 with a dependency on the unsynced CREATE) and adds a dependency on the row's latest
-  unsynced operation. F04, F05, and F08 never build `baseVersion` themselves.
+  unsynced operation. F04, F05, and F08 never build `baseVersion` themselves. A COMMAND on an existing row (F08
+  `CONFIRM_HOMEWORK`) uses `outbox.enqueueCommand`, which derives the base version the same way.
+- **Sync notices (F08):** an `APPLIED` result may carry `notices` (e.g. `CONFIRMED_HOMEWORK_UNCHANGED` after a source
+  correction); the engine stores them in `sync_notices` for the row's screen (the daily record shows "Confirmed
+  homework was not changed").
 - **Send order:** outbox `seq` order, dependencies first, and at most one operation per row at a time. A later edit
   waits for the earlier edit of the same row ("Waiting: an earlier change to this record must sync first").
 - **Retry and discard:** Retry re-queues a `FAILED` change under a new `op_id` with its original `seq`, and is
@@ -97,9 +103,11 @@ Teacher, Admin, and Owner only; Student and Parent stay online-only and read-onl
   acknowledged edit makes the next pull start from a fresh snapshot, so the server's values come back.
 - **Conflicts:** each open conflict is re-checked with the server at most once every 5 minutes, at most 50 per run,
   least recently checked first. A conflict that is no longer reachable turns its item into `FAILED` (`NOT_FOUND`).
-- **No entity tables yet.** Attendance (F04), daily records (F05), and homework (F08) add their tables as new local
-  migrations and register them in `sync/registry.ts`. Until then the real app queues nothing; the engine is
-  exercised with a test-only probe entity (`sync/testing/probe.ts`).
+- **Entity tables:** attendance (F04), daily records (F05), and homework assignments (F08, `features/homework`) are
+  registered in `sync/registry.ts`; engine unit tests also use a test-only probe entity (`sync/testing/probe.ts`).
+  Homework drafts are built on the device by `suggest()` (packages/domain/homework) in the same transaction as the
+  daily record they come from; "Confirmed on device — waiting to sync" is derived from the queued command, never
+  from a local status change.
 - **Revocation and sign-out:** sign-out first refuses new saves, stops the sync engine, and waits for the run and saves
   in flight before it counts unsynced changes. `403 ACCESS_REVOKED` locks the workspace and purges synced rows; unsynced operations
   stay visible but locked and are purged on sign-out or 30 days later (F12-AC20). "Sign out anyway" purges the
@@ -189,5 +197,9 @@ workspace database; Student and Parent never download it. F12 code, the outbox, 
   - **Backups:** `android.allowBackup` is `false` (`app.config.ts`), so Google auto-backup does not copy the
     workspaces. On Android 12+ this flag does not stop device-to-device transfer; that needs `dataExtractionRules`,
     which is not configured yet.
+  - **Offline revocation:** a device that is offline when access is revoked cannot be wiped; it keeps its synced
+    data readable until it next reaches the server, protected only by the app lock (where enabled) and device
+    security. Pending writes are never sent after revocation and are purged 30 days after detection. What is
+    protected, what is not, and the test gaps: `docs/ARCHITECTURE.md` §8.4 (F12-AC14/AC20, NFR-OFF-010/011, FR-SEC-003).
   - After an app restart while offline, staff cannot reach their work screens (offline cold start).
   - A reactivated account stays locked on the device until it signs out.

@@ -1,15 +1,112 @@
 # F06 · Quran portions and metadata — mobile E2E (docs/specs/07-f06-quran-portions-metadata.md; design.md §13 US-024)
 # Covers: F06-AC1, F06-AC2, F06-AC3, F06-AC4
+# TEST ENTRY ONLY: the reset test madrasa has no Quran metadata; step 1 adds the Surah the flow's spec names as a test
+# entry (no seed, no dataset) with a SYNTHETIC name, as in e2e/api/f06-quran-portions.spec.ts; the transliteration box
+# is required by the form and gets a neutral test value.
+# The Arabic name is typed through Maestro's clipboard (setClipboard + pasteText), because inputText is ASCII-only.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F06 metadata — Admin edits, Arabic preserved, boundary validation, no Teacher controls
 tags:
-  - pending
   - F06
   - US-024
 ---
-- launchApp:
-    clearState: true
-# 1. Sign in as admin.a → Settings → Quran metadata → add Surah: number, Arabic name "الفاتحة", 7 Ayat → saved. (F06-AC1)
-# 2. Switch to Urdu and Roman Urdu → the Arabic name is shown exactly as entered in the Quranic font.  (F06-AC3)
+- runFlow: ../../support/maestro/reset.yaml
+# 1. Sign in as admin-a → Settings → Quran metadata → add Surah: number, synthetic Arabic name "اختبار ١" (the API fixture's label, never a real Surah name), 7 Ayat → saved. (F06-AC1)
+- runFlow:
+    file: ../../support/maestro/sign-in-staff.yaml
+    env: { USER_ID: admin-a }
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.quran" } }
+- extendedWaitUntil:
+    visible: { id: "quran.addSurah" }
+    timeout: 30000
+- assertVisible: { id: "quran.surahs.empty" }
+- tapOn: { id: "quran.addSurah" }
+- extendedWaitUntil:
+    visible: { id: "surahForm.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "surahForm.number", TEXT: "1" } }
+- tapOn: { id: "surahForm.nameAr" }
+- setClipboard: "اختبار ١"
+- pasteText
+- runFlow: ../../support/maestro/dismiss-keyboard.yaml
+- assertVisible: { id: "surahForm.nameAr", text: "اختبار ١" }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "surahForm.nameAr.preview", TEXT: "اختبار ١" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "surahForm.nameTranslit", TEXT: "Synthetic 1" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "surahForm.ayahCount", TEXT: "7" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "surahForm.save" } }
+- extendedWaitUntil:
+    visible: { id: "quran.surah.1" }
+    timeout: 30000
+- assertVisible: { id: "quran.surah.1.nameAr", text: "اختبار ١" }
+- assertVisible: { text: "Ayat: 7 · .*" }
+# The audit entry is covered by e2e/api/f06-quran-portions.spec.ts 'F06-AC1 (US-024) Admin Surah and Para boundary
+# edits are saved per madrasa and audited'.
 # 3. Edit a Para boundary with end before start → field error.                                         (F06-AC4)
-# 4. Sign in as teacher.a1 → Settings has no Quran metadata edit controls.                             (F06-AC2)
+- tapOn: { id: "quran.tab.paras" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "quran.addPara" } }
+- extendedWaitUntil:
+    visible: { id: "paraForm.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "paraForm.number", TEXT: "1" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "paraForm.startSurah", TEXT: "1" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "paraForm.startAyah", TEXT: "5" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "paraForm.endSurah", TEXT: "1" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "paraForm.endAyah", TEXT: "2" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "paraForm.save" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "paraForm.endAyah.error" } }
+- assertVisible: { id: "paraForm.screen" }
+- runFlow: ../../support/maestro/back-home.yaml
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.quran" } }
+- tapOn: { id: "quran.tab.paras" }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "quran.paras.empty" } }
+- runFlow: ../../support/maestro/back-home.yaml
+# 2. Switch to Urdu and Roman Urdu → the Arabic name is shown exactly as entered in the Quranic font.  (F06-AC3)
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.profile" } }
+- runFlow: { file: ../../support/maestro/set-language.yaml, env: { LOCALE: ur } }
+- runFlow: ../../support/maestro/back-home.yaml
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.quran" } }
+- extendedWaitUntil:
+    visible: { id: "quran.surah.1.nameAr" }
+    timeout: 30000
+- assertVisible: { id: "quran.surah.1.nameAr", text: "اختبار ١" }
+- runFlow: ../../support/maestro/back-home.yaml
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.profile" } }
+- runFlow: { file: ../../support/maestro/set-language.yaml, env: { LOCALE: ur-Latn } }
+- runFlow: ../../support/maestro/back-home.yaml
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.quran" } }
+- extendedWaitUntil:
+    visible: { id: "quran.surah.1.nameAr" }
+    timeout: 30000
+- assertVisible: { id: "quran.surah.1.nameAr", text: "اختبار ١" }
+- runFlow: ../../support/maestro/back-home.yaml
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.profile" } }
+- runFlow: { file: ../../support/maestro/set-language.yaml, env: { LOCALE: en } }
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow: ../../support/maestro/sign-out.yaml
+# 4. Sign in as teacher-a1 → Settings has no Quran metadata edit controls (the API refusal is covered by
+#    e2e/api/f06-quran-portions.spec.ts 'F06-AC2 (US-024) a Teacher cannot edit Quran metadata').      (F06-AC2)
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.quran" } }
+- extendedWaitUntil:
+    visible: { id: "quran.surah.1" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "quran.readOnly" } }
+- assertNotVisible: { id: "quran.addSurah" }
+- assertNotVisible: { id: "quran.review" }
+- tapOn: { id: "quran.tab.paras" }
+- assertNotVisible: { id: "quran.addPara" }
+- tapOn: { id: "quran.tab.surahs" }
+# A Surah row opens no edit form for a Teacher.
+- tapOn: { id: "quran.surah.1" }
+- assertNotVisible: { id: "surahForm.screen" }
+- assertVisible: { id: "quran.screen" }

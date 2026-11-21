@@ -1,0 +1,17 @@
+# Subflow (F08): from Home, open Homework for a student of class Hifz A1.
+# Usage: runFlow { file: ../../support/maestro/homework-open.yaml, env: { STUDENT: EXT-A-001 } }
+appId: com.hifzamanah.app
+---
+- tapOn: { id: "nav.homework" }
+- extendedWaitUntil:
+    visible: { id: "homework.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "homework.class.Hifz A1" }
+- extendedWaitUntil:
+    visible: { id: "homework.student.${STUDENT}" }
+    timeout: 30000
+- tapOn: { id: "homework.student.${STUDENT}" }
+- extendedWaitUntil:
+    visible: { id: "homework.tab.suggested" }
+    timeout: 30000
+- waitForAnimationToEnd

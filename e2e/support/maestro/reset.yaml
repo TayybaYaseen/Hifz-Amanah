@@ -9,8 +9,31 @@ appId: com.hifzamanah.app
       ACTION: reset
 - launchApp:
     clearState: true
-# Debug builds load the JS bundle from Metro on a cold start; a slow emulator can take over 30 s, past the default
-# assertVisible wait. Wait up to 2 minutes; the flow still fails if the sign-in screen never appears.
+# Debug builds load the JS bundle from Metro on a cold start (the first run after a Metro cache clear also builds it);
+# a slow emulator can take minutes. Wait up to about 2.5 minutes in 10 s rounds. An overloaded emulator can also show
+# Android's own "System UI isn't responding" dialog over the app: it is not the app's, so each round chooses Wait. Only
+# that exact System UI dialog is dismissed; an app ANR still fails the flow, and so does a sign-in screen that never
+# appears (the assert below).
+- repeat:
+    while:
+      notVisible:
+        id: "signin.screen"
+    times: 15
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: "System UI isn't responding"
+          commands:
+            - tapOn:
+                text: "Wait"
+      - extendedWaitUntil:
+          visible:
+            id: "signin.screen"
+          timeout: 10000
+          optional: true
+# The rounds above can return early while the app has no window content yet (seen in long gate sessions, where a cold
+# start took about 90 s), so the final check waits on the sign-in screen itself rather than asserting at once.
 - extendedWaitUntil:
     visible:
       id: "signin.screen"

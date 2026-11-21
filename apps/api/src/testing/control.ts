@@ -10,7 +10,7 @@ import { z } from 'zod';
 import { loginIdKey } from '@hifz/contracts';
 import type { Clock } from '../platform/clock.ts';
 import type { Db } from '../platform/db.ts';
-import { AppError, parse } from '../platform/errors.ts';
+import { AppError, body, parse } from '../platform/errors.ts';
 import type { MemoryMailer } from '../platform/mailer.ts';
 import { auditFaults } from '../modules/audit/audit.ts';
 import { decryptSecret, encryptSecret } from '../modules/identity/secrets.ts';
@@ -20,6 +20,10 @@ import type { SyncRegistry } from '../modules/sync/handler.ts';
 import { newTotpSecret, totpForStep, totpStep } from '../modules/identity/totp.ts';
 import { TEST_PASSWORD, classes as fixtureClasses, madaris, students as fixtureStudents } from '../../../../e2e/fixtures/personas.ts';
 import { seedPersonas } from './seed.ts';
+import { weekdayOf } from '@hifz/domain/calendar';
+import { ScheduleService } from '../modules/calendar/schedule-service.ts';
+import type { Actor } from '../modules/identity/auth-service.ts';
+import { todayFor } from '../modules/roster/shared.ts';
 import { parseSeed, SeedRejectedError, type QuranSeedLoader } from '../modules/quran-ref/seed.ts';
 import { QuranSourceRegistry } from '../modules/quran-ref/sources.ts';
 import { convertSources, type ValidationReport } from '../modules/quran-ref/converter/convert.ts';
@@ -131,6 +135,17 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
 
   const sentTo = (loginId: string) => deps.mailer.sent.filter((m) => loginIdKey(m.meta.userId) === loginIdKey(loginId));
 
+  // F04-AC10 (mobile E2E): the next `n` successful sync pushes are processed and committed, then answered with a
+  // temporary 503 as if the acknowledgement were lost on the way back, so the device retries operations the server
+  // already holds. Armed only through /__test/sync/drop-ack-next; cleared by /reset.
+  let dropAcksLeft = 0;
+  app.addHook('onSend', async (request, reply, payload) => {
+    if (dropAcksLeft <= 0 || request.method !== 'POST' || request.routeOptions.url !== '/sync/push' || reply.statusCode !== 200) return payload;
+    dropAcksLeft -= 1;
+    reply.code(503).header('content-type', 'application/json; charset=utf-8');
+    return JSON.stringify(body(new AppError('INTERNAL')));
+  });
+
   app.register(
     async (scope) => {
       scope.addHook('onRequest', async (request) => {
@@ -141,6 +156,7 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
       scope.post('/reset', async () => {
         await sql.raw(`TRUNCATE ${tables().join(', ')} RESTART IDENTITY`).execute(deps.db);
         deps.sync.control.reset();
+        dropAcksLeft = 0;
         deps.clock.reset();
         deps.mailer.clear();
         deps.logSink?.clear();
@@ -203,14 +219,17 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
 
       // A code the server will accept now. Codes cannot be reused, so after two sign-ins in one 30-second step
       // this moves the test clock to the next step instead of returning a code that would be refused.
+      // ?prefer=next (mobile E2E on slow emulators): the next step's code, which the server's real ±1-step drift
+      // already accepts now and keeps accepting for 60–90 s instead of 30–60 s, so slow typing does not expire it.
       scope.get('/totp/:loginId', async (request) => {
         const id = await userIdOf((request.params as { loginId: string }).loginId);
+        const preferNext = (request.query as { prefer?: string } | undefined)?.prefer === 'next';
         const row = await deps.db.selectFrom('user_totp').select(['secret_encrypted', 'last_used_step']).where('user_id', '=', id).executeTakeFirst();
         if (!row) throw new AppError('NOT_FOUND');
         const last = row.last_used_step === null ? -Infinity : Number(row.last_used_step);
         for (;;) {
           const current = totpStep(deps.clock.now().getTime());
-          const step = [current, current + 1].find((s) => s > last);
+          const step = (preferNext ? [current + 1] : [current, current + 1]).find((s) => s > last);
           if (step !== undefined) return { code: totpForStep(decryptSecret(deps.totpKey, row.secret_encrypted), step) };
           deps.clock.advance(30_000);
         }
@@ -317,6 +336,38 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
         return { ok: true, revokedVersions };
       });
 
+      // F08 mobile E2E: the newest lesson portion of a seeded student (by external ID), section, and Para in the madrasa
+      // with this code, so a Maestro flow (which cannot read the app's IDs) can plant a legacy attempt on the portion it
+      // just recorded. External student IDs are unique per organization only, so the organization is required.
+      scope.post('/hifz/lesson-portion-lookup', async (request) => {
+        const input = parse(
+          z.strictObject({
+            organizationCode: z.string().min(1),
+            externalStudentId: z.string().min(1).max(64),
+            section: z.enum(['SABAQ', 'SABQI', 'MANZIL']),
+            paraNumber: z.number().int().min(1).max(30).nullable(),
+          }),
+          request.body,
+        );
+        const org = await deps.db.selectFrom('organizations').select('id').where('code', '=', input.organizationCode).executeTakeFirst();
+        if (!org) throw new AppError('NOT_FOUND');
+        let q = deps.db
+          .selectFrom('lesson_portions as p')
+          .innerJoin('daily_records as r', 'r.id', 'p.daily_record_id')
+          .innerJoin('students as s', 's.id', 'r.student_id')
+          .select('p.id')
+          .where('p.organization_id', '=', org.id)
+          .where('r.organization_id', '=', org.id)
+          .where('s.organization_id', '=', org.id)
+          .where('s.external_student_id', '=', input.externalStudentId)
+          .where('p.section', '=', input.section)
+          .where('p.removed_at', 'is', null);
+        if (input.paraNumber !== null) q = q.where('p.para_number', '=', input.paraNumber);
+        const row = await q.orderBy('p.created_at', 'desc').executeTakeFirst();
+        if (!row) throw new AppError('NOT_FOUND');
+        return { id: row.id };
+      });
+
       // F08-AC4: a legacy attempt whose completed unit differs from the portion's assigned unit. Validation refuses this
       // on every write path today (FR-QTY-004); data from before the rule, or a future import, could still hold it, so
       // tests plant it directly (synthetic only) to prove nothing is converted and the portion is flagged for review.
@@ -359,6 +410,65 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
         return { id };
       });
 
+      // Mobile E2E (F05/F08): Maestro flows record lessons and attendance on the device's real today, and the fixture
+      // classes meet Monday–Saturday, so on a Sunday every such flow is (correctly) refused. When today is not one of
+      // the class's weekdays, this has the madrasa's Admin add today's weekday from today on through the real schedule
+      // service (F04-AC2: a new version from today; earlier days keep the version that was in force), exactly as an
+      // Admin would. On a scheduled day it changes nothing. Production scheduling rules are untouched.
+      scope.post('/calendar/ensure-class-day', async (request) => {
+        const input = parse(z.strictObject({ organizationCode: z.string().min(1), className: z.string().min(1) }), request.body);
+        const org = await deps.db.selectFrom('organizations').select('id').where('code', '=', input.organizationCode).executeTakeFirst();
+        if (!org) throw new AppError('NOT_FOUND');
+        const klass = await deps.db.selectFrom('classes').select('id').where('organization_id', '=', org.id).where('name', '=', input.className).where('status', '=', 'ACTIVE').executeTakeFirst();
+        if (!klass) throw new AppError('NOT_FOUND');
+        // The acting Admin is fixed, never arbitrary: the madrasa's longest-standing active Admin (earliest membership),
+        // ties broken by user ID. Only an active, unrevoked ADMIN of this madrasa qualifies (an Owner is not used: the
+        // schedule change is an Admin task, and the audit names that Admin).
+        const admin = await deps.db
+          .selectFrom('memberships as m')
+          .innerJoin('users as u', 'u.id', 'm.user_id')
+          .select(['m.user_id', 'u.login_id'])
+          .where('m.organization_id', '=', org.id)
+          .where('m.role', '=', 'ADMIN')
+          .where('m.status', '=', 'ACTIVE')
+          .where('m.revoked_at', 'is', null)
+          .where('u.status', '=', 'ACTIVE')
+          .orderBy('m.created_at', 'asc')
+          .orderBy('m.user_id', 'asc')
+          .executeTakeFirst();
+        if (!admin) throw new AppError('NOT_FOUND');
+        const today = await todayFor(deps.db, org.id, deps.clock);
+        const weekday = weekdayOf(today);
+        const inForce = await deps.db
+          .selectFrom('class_schedules')
+          .select(['weekdays', 'start_time', 'end_time'])
+          .where('organization_id', '=', org.id)
+          .where('class_id', '=', klass.id)
+          .where('superseded_at', 'is', null)
+          .where('effective_from', '<=', today)
+          .where((eb) => eb.or([eb('effective_to', 'is', null), eb('effective_to', '>=', today)]))
+          .orderBy('effective_from', 'desc')
+          .executeTakeFirst();
+        const weekdays = (inForce?.weekdays ?? []).map(Number);
+        if (weekdays.includes(weekday)) return { date: today, changed: false };
+        const actor: Actor = {
+          userId: admin.user_id,
+          sessionId: uuidv7(),
+          organizationId: org.id,
+          role: 'ADMIN',
+          allClasses: false,
+          loginId: admin.login_id,
+          authenticatedAt: deps.clock.now(),
+        };
+        await new ScheduleService(deps.db, deps.clock).set(actor, klass.id, {
+          effectiveFrom: today,
+          weekdays: [...weekdays, weekday],
+          startTime: inForce?.start_time ? String(inForce.start_time).slice(0, 5) : null,
+          endTime: inForce?.end_time ? String(inForce.end_time).slice(0, 5) : null,
+        });
+        return { date: today, changed: true };
+      });
+
       scope.get('/roster/ids', async () => {
         const orgs = await deps.db.selectFrom('organizations').select(['id', 'code']).execute();
         const orgOf = (madrasa: keyof typeof madaris) => orgs.find((o) => o.code === madaris[madrasa].code)?.id ?? '';
@@ -394,6 +504,46 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
         );
         deps.sync.control.failNext(count, status);
         return { status: 'armed', count };
+      });
+
+      // The next `count` successful pushes are committed, then answered 503: the acknowledgement is lost (F04-AC10).
+      scope.post('/sync/drop-ack-next', async (request) => {
+        const { count } = parse(z.strictObject({ count: z.number().int().min(0).max(100) }), request.body);
+        dropAcksLeft = count;
+        return { status: 'armed', count };
+      });
+
+      // How many dropped acknowledgements are still armed (0 once the app's push has met it).
+      scope.get('/sync/drop-ack-next', async () => ({ left: dropAcksLeft }));
+
+      // Attendance records of one class on one date, per student, with the number of ATTENDANCE_RECORDED audit entries
+      // for each record (F04-AC10 mobile E2E: one record per student after a retried save). No reason or note text.
+      scope.post('/attendance/records', async (request) => {
+        const input = parse(z.strictObject({ organizationCode: z.string().min(1), className: z.string().min(1), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }), request.body);
+        const org = await deps.db.selectFrom('organizations').select('id').where('code', '=', input.organizationCode).executeTakeFirst();
+        if (!org) throw new AppError('NOT_FOUND');
+        const klass = await deps.db.selectFrom('classes').select('id').where('organization_id', '=', org.id).where('name', '=', input.className).executeTakeFirst();
+        if (!klass) throw new AppError('NOT_FOUND');
+        const rows = await deps.db
+          .selectFrom('attendance_records as a')
+          .innerJoin('students as s', 's.id', 'a.student_id')
+          .select(['a.id', 'a.status', 's.external_student_id'])
+          .where('a.organization_id', '=', org.id)
+          .where('a.class_id', '=', klass.id)
+          .where('a.report_date', '=', input.date)
+          .orderBy('s.external_student_id')
+          .execute();
+        const items = [];
+        for (const r of rows) {
+          const audits = await deps.db
+            .selectFrom('audit_logs')
+            .select((eb) => eb.fn.countAll<string>().as('n'))
+            .where('target_id', '=', r.id)
+            .where('action', '=', 'ATTENDANCE_RECORDED')
+            .executeTakeFirstOrThrow();
+          items.push({ externalStudentId: r.external_student_id, status: r.status, recordedAudits: Number(audits.n) });
+        }
+        return { items };
       });
 
       // The stored result of one operation, for E2E assertions (no fields: sync_ops never stores them).

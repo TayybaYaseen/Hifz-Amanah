@@ -243,7 +243,7 @@ export function PerformanceBlock({ form, onChange, prefix, index, errors }: { fo
 }
 
 /** Sabaq: Surah/Ayat range, derived Para (read-only), Total Lines from the layout, Assigned lines. Lines only. */
-function SabaqFields({ form, onChange, prefix, index, errors }: { form: PortionForm; onChange: (next: PortionForm) => void; prefix: string; index: Index; errors: SlotErrors }) {
+export function SabaqFields({ form, onChange, prefix, index, errors }: { form: PortionForm; onChange: (next: PortionForm) => void; prefix: string; index: Index; errors: SlotErrors }) {
   const { t } = useTranslation();
   const derived = sabaqDerived(form, index);
   const set = (patch: Partial<PortionForm>) => onChange({ ...form, ...patch });
@@ -312,7 +312,7 @@ function SabaqFields({ form, onChange, prefix, index, errors }: { form: PortionF
 }
 
 /** Sabqi / Manzil: Para (Sabqi defaults to the Sabaq Para), assigned unit and amount (presets or Lines/Ayat/Pages). */
-function RevisionFields({ form, onChange, prefix, errors, sabqiDefault }: { form: PortionForm; onChange: (next: PortionForm) => void; prefix: string; errors: SlotErrors; sabqiDefault: number | null }) {
+export function RevisionFields({ form, onChange, prefix, errors, sabqiDefault }: { form: PortionForm; onChange: (next: PortionForm) => void; prefix: string; errors: SlotErrors; sabqiDefault: number | null }) {
   const { t } = useTranslation();
   const [pending, setPending] = useState<{ to: UnitChoice; kind: 'KEEP' | 'CLEAR'; amount: string; from: string } | null>(null);
   const choose = (to: UnitChoice) => {
@@ -400,6 +400,8 @@ export function PortionCard({ form, number, onChange, onRemove, index, errors, s
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space[2] }}>
         <AppText role="cardTitle" testID={`${prefix}.title`}>{portionTitle(t, form.section, number)}</AppText>
         {form.isExtra ? <AppText role="helper" color={colors.info} testID={`${prefix}.extra`}>{`＋ ${t('daily.extra')}`}</AppText> : null}
+        {/* F08: recorded against a confirmed homework portion (FR-HW-015, F08-AC16). */}
+        {form.homeworkPortionId ? <AppText role="helper" color={colors.info} testID={`${prefix}.homeworkLink`}>{`⇢ ${t('homework.linked')}`}</AppText> : null}
         {form.perf.status ? <StatusChip status={form.perf.status} testID={`${prefix}.statusChip.${form.perf.status}`} /> : null}
       </View>
       {form.section === 'SABAQ' ? (

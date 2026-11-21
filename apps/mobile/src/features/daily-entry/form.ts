@@ -104,6 +104,8 @@ export interface PortionForm {
   /** Saved attempts (edit mode); the card corrects the latest only (UI spec 8.7). */
   attemptCount: number;
   latestAttemptId: string | null;
+  /** F08: the confirmed homework portion this portion is recorded against (FR-HW-015), or null. */
+  homeworkPortionId: string | null;
 }
 
 export const emptyPerformance = (): PerformanceForm => ({ status: null, completedText: '', completedPreset: null, quality: null, noMistakes: false, mistakes: [], remarks: '' });
@@ -130,6 +132,7 @@ export function newPortion(key: string, section: Section, opts: { isExtra?: bool
     perf: emptyPerformance(),
     attemptCount: 0,
     latestAttemptId: null,
+    homeworkPortionId: null,
   };
 }
 
@@ -182,6 +185,7 @@ export function portionFromSaved(p: LocalPortion): PortionForm {
     },
     attemptCount: p.attempts.length,
     latestAttemptId: latest?.id ?? null,
+    homeworkPortionId: p.homeworkPortionId ?? null,
   };
 }
 
@@ -594,9 +598,10 @@ export function portionWrite(form: PortionForm, position: number, index: Referen
       assigned,
       totalLines: p.totalLines,
       totalLinesSource: v.derived?.source ?? 'MANUAL',
+      homeworkPortionId: form.homeworkPortionId,
     };
   }
-  return { section: form.section, position, isExtra: form.isExtra, paraNumber: p.paraNumber, range: null, assigned, totalLines: null, totalLinesSource: null };
+  return { section: form.section, position, isExtra: form.isExtra, paraNumber: p.paraNumber, range: null, assigned, totalLines: null, totalLinesSource: null, homeworkPortionId: form.homeworkPortionId };
 }
 
 /** The attempt to store, normalized by the domain (FR-QTY-007: NOT_REMEMBERED → 0; COMPLETED → assigned). */

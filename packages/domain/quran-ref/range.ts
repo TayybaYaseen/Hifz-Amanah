@@ -222,6 +222,29 @@ export function ayahLines(layout: readonly LayoutRow[]): LayoutLine[] {
  * Records whose stored range is no longer valid after a metadata edit (F06-AC19, FR-SAB-007). The records are never
  * changed; the caller lists these for Admin review.
  */
-export function rangesNeedingReview<T extends { id: string; range: AyahRange }>(records: readonly T[], surahs: readonly SurahMeta[]): T[] {
-  return records.filter((r) => validateAyahRange(r.range, surahs).length > 0);
+export function rangesNeedingReview<T extends { id: string; range: AyahRange; paraNumber?: number | null }>(
+  records: readonly T[],
+  surahs: readonly SurahMeta[],
+  paras?: readonly ParaBoundary[],
+): T[] {
+  return records.filter((r) => recordReviewIssues(r, surahs, paras).length > 0);
+}
+
+/** Why a stored record no longer fits the metadata (F06-AC19). */
+export type ReviewIssue = RangeIssue | { field: 'paraNumber'; code: 'PARA_CHANGED'; derived: number | null };
+
+/**
+ * The review issues of one stored record (F06-AC19, FR-SAB-007, DEC-B32): its range no longer fits the Surah's Ayat
+ * count, or (when the record stores a Para derived from its range, as Sabaq does, FR-SAB-001) the corrected Para
+ * boundaries now place its start in another Para, or in none (`derived: null`). The record is never changed.
+ */
+export function recordReviewIssues(
+  record: { range: AyahRange; paraNumber?: number | null },
+  surahs: readonly SurahMeta[],
+  paras?: readonly ParaBoundary[],
+): ReviewIssue[] {
+  const issues: ReviewIssue[] = validateAyahRange(record.range, surahs);
+  if (issues.length || paras === undefined || record.paraNumber === undefined || record.paraNumber === null) return issues;
+  const derived = paraFor({ surah: record.range.surah, ayah: record.range.ayahStart }, paras);
+  return derived === record.paraNumber ? issues : [{ field: 'paraNumber', code: 'PARA_CHANGED', derived }];
 }

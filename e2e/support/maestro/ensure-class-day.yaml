@@ -1,0 +1,13 @@
+# Subflow: make sure class Hifz A1 (madrasa ALIF) meets today, so a flow can record on the device's real today.
+# The fixture classes meet Monday–Saturday. On a Sunday the madrasa's Admin adds today's weekday from today on through
+# the real schedule service (F04-AC2); on a scheduled day nothing changes. Run it after reset.yaml and before signing
+# in, so the device pulls the schedule in force.
+# Usage: - runFlow: ../../support/maestro/ensure-class-day.yaml
+appId: com.hifzamanah.app
+---
+- runScript:
+    file: control.js
+    env:
+      ACTION: ensureClassDay
+      ORG_CODE: ALIF
+      CLASS_NAME: Hifz A1

@@ -27,6 +27,7 @@ import type { Outbox, OutboxItem } from '../../sync/outbox.ts';
 import type { EntityRegistry, LocalEntityHandler } from '../../sync/registry.ts';
 import { DAILY_RECORD_RETENTION_DAYS } from '../../sync/retention.ts';
 import { writeMarkInTx, type MarkToSave } from '../attendance/local.ts';
+import { homeworkDepsInTx, rebuildDraftsInTx } from '../homework/local.ts';
 
 export type Section = 'SABAQ' | 'SABQI' | 'MANZIL';
 export const HIFZ_ENTITIES = ['daily_record', 'lesson_portion', 'portion_attempt'] as const;
@@ -148,6 +149,8 @@ export interface LocalPortion {
   totalLines: number | null;
   totalLinesSource: TotalLinesSource | null;
   lineCountEdition: string | null;
+  /** F08: the confirmed homework portion this is the next-class work for (FR-HW-015), or null. */
+  homeworkPortionId?: string | null;
   removed: boolean;
   /** Oldest first; the current attempt is last. */
   attempts: LocalAttempt[];
@@ -204,6 +207,7 @@ interface PortionRow {
   total_lines: number | null;
   total_lines_source: TotalLinesSource | null;
   line_count_edition: string | null;
+  homework_portion_id?: string | null;
   removed: number;
 }
 
@@ -282,6 +286,7 @@ const toPortion = (r: PortionRow, attempts: LocalAttempt[]): LocalPortion => ({
   totalLines: num(r.total_lines),
   totalLinesSource: r.total_lines_source,
   lineCountEdition: r.line_count_edition,
+  homeworkPortionId: r.homework_portion_id ?? null,
   removed: Boolean(Number(r.removed)),
   attempts: attempts.filter((a) => a.lessonPortionId === r.id).sort((a, b) => a.attemptNo - b.attemptNo),
 });
@@ -312,15 +317,15 @@ async function upsertPortion(tx: SqlExecutor, id: string, rowVersion: number, f:
   const r = f.range ?? null;
   await tx.run(
     `INSERT INTO lesson_portions (id, row_version, daily_record_id, report_date, section, position, is_extra, para_number, surah_start,
-       ayah_start, surah_end, ayah_end, assigned_unit, assigned_num, assigned_den, total_lines, total_lines_source, line_count_edition, removed)
-     VALUES (?, ?, ?, (SELECT report_date FROM daily_records WHERE id = ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ayah_start, surah_end, ayah_end, assigned_unit, assigned_num, assigned_den, total_lines, total_lines_source, line_count_edition, removed, homework_portion_id)
+     VALUES (?, ?, ?, (SELECT report_date FROM daily_records WHERE id = ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (id) DO UPDATE SET row_version = excluded.row_version, daily_record_id = excluded.daily_record_id,
        report_date = COALESCE(excluded.report_date, lesson_portions.report_date), section = excluded.section,
        position = excluded.position, is_extra = excluded.is_extra, para_number = excluded.para_number,
        surah_start = excluded.surah_start, ayah_start = excluded.ayah_start, surah_end = excluded.surah_end, ayah_end = excluded.ayah_end,
        assigned_unit = excluded.assigned_unit, assigned_num = excluded.assigned_num, assigned_den = excluded.assigned_den,
        total_lines = excluded.total_lines, total_lines_source = excluded.total_lines_source,
-       line_count_edition = excluded.line_count_edition, removed = excluded.removed`,
+       line_count_edition = excluded.line_count_edition, removed = excluded.removed, homework_portion_id = excluded.homework_portion_id`,
     [
       id,
       rowVersion,
@@ -341,6 +346,7 @@ async function upsertPortion(tx: SqlExecutor, id: string, rowVersion: number, f:
       f.totalLinesSource ?? null,
       f.lineCountEdition ?? null,
       f.removed ? 1 : 0,
+      f.homeworkPortionId ?? null,
     ],
   );
 }
@@ -572,6 +578,7 @@ export async function storeDetail(db: SqlDriver, detail: DailyRecordDetail, name
           totalLines: p.totalLines,
           totalLinesSource: p.totalLinesSource,
           lineCountEdition: p.lineCountEdition,
+          homeworkPortionId: p.homeworkPortionId ?? null,
           removed: p.removed,
         });
       }
@@ -619,6 +626,8 @@ export interface PortionWrite {
   assigned: Quantity;
   totalLines: number | null;
   totalLinesSource: TotalLinesSource | null;
+  /** F08: the confirmed homework portion this portion is the next-class work for (FR-HW-015, F08-AC16). */
+  homeworkPortionId?: string | null;
 }
 
 export interface Actor {
@@ -642,6 +651,7 @@ const portionSyncFields = (recordId: string, p: PortionWrite) => ({
   assigned: p.assigned,
   totalLines: p.section === 'SABAQ' ? p.totalLines : null,
   totalLinesSource: p.section === 'SABAQ' ? p.totalLinesSource : null,
+  homeworkPortionId: p.homeworkPortionId ?? null,
 });
 
 const portionGroup = (p: PortionWrite) => {
@@ -654,8 +664,8 @@ const attemptOutcome = (a: AttemptWrite) => ({ status: a.status, completed: a.co
 async function insertPortion(tx: SqlExecutor, id: string, recordId: string, reportDate: string, p: PortionWrite): Promise<void> {
   await tx.run(
     `INSERT INTO lesson_portions (id, row_version, daily_record_id, report_date, section, position, is_extra, para_number, surah_start, ayah_start,
-       surah_end, ayah_end, assigned_unit, assigned_num, assigned_den, total_lines, total_lines_source, removed)
-     VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+       surah_end, ayah_end, assigned_unit, assigned_num, assigned_den, total_lines, total_lines_source, removed, homework_portion_id)
+     VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
     [
       id,
       recordId,
@@ -673,6 +683,7 @@ async function insertPortion(tx: SqlExecutor, id: string, recordId: string, repo
       p.assigned.denominator,
       p.section === 'SABAQ' ? p.totalLines : null,
       p.section === 'SABAQ' ? p.totalLinesSource : null,
+      p.homeworkPortionId ?? null,
     ],
   );
 }
@@ -731,7 +742,8 @@ async function createPortionWithAttempt(
     opType: 'CREATE',
     baseVersion: null,
     fields: portionSyncFields(ctx.recordId, p),
-    dependsOn: ctx.dependsOn,
+    // A link to homework waits for that assignment's unsynced CREATE or confirmation (the server checks it is confirmed).
+    dependsOn: [...new Set([...ctx.dependsOn, ...(p.homeworkPortionId ? await homeworkDepsInTx(tx, outbox, [p.homeworkPortionId]) : [])])],
     label: ctx.label,
   });
   const attemptId = outbox.newEntityId();
@@ -763,6 +775,11 @@ export interface NewEntryInput {
   portions: Array<{ portion: PortionWrite; attempt: AttemptWrite }>;
   /** Device time of the save, ISO. */
   now: string;
+  /**
+   * F08: runs inside the same transaction once the record and its portions are written (the homework draft built by
+   * suggest() from this record, plan §2.1), so the record and its draft are saved together or not at all.
+   */
+  afterSave?: (tx: SqlExecutor, recordId: string) => Promise<void>;
 }
 
 /**
@@ -794,6 +811,7 @@ export async function saveNewEntry(outbox: Outbox, input: NewEntryInput): Promis
     for (const { portion, attempt } of input.portions) {
       await createPortionWithAttempt(tx, outbox, { recordId, reportDate: input.reportDate, label, actor: input.actor, at: input.now, dependsOn: [recordOp, ...deps] }, portion, attempt);
     }
+    if (input.afterSave) await input.afterSave(tx, recordId);
     return recordId;
   }, []);
   return result;
@@ -856,20 +874,24 @@ export async function saveCorrection(outbox: Outbox, input: CorrectionInput): Pr
       ops += 1;
     }
     const recordCreate = await pendingCreate(tx, outbox, 'daily_record', input.recordId);
+    // F08 (review H1): the lesson portions whose source changed; their local drafts are rebuilt below, in this transaction.
+    const touched = new Set<string>();
     for (const c of input.portions) {
       if (c.id === null) {
         if (c.removed || !c.attempt) continue;
-        await createPortionWithAttempt(
+        const created = await createPortionWithAttempt(
           tx,
           outbox,
           { recordId: input.recordId, reportDate: input.reportDate, label, actor: input.actor, at: input.now, dependsOn: [...(recordCreate ? [recordCreate] : []), ...deps] },
           c.portion,
           c.attempt,
         );
+        touched.add(created.portionId);
         ops += 2;
         continue;
       }
       if (c.removed) {
+        touched.add(c.id);
         await tx.run('UPDATE lesson_portions SET removed = 1 WHERE id = ?', [c.id]);
         await outbox.enqueueUpdate(tx, { entity: 'lesson_portion', entityId: c.id, fields: { removed: true }, label });
         ops += 1;
@@ -897,14 +919,20 @@ export async function saveCorrection(outbox: Outbox, input: CorrectionInput): Pr
         );
         const fields = { ...(c.positionChanged ? { position: p.position } : {}), ...(c.portionChanged ? portionGroup(p) : {}) };
         await outbox.enqueueUpdate(tx, { entity: 'lesson_portion', entityId: c.id, fields, dependsOn: deps, label });
+        touched.add(c.id);
         ops += 1;
       }
       if (c.attempt && c.latestAttemptId && (c.outcomeChanged || c.remarksChanged)) {
         await updateAttemptRow(tx, c.latestAttemptId, c.attempt);
         const fields = { ...(c.outcomeChanged ? attemptOutcome(c.attempt) : {}), ...(c.remarksChanged ? { remarks: c.attempt.remarks } : {}) };
         await outbox.enqueueUpdate(tx, { entity: 'portion_attempt', entityId: c.latestAttemptId, fields, dependsOn: deps, label });
+        if (c.outcomeChanged) touched.add(c.id);
         ops += 1;
       }
+    }
+    if (touched.size > 0) {
+      const record = await readRecord(tx, input.recordId);
+      if (record) ops += await rebuildDraftsInTx(tx, outbox, record, touched);
     }
     return ops;
   }, []);
@@ -932,6 +960,10 @@ export async function addAttempt(outbox: Outbox, input: { portionId: string; rep
       dependsOn: portionCreate ? [portionCreate] : [],
       label,
     });
+    // F08 (review H1): the latest attempt changed, so the record's local drafts follow it in this transaction.
+    const owner = await tx.get<{ daily_record_id: string }>('SELECT daily_record_id FROM lesson_portions WHERE id = ?', [input.portionId]);
+    const record = owner ? await readRecord(tx, owner.daily_record_id) : null;
+    if (record) await rebuildDraftsInTx(tx, outbox, record, [input.portionId]);
     return id;
   }, []);
   return result;

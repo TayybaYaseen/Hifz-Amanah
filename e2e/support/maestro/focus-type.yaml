@@ -1,0 +1,14 @@
+# Subflow: tap a field, wait until it really has input focus, then clear it and type.
+# On a slow emulator `inputText` straight after `tapOn` can start before the field is focused, and the first
+# characters are lost ("admin-a" arrived as "dmin-a" and the app rightly refused the sign-in). Waiting on the focused
+# state removes that race; it changes nothing the app does. Callers still assert the resulting value where the field
+# shows it (a password field does not).
+# Usage: runFlow { file: focus-type.yaml, env: { ID: "signin.userId", TEXT: "admin-a" } } (clears up to 64 characters)
+appId: com.hifzamanah.app
+---
+- tapOn: { id: "${ID}" }
+- extendedWaitUntil:
+    visible: { id: "${ID}", focused: true }
+    timeout: 30000  # a slow emulator can take over 15 s to open the keyboard; ends as soon as the field has focus
+- eraseText: 64
+- inputText: ${TEXT}

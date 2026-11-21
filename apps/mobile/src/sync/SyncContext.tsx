@@ -19,12 +19,14 @@ import { secureRandomBytes } from './platform.ts';
 import { appRegistry, type EntityRegistry } from './registry.ts';
 import { registerAttendance } from '../features/attendance/local.ts';
 import { cacheReportMode, registerDailyEntry } from '../features/daily-entry/local.ts';
+import { registerHomework } from '../features/homework/local.ts';
 import { httpSyncApi, type ConflictApi } from './transport.ts';
 import { holdForSignOut, lockWorkspace, quiesceForSignOut, readMeta, resumeHeld, setOrgTimeZone, signOutAction, type WorkspaceMeta } from './workspace.ts';
 
-// Offline-capable entities: F04 attendance, F05 daily records/portions/attempts (F08 homework adds its own here).
+// Offline-capable entities: F04 attendance, F05 daily records/portions/attempts, F08 homework assignments.
 registerAttendance(appRegistry);
 registerDailyEntry(appRegistry);
+registerHomework(appRegistry);
 
 const TIMER_MS = 30_000;
 const EMPTY_COUNTS: Record<QueueState, number> = { PENDING: 0, SYNCING: 0, SYNCED: 0, FAILED: 0, ACTION_REQUIRED: 0 };

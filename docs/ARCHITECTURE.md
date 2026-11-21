@@ -549,6 +549,52 @@ sequenceDiagram
 | | Admin approvals, account management |
 | Homework **confirmation** (FR-HW-017): queued as an operation carrying the draft's source `row_version`s. The server re-validates them; if any changed, it creates a conflict instead of confirming | Report publishing, class summary export |
 
+### 8.4 Offline revocation — security boundary
+
+Scope: Teacher, Admin, and Owner devices (Student and Parent keep no data on the device). Requirements: F12-AC14, F12-AC20, NFR-OFF-010, NFR-OFF-011, FR-SEC-003, FR-SYNC-009. AGENTS.md §7 applies: an offline device cannot be wiped, and the app never claims it can.
+
+**What is protected**
+
+- **Every pushed operation is authorized again on the server.** The organization comes from the authenticated membership. Push computes the caller's current scope (`SyncScopeProvider`) and refuses any create, update, or command whose class or student is outside it with `REJECTED NOT_FOUND`, the same answer as a missing record. Hifz, homework, and attendance handlers all use this path. A write made offline after access was lost therefore never applies.
+- **A deactivated account or revoked membership gets `403 ACCESS_REVOKED`** on push, pull, refresh, and every other call, before any operation is read. Nothing from the refused push is stored.
+- **After the device reaches the server** (any sync, refresh, or API call), the app locks the workspace (`lockWorkspace`): synced rows, synced queue items, cached conflicts, sync notices, deferred server rows, the per-class caches (`class_roster_cache` student names and external IDs, `class_calendar_cache`), and the Quran reference cache are deleted, the pull cursor is cleared, and the file is checkpointed so purged pages are overwritten. Sync stops for good, and the device index records `LOCKED_REVOKED`, so the lock survives a restart.
+- **A scope change without revocation** (unassigned from a class, student moved) is sent as `scopeReset` on the next pull. The device drops every synced row and the per-class caches and bootstraps again. A `FORBIDDEN` or `NOT_FOUND` for one class removes that class's caches at once, and a `GET /classes` answer removes the caches of every class it no longer lists.
+- **Pending writes stay on the device**, visible and locked (F12-AC20). They are never sent after revocation. They are deleted on sign-out of a locked workspace, or 30 days after `revoked_at`. Writes refused after a scope change stay as visible `FAILED NOT_FOUND` items; nothing is lost silently.
+- **Sign-out** deletes the workspace database when no unsynced changes remain, or when the workspace is locked. Otherwise it purges the synced cache and holds the unsynced operations, locked to that account, for up to 30 days (Q14, `signOutAction`). Each account and organization has its own database file, so another account on the same phone never reads this cache.
+- **App lock** (PIN, optional fingerprint) hides the workspace screens after 5 minutes in the background and on a cold start. It is required for Owner and Admin (NFR-OFF-011) and optional for a Teacher. After a restart without a connection, the work screens are not reachable at all (offline cold start).
+
+**What is not protected**
+
+- **A device that stays offline keeps its already-synced data readable** (up to 120 days of daily records, Quranic reference data, class rosters with student names and external IDs, homework, attendance) until the app next reaches the server. There is no remote wipe and no maximum offline age. The 30-day clock for pending writes starts when the device detects the revocation (`revoked_at`), not when the Owner or Admin revoked access. While the device is offline, protection is the app lock where enabled and Android device security.
+- The device database is not encrypted (D1), and the revoked, offline, and session-expired screens are not behind the app lock (D3). On Android 12 and later, device-to-device transfer is not blocked yet (`dataExtractionRules`).
+- Purge and retention clocks never run behind the last server time the device saw, but a device that never reaches the server cannot learn it, so turning its clock back postpones the 30-day and 120-day purges.
+- A Teacher who is only unassigned from a class (account still active) keeps that class's cached roster and calendar until the next successful pull or class list.
+
+**Tests**
+
+| Point | Test |
+|---|---|
+| 403 `ACCESS_REVOKED` on push, pull, refresh | `apps/api/test/sync/access-revoked.test.ts` (3 tests, F12-AC14); `e2e/api/f12-sync.spec.ts` "F12-AC14 a revoked Teacher gets access revoked on sync" |
+| Out-of-scope writes refused `NOT_FOUND` | `apps/api/test/sync/push.test.ts` "F12-AC7 a Teacher cannot create or change records outside their assigned classes"; `apps/api/test/hifz/hifz.test.ts` unassigned Teacher block; `apps/api/test/homework/homework.test.ts` "homework is staff-only and scoped to the Teacher's classes"; `apps/api/test/calendar/calendar.test.ts` out-of-class attendance push |
+| Scope reset (server) | `apps/api/test/sync/pull.test.ts` "F12 unit (decision Q8) a scope change after the cursor answers scopeReset" |
+| Lock purges synced data, keeps pending ops | `apps/mobile/src/sync/outbox.test.ts` "F12-AC14 access revoked stops syncing that workspace"; `apps/mobile/src/sync/retention.test.ts` "F12-AC20 on revocation synced data is purged at once" |
+| Caches cleared on lock, sign-out hold, scope change | `retention.test.ts` "F04 (security re-review, F12-AC20) revocation removes cached student names and IDs", "Q14 sign out anyway removes the cached roster", "NFR-OFF-010 a scope change reported by the server removes the per-class caches"; `features/attendance/local.test.ts` (`keepRostersOf`, `forgetRoster`) |
+| Locked pending ops purged on sign-out or after 30 days; held ops | `retention.test.ts` "F12-AC20 unsynced changes of a locked workspace are purged", "F12-AC10 / Q14 Sign out anyway", "signing in again after 30 days does not resume held changes"; `engine.test.ts` `signOutAction` |
+| Per-account isolation | `retention.test.ts` "another account or madrasa on the device never sees the previous roster" |
+| Session moves to `revoked` | `apps/mobile/src/auth/session.test.ts` "F12-AC14 a 403 ACCESS_REVOKED on any call moves the session to revoked", "at launch, a refresh answered with ACCESS_REVOKED shows the revoked state" |
+| Banner `ACCESS_REVOKED` | `apps/mobile/src/sync/banner.test.ts` |
+| Quran reference cache deleted | `apps/mobile/src/features/quran/reference.test.ts` "403 ACCESS_REVOKED deletes the cache" |
+| App lock | `apps/mobile/src/app-lock/lock.test.ts` (F12-AC18) |
+
+**Gaps (no test today)**
+
+- No automated test for the in-memory window: data readable while the app keeps running offline after a revocation, and the offline cold start state. Both follow from the design and are not asserted.
+- The workspace-locked screen has no component or Maestro test that has run (`e2e/mobile/f12-sync/revoked-upgrade-migration.yaml` is pending; no component-test setup).
+- No test that a `LOCKED_REVOKED` workspace stays locked across an app restart while offline, and none for clock rollback while offline.
+- No end-to-end test that a pending homework or Hifz operation saved before revocation is rejected after the account is reactivated or reassigned; the revoked path is covered only at the engine (outbox.test.ts) and API (access-revoked.test.ts) levels separately.
+- A late in-flight roster or calendar response re-caching a class that was just pruned is not covered by a test; a cache-scope guard for it is being added separately and is not described here as done.
+- A reactivated account stays locked on the device until it signs out (open item).
+
 ---
 
 ## 9. Hifz, homework, and reporting logic
