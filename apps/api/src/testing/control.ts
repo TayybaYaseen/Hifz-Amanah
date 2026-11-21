@@ -20,6 +20,7 @@ import type { SyncRegistry } from '../modules/sync/handler.ts';
 import { newTotpSecret, totpForStep, totpStep } from '../modules/identity/totp.ts';
 import { TEST_PASSWORD, classes as fixtureClasses, madaris, students as fixtureStudents } from '../../../../e2e/fixtures/personas.ts';
 import { seedPersonas } from './seed.ts';
+import { ReportSeeder } from './report-seed.ts';
 import { weekdayOf } from '@hifz/domain/calendar';
 import { ScheduleService } from '../modules/calendar/schedule-service.ts';
 import type { Actor } from '../modules/identity/auth-service.ts';
@@ -93,6 +94,9 @@ const TABLES = [
   // The source catalogue is global; tests register synthetic sources only, so a reset clears it.
   'quran_source_licences',
   'quran_sources',
+  // F09 report cache and source stamps (they reference students and organizations).
+  'report_cache',
+  'report_stamps',
   // F04 calendar tables (attendance_records is reset through its sync handler's tables).
   'calendar_exceptions',
   'class_schedules',
@@ -122,6 +126,8 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
   const expected = Buffer.from(deps.secret);
   // Tables of test-registered sync handlers (e.g. sync_probe) are reset and searched with the rest.
   const tables = (): string[] => [...deps.sync.registry.tables(), ...TABLES];
+  // F09: report scenarios for the mobile flows, written through the real API (report-seed.ts).
+  const reportSeeder = new ReportSeeder({ app, db: deps.db, clock: deps.clock, secret: deps.secret });
 
   const userIdOf = async (loginId: string): Promise<string> => {
     const row = await deps.db
@@ -161,6 +167,7 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
         deps.mailer.clear();
         deps.logSink?.clear();
         auditFaults.failNext = false;
+        reportSeeder.forget();
         await seedPersonas(deps.db, deps.clock, deps.totpKey);
         return { status: 'reset' };
       });
@@ -467,6 +474,16 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
           endTime: inForce?.end_time ? String(inForce.end_time).slice(0, 5) : null,
         });
         return { date: today, changed: true };
+      });
+
+      // ---------- F09 · Report scenarios (e2e/mobile/f09-reports) ----------
+      scope.post('/reports/seed', async (request) => {
+        const { scenario } = parse(z.strictObject({ scenario: z.enum(['WEEK', 'MONTH', 'SUMMARY']) }), request.body);
+        return reportSeeder.seed(scenario);
+      });
+      scope.post('/reports/correct', async () => {
+        await reportSeeder.correct();
+        return { status: 'corrected' };
       });
 
       scope.get('/roster/ids', async () => {

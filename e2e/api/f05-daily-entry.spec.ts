@@ -224,8 +224,23 @@ test.describe('F05 · Daily Hifz entry', { tag: '@F05' }, () => {
     expect(d.sectionSummary.find((x) => x.section === 'MANZIL')!.totals.assigned).toEqual([para(3, 4)]);
   });
 
-  test.fixme('F05-AC4 (US-018) editing a portion changes the weekly report total', async () => {
-    // Waits for F09 (weekly reports). Edit a Partial portion's quantity; the weekly report total for that week changes.
+  test('F05-AC4 (US-018) editing a portion changes the weekly report total', async ({ as, control }) => {
+    // Edit a Partial portion's quantity; the weekly report total for that week changes (F09 GET /reports/student).
+    const ids = await control.rosterIds();
+    const teacher = await as('teacher.a1');
+    const day = classDay(1);
+    const recordId = await presentRecord(teacher, ids, 'S1', day);
+    const sabqi = await applied(teacher, portion(recordId, { section: 'SABQI', paraNumber: 3, assigned: para(3, 4) }));
+    await applied(teacher, attempt(sabqi, { status: 'PARTIAL', completed: para(1, 2) }));
+    const week = async () => {
+      const res = await teacher.get(`/reports/student?studentId=${ids.students.S1}&kind=WEEK&date=${day}`);
+      expect(res.status(), await res.text()).toBe(200);
+      return (await res.json()).report.sections.find((s: { section: string }) => s.section === 'SABQI').totals;
+    };
+    expect(await week()).toMatchObject({ assigned: [para(3, 4)], remaining: [para(1, 4)] });
+    const [edit] = await push(teacher, [op('lesson_portion', 'UPDATE', sabqi, { paraNumber: 3, range: null, totalLines: null, totalLinesSource: null, assigned: para(1) }, 1)]);
+    expect(edit, JSON.stringify(edit)).toMatchObject({ status: 'APPLIED' });
+    expect(await week()).toMatchObject({ assigned: [para(1)], completed: [para(1, 2)], remaining: [para(1, 2)] });
   });
 
   test('F05-AC5 (US-018) an Absent day has no failed portion and no quality', async ({ as, control }) => {
@@ -551,7 +566,28 @@ test.describe('F05 · Daily Hifz entry', { tag: '@F05' }, () => {
     expect(d.portions.find((p) => p.id === manzil)!.progress).toMatchObject({ currentStatus: 'PARTIAL', completed: para(3, 4), remaining: para(1, 4), quality: 3 });
   });
 
-  test.fixme('F05-AC19 (US-023) correcting an old record recalculates its weekly report', async () => {
-    // Waits for F09 (weekly reports). Correct a 90-day-old record; the weekly report for that week recalculates.
+  test('F05-AC19 (US-023) correcting an old record recalculates its weekly report', async ({ as, control }) => {
+    // Correct a 90-day-old record; the weekly report for that week recalculates (F09 GET /reports/student).
+    const ids = await control.rosterIds();
+    const teacher = await as('teacher.a1');
+    const old = hw.classDayFrom(90);
+    const recordId = await presentRecord(teacher, ids, 'S1', old);
+    const manzil = await applied(teacher, portion(recordId, { section: 'MANZIL', paraNumber: 9, assigned: para(1) }));
+    const manzilAttempt = await applied(teacher, attempt(manzil, { status: 'NOT_REMEMBERED' }));
+    const week = async () => {
+      const res = await teacher.get(`/reports/student?studentId=${ids.students.S1}&kind=WEEK&date=${old}`);
+      expect(res.status(), await res.text()).toBe(200);
+      return (await res.json()).report;
+    };
+    const before = await week();
+    expect(before.sections.find((s: { section: string }) => s.section === 'MANZIL').statusCounts).toMatchObject({ NOT_REMEMBERED: 1 });
+    expect(before.quality.count).toBe(0);
+    const [m] = await push(teacher, [correctAttempt(manzilAttempt, 1, { status: 'PARTIAL', completed: para(3, 4), quality: 3, noMistakes: true, mistakes: [] })]);
+    expect(m, JSON.stringify(m)).toMatchObject({ status: 'APPLIED' });
+    const after = await week();
+    const manzilAfter = after.sections.find((s: { section: string }) => s.section === 'MANZIL');
+    expect(manzilAfter.statusCounts).toMatchObject({ NOT_REMEMBERED: 0, PARTIAL: 1 });
+    expect(manzilAfter.totals).toMatchObject({ completed: [para(3, 4)], remaining: [para(1, 4)] });
+    expect(after.quality).toMatchObject({ count: 1, display: '3.0' });
   });
 });

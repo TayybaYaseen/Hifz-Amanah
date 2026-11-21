@@ -343,7 +343,9 @@ homework
 reporting / platform
   report_published(organization_id, student_id, period_kind, period_start, published_by, published_at,
                    updated_after_publish_at NULL)                      -- FR-RPT-010
-  report_cache(organization_id, student_id, period_kind, period_start, source_seq, payload jsonb)
+  report_cache(organization_id, student_id, period_kind, period_start, scope_key, settings_key, as_of,
+               org_stamp, student_stamp, payload jsonb, built_at)   -- F09, migration 0015 (ADR-020)
+  report_stamps(organization_id, scope_key['ORG'|student id], stamp)  -- bumped by triggers on every report source table
   -- sync tables as built in F12 (migrations 0004/0005/0006, ADR-015); RLS forced on all four (ADR-016)
   change_log(seq BIGSERIAL, organization_id, entity, entity_id, row_version, op[UPSERT|REMOVE],
              changed_fields text[], student_id NULL, class_id NULL,       -- scope keys at change time (F12-AC7)
@@ -650,7 +652,7 @@ buildReport(period, tz, weekStart, schedule, exceptions, attendance, records, at
 - **Quantities** are grouped by unit and never mixed (FR-RPT-005). Sabaq totals are in lines; Sabqi and Manzil totals keep their units. Para-wise progress places Sabaq under its derived Para.
 - **Quality average** includes recorded ratings only and shows `n` (FR-RPT-004). "No data" is shown distinctly from 0. The scale is 1 = Excellent … 5 = Weak, so **lower is better**. The display label is the nearest whole score with .5 rounding up, while the exact average is kept for calculations (FR-ATT-009).
 - **Homework counts** report confirmed, draft, attempted, completed, and carried forward separately (FR-RPT-007, FR-MNR-005).
-- **Cache:** `report_cache` stores `source_seq`. A change-log entry for an affected student or period invalidates the cache. A nightly verification job recomputes a sample of reports and compares them (FR-RPT-008).
+- **Cache (ADR-020, as built in F09):** `report_cache` stores the payload with the per-student and per-madrasa source stamps it was built from, the date (`as_of`), the timezone and week start, and the viewer's class scope. Triggers on every source table (records, portions, attempts, mistakes, attendance, homework, enrollments, students; timetables and exceptions for the madrasa) bump the stamps in the same transaction as the change, so any correction makes the next read rebuild from source. `change_log` alone was not enough: calendar and roster changes are not sync entities. A nightly verification job recomputes a sample of reports and compares them (FR-RPT-008; `ReportService.verifyCache`, scheduled once the worker exists).
 - **Export metadata** includes the period, timezone, filters, `generated_at`, and a pending-offline-changes flag (SRS §15.1).
 
 ### 9.4 Deterministic analytics
@@ -816,6 +818,7 @@ App (online, Teacher/Admin) → POST /analytics/{studentId}/ai-recommendation
 | ADR-017 | Quran reference data: extend `quran-ref` (source catalogue + licence gate, line-level 16-line layout with line types and word positions, optional divisions), offline snapshot cache on devices, import validation and reviewer sign-off ([docs/adr/ADR-017](adr/ADR-017-quran-reference-data-model.md)) | Accepted 2026-11-09 (SRS DEC-B72); §8 delivery waits on OD-QR-7 |
 | ADR-018 | Quran reference snapshot (`GET /quran/reference/version|snapshot`, content-addressed version, SHA-256, ETag) and disposable `ref_*` SQLite cache on staff devices; full atomic replace; no F12 protocol change; licence withdrawal revokes snapshot versions, removed from devices on next connection ([docs/adr/ADR-018](adr/ADR-018-quran-reference-snapshot-offline-cache.md)) | **Accepted and implemented 2026-11-09** (DEC-B75, DEC-B79, DEC-B80…B84); server migration 0011, workspace migration 5 |
 | ADR-019 | Database access layer as built: Kysely over `pg` with plain SQL migrations on the server (an approved option); a small typed SQL driver over `expo-sqlite` with append-only local migrations on mobile, no Drizzle ([docs/adr/ADR-019](adr/ADR-019-database-access-layer.md)) | Accepted 2026-11-12 (SRS DEC-B85) |
+| ADR-020 | Report cache validity from source stamps bumped by triggers on every report source table (per student, and per madrasa for timetables and exceptions), plus the date, settings, and viewer scope; replaces the `change_log` `source_seq` plan, which misses calendar and roster changes ([docs/adr/ADR-020](adr/ADR-020-report-cache-source-stamps.md)) | Proposed 2026-11-21 (F09) |
 
 ### 19.1 Implementation gates (closed 2026-10-30)
 

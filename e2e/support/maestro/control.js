@@ -13,8 +13,11 @@
 // dropAckLeft: sets output.dropAckLeft, the dropped acknowledgements still armed (0 once a push met it).
 // attendanceRecords (F04-AC10): ORG_CODE, CLASS_NAME, DATE; sets output.attendance to a list of
 // "<externalStudentId>:<status>:<ATTENDANCE_RECORDED audit count>" joined by ",", one item per stored record.
-// Results go to `output`: output.otp, output.totp, output.classDay, output.attendance.
-/* global http, json, output, ACTION, LOGIN_ID, ADVANCE_MS, ORG_CODE, CLASS_NAME, CONTROL_URL, CONTROL_SECRET, STUDENT, SECTION, PARA, STATUS, UNIT, AMOUNT, COUNT, DATE */
+// reportSeed (F09): SCENARIO (WEEK | MONTH | SUMMARY) writes a synthetic report scenario through the real API
+// (apps/api/src/testing/report-seed.ts); sets output.report (from, to, and the scenario's named dates).
+// reportCorrect (F09-AC3): another device corrects the WEEK scenario's Tuesday rating 3 → 5.
+// Results go to `output`: output.otp, output.totp, output.classDay, output.attendance, output.report.
+/* global http, json, output, ACTION, LOGIN_ID, ADVANCE_MS, ORG_CODE, CLASS_NAME, CONTROL_URL, CONTROL_SECRET, STUDENT, SECTION, PARA, STATUS, UNIT, AMOUNT, COUNT, DATE, SCENARIO */
 var base = (typeof CONTROL_URL !== 'undefined' && CONTROL_URL ? CONTROL_URL : 'http://localhost:3000') + '/__test/';
 var secret = typeof CONTROL_SECRET !== 'undefined' && CONTROL_SECRET ? CONTROL_SECRET : 'local-e2e-control-secret';
 var headers = { 'x-test-control-secret': secret, 'Content-Type': 'application/json' };
@@ -50,4 +53,6 @@ else if (ACTION === 'attendanceRecords') {
   output.attendance = call('POST', 'attendance/records', { organizationCode: ORG_CODE, className: CLASS_NAME, date: DATE }).items
     .map(function (r) { return r.externalStudentId + ':' + r.status + ':' + r.recordedAudits; }).join(',');
 }
+else if (ACTION === 'reportSeed') output.report = call('POST', 'reports/seed', { scenario: SCENARIO });
+else if (ACTION === 'reportCorrect') call('POST', 'reports/correct');
 else throw new Error('Unknown ACTION ' + ACTION);

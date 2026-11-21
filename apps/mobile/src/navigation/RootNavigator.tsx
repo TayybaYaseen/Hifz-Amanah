@@ -27,6 +27,7 @@ import { DailyEntryScreen } from '../features/daily-entry/DailyEntryScreen.tsx';
 import { DailyRecordScreen } from '../features/daily-entry/DailyRecordScreen.tsx';
 import { HomeworkEditScreen, type HomeworkEditParams } from '../features/homework/HomeworkEditScreen.tsx';
 import { HomeworkScreen } from '../features/homework/HomeworkScreen.tsx';
+import { ReportsScreen } from '../features/reports/ReportsScreen.tsx';
 import { HolidaysScreen, LeaveApprovalsScreen, TimetableScreen } from '../features/attendance/CalendarScreens.tsx';
 import { ParaFormScreen, QuranMetadataScreen, QuranReviewScreen, SurahFormScreen } from '../features/quran/QuranScreens.tsx';
 import { QuranReferenceScreen } from '../features/quran/QuranReferenceScreen.tsx';
@@ -71,6 +72,8 @@ type AppStack = {
   // F08 homework (Owner, Admin, Teacher; offline-first; revise is Owner/Admin and online only)
   Homework: { classId?: string; studentId?: string };
   HomeworkEdit: HomeworkEditParams;
+  // F09 weekly/monthly reports and the class summary (Owner, Admin, Teacher; provisional offline)
+  Reports: undefined;
   LeaveApprovals: undefined;
   Holidays: undefined;
   Timetable: { klass: ClassResponse };
@@ -223,7 +226,7 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
   return (
     <App.Navigator screenOptions={screenOptions}>
       <App.Screen name="Home" options={{ title: t('common.appName') }}>
-        {({ navigation }) => <HomeScreen me={me} onMore={() => navigation.navigate('More')} onSyncQueue={() => navigation.navigate('SyncQueue')} onAttendance={() => navigation.navigate('BulkEntry')} onDailyEntry={() => navigation.navigate('DailyEntry', {})} onHomework={() => navigation.navigate('Homework', {})} />}
+        {({ navigation }) => <HomeScreen me={me} onMore={() => navigation.navigate('More')} onSyncQueue={() => navigation.navigate('SyncQueue')} onAttendance={() => navigation.navigate('BulkEntry')} onDailyEntry={() => navigation.navigate('DailyEntry', {})} onHomework={() => navigation.navigate('Homework', {})} onReports={() => navigation.navigate('Reports')} />}
       </App.Screen>
       <App.Screen name="More" options={{ title: t('more.title') }}>
         {({ navigation }) => (
@@ -298,6 +301,10 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
           </App.Screen>
           <App.Screen name="HomeworkEdit" options={({ route }) => ({ title: t(route.params.mode === 'new' ? 'homework.newTitle' : route.params.mode === 'revise' ? 'homework.reviseTitle' : 'homework.editTitle') })}>
             {({ navigation, route }) => <HomeworkEditScreen me={me} params={route.params} onDone={() => navigation.goBack()} onSyncQueue={() => navigation.navigate('SyncQueue')} />}
+          </App.Screen>
+          {/* F09 · Reports: weekly and monthly, class summary (US-039…043, US-073). */}
+          <App.Screen name="Reports" options={{ title: t('reports.title') }}>
+            {({ navigation }) => <ReportsScreen onSyncQueue={() => navigation.navigate('SyncQueue')} />}
           </App.Screen>
           <App.Screen name="SyncQueue" options={{ title: t('syncQueue.title') }}>
             {({ navigation }) => <SyncQueueScreen onReview={(conflictId) => navigation.navigate('ConflictReview', { conflictId })} />}

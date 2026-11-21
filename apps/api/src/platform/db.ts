@@ -427,6 +427,30 @@ export interface HomeworkPortionsTable {
   updated_at: Timestamp;
 }
 
+// ---------- F09 · Reports (0015_reporting.sql). Row-level security applies: query through withTenant(). ----------
+
+/** Bumped by triggers on every report source table (ADR-020); 'ORG' or a student id. */
+export interface ReportStampsTable {
+  organization_id: string;
+  scope_key: string;
+  stamp: ColumnType<string, number | string, number | string>;
+}
+
+/** A computed report, valid while its stamps, date, and settings are unchanged. Staff payload: project before sending. */
+export interface ReportCacheTable {
+  organization_id: string;
+  student_id: string;
+  period_kind: 'WEEK' | 'MONTH';
+  period_start: string;
+  scope_key: string;
+  settings_key: string;
+  as_of: string;
+  org_stamp: ColumnType<string, number | string, number | string>;
+  student_stamp: ColumnType<string, number | string, number | string>;
+  payload: ColumnType<unknown, string, string>;
+  built_at: Timestamp;
+}
+
 // ---------- F06 · Quran reference (0009_quran_ref.sql) ----------
 
 export interface MushafEditionsTable {
@@ -590,6 +614,8 @@ export interface Database {
   attempt_mistakes: AttemptMistakesTable;
   homework_assignments: HomeworkAssignmentsTable;
   homework_portions: HomeworkPortionsTable;
+  report_stamps: ReportStampsTable;
+  report_cache: ReportCacheTable;
   mushaf_editions: MushafEditionsTable;
   quran_imports: QuranImportsTable;
   quran_sources: QuranSourcesTable;

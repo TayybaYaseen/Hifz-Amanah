@@ -293,6 +293,27 @@ export class HomeworkService {
     return { created: created!, superseded: superseded! };
   }
 
+  // ---------- For reports (F09) ----------
+
+  /**
+   * The homework a report needs for these students (F09-AC6, AC9, AC18; FR-RPT-007, FR-MNR-005, FR-WKR-007): drafts and
+   * confirmed assignments given in the period, and every confirmed assignment given by its end (outstanding work). Same
+   * derived views as the Homework screen, in a fixed number of queries whatever the number of students (NFR-PERF-002).
+   * Runs in the caller's tenant transaction; the caller has authorized the students.
+   */
+  async forReport(tx: Tx, org: string, studentIds: readonly string[], period: { from: string; to: string }): Promise<HomeworkAssignmentView[]> {
+    if (studentIds.length === 0) return [];
+    const rows = await tx
+      .selectFrom('homework_assignments')
+      .select('id')
+      .where('organization_id', '=', org)
+      .where('student_id', 'in', [...studentIds])
+      .where('assigned_date', '<=', period.to)
+      .where((eb) => eb.or([eb('status', '=', 'CONFIRMED'), eb.and([eb('status', '=', 'DRAFT'), eb('assigned_date', '>=', period.from)])]))
+      .execute();
+    return this.views(tx, org, await loadAssignments(tx, org, rows.map((r) => r.id)));
+  }
+
   // ---------- Views ----------
 
   /** Views in the given order, with sources, progress, carried-over state, and names, in a fixed number of queries. */

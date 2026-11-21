@@ -29,6 +29,8 @@ import { homeworkAssignmentSyncHandler } from './modules/homework/assignment-syn
 import { HomeworkService } from './modules/homework/homework-service.ts';
 import { homeworkHooks } from './modules/homework/hooks.ts';
 import { registerHomeworkRoutes } from './modules/homework/routes.ts';
+import { ReportService } from './modules/reporting/report-service.ts';
+import { registerReportRoutes } from './modules/reporting/routes.ts';
 import { QuranReferenceService } from './modules/quran-ref/reference-service.ts';
 import { registerQuranRoutes } from './modules/quran-ref/routes.ts';
 import { QuranSeedLoader, readSeedFile } from './modules/quran-ref/seed.ts';
@@ -141,7 +143,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerHifzRoutes(app, { authenticate: (request) => auth.authenticate(bearer(request)), records: new DailyRecordService(deps.db, deps.clock) });
 
   // ---------- Homework (F08) ----------
-  registerHomeworkRoutes(app, { authenticate: (request) => auth.authenticate(bearer(request)), homework: new HomeworkService(deps.db, deps.clock, quranMetadata) });
+  const homeworkService = new HomeworkService(deps.db, deps.clock, quranMetadata);
+  registerHomeworkRoutes(app, { authenticate: (request) => auth.authenticate(bearer(request)), homework: homeworkService });
+
+  // ---------- Weekly and monthly reports (F09) ----------
+  // Staff only; derived from source records on read, with a stamp-checked cache (ADR-020).
+  registerReportRoutes(app, { authenticate: (request) => auth.authenticate(bearer(request)), reports: new ReportService(deps.db, deps.clock, homeworkService) });
   // Source changes rebuild drafts and say when confirmed homework was left unchanged (FR-HW-011, F08-AC14).
   const homework = homeworkHooks();
 
