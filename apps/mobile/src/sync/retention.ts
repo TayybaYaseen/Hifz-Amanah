@@ -4,6 +4,7 @@
 // - Unsynced rows are never removed by cleanup: a row with any operation that is not SYNCED is always kept.
 // - The "purge synced" step is shared by revocation (immediately), "Sign out anyway" (Q14), and scope resets.
 import type { SqlExecutor } from '../local-db/driver.ts';
+import { bumpCacheEpoch } from './cacheEpoch.ts';
 import type { EntityRegistry } from './registry.ts';
 
 export const DAILY_RECORD_RETENTION_DAYS = 120;
@@ -79,13 +80,35 @@ const UNSYNCED_IDS = "SELECT entity_id FROM outbox WHERE entity = ? AND state !=
  * the pull cursor so the next sync starts from a fresh snapshot. Rows with unsynced operations, and those
  * operations, are kept. Runs inside the caller's transaction.
  */
-export async function purgeSynced(tx: SqlExecutor, registry: EntityRegistry, options: { keepQueueHistory?: boolean } = {}): Promise<void> {
+export async function purgeSynced(
+  tx: SqlExecutor,
+  registry: EntityRegistry,
+  options: {
+    /** A routine refetch: keep the queue history and the per-class caches (the pull does not refill them). */
+    keepQueueHistory?: boolean;
+    /** The server reported a scope change (classes or students left this user's reach): drop the per-class caches. */
+    scopeChanged?: boolean;
+  } = {},
+): Promise<void> {
   for (const handler of registry.all()) {
     await tx.run(`DELETE FROM ${handler.table} WHERE id NOT IN (${UNSYNCED_IDS})`, [handler.entity]);
   }
   if (!options.keepQueueHistory) {
     await tx.run("DELETE FROM outbox WHERE state = 'SYNCED'");
     await tx.run('DELETE FROM conflicts');
+    // F08 sync notices refer to synced rows only.
+    await tx.run('DELETE FROM sync_notices');
+  }
+  if (!options.keepQueueHistory || options.scopeChanged) {
+    // Per-class caches hold student names and IDs (F04 roster) and class calendars (F08, security review L1). They go
+    // on lock (revocation), on sign-out, and when the scope changes, so a class or student that left this user's reach
+    // is never listed again from the device. A routine refetch keeps them: offline Bulk Entry, Daily Entry, and
+    // homework due dates need them, and the screens refresh them from the server whenever they are online.
+    // The global epoch bump in the same transaction stops every server answer still in flight from caching a class
+    // again (cacheEpoch.ts). A routine refetch does not bump: it removes no per-class cache.
+    await bumpCacheEpoch(tx);
+    await tx.run('DELETE FROM class_roster_cache');
+    await tx.run('DELETE FROM class_calendar_cache');
   }
   // Server rows held back while local changes were unsynced are cached data too.
   await tx.run('DELETE FROM deferred_changes');

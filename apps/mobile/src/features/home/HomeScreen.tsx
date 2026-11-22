@@ -10,7 +10,7 @@ import { isolate } from '../../i18n/direction.ts';
 import { useSync } from '../../sync/SyncContext.tsx';
 import { colors } from '../../theme/tokens.ts';
 
-export function HomeScreen({ me, onMore, onSyncQueue, onAttendance, onDailyEntry }: { me: MeResponse; onMore: () => void; onSyncQueue: () => void; onAttendance: () => void; onDailyEntry: () => void }) {
+export function HomeScreen({ me, onMore, onSyncQueue, onAttendance, onDailyEntry, onHomework, onReports }: { me: MeResponse; onMore: () => void; onSyncQueue: () => void; onAttendance: () => void; onDailyEntry: () => void; onHomework?: () => void; onReports?: () => void }) {
   const { t } = useTranslation();
   const sync = useSync();
   return (
@@ -35,6 +35,10 @@ export function HomeScreen({ me, onMore, onSyncQueue, onAttendance, onDailyEntry
       {/* F05: Daily Hifz entry, the Teacher's primary action (design.md §4.4). */}
       {sync.enabled ? <Button testID="nav.dailyEntry" label={t('home.dailyEntry')} onPress={onDailyEntry} /> : null}
       {sync.enabled ? <Button testID="nav.attendance" label={t('home.attendance')} onPress={onAttendance} /> : null}
+      {/* F08: Homework — suggestions and confirmed assignments (design.md §4.9). */}
+      {sync.enabled && onHomework ? <Button testID="nav.homework" variant="secondary" label={t('home.homework')} onPress={onHomework} /> : null}
+      {/* F09: Weekly and monthly reports and the class summary (design.md §4.10). */}
+      {sync.enabled && onReports ? <Button testID="nav.reports" variant="secondary" label={t('home.reports')} onPress={onReports} /> : null}
       <Button testID="nav.more" variant="secondary" label={t('home.more')} onPress={onMore} />
     </AppScreen>
   );

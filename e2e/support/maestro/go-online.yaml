@@ -4,5 +4,5 @@ appId: com.hifzamanah.app
 - setAirplaneMode: disabled
 - extendedWaitUntil:
     visible:
-      id: "sync.banner.synced"
+      id: "sync.banner.state.SYNCED"
     timeout: 60000

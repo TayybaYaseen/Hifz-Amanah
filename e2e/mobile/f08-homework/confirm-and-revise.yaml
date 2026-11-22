@@ -1,21 +1,206 @@
 # F08 · Homework and carry forward — mobile E2E (docs/specs/11-f08-homework-carry-forward.md; design.md §4.9)
 # Covers: F08-AC1, F08-AC2, F08-AC10, F08-AC11, F08-AC13, F08-AC14, F08-AC15, F08-AC16
+# Also checks F08-AC17 on the device: a Teacher has no Revise control (the API refusal is in e2e/api/f08-homework.spec.ts).
+# SYNTHETIC DATA ONLY: seeded personas and the synthetic Quran fixture (Surah 2 Ayat 1–20 = 10 lines on its test layout).
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F08 confirm — explicit confirm, next class, correction, revise
 tags:
-  - pending
   - F08
   - US-033
   - US-037
   - US-038
 ---
-- launchApp:
-    clearState: true
-# 1. Sign in as teacher.a1 → Homework → New: Sabaq Al-Baqarah 1–10 (10 lines), Sabqi Para 3 Rubu, Sabqi Para 4 Complete,
+- runFlow: ../../support/maestro/reset.yaml
+- runFlow: ../../support/maestro/ensure-class-day.yaml
+- runScript:
+    file: ../../support/maestro/control.js
+    env:
+      ACTION: quranSeed
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+# 1. teacher-a1 → Homework → New: Sabaq Surah 2 Ayat 1–20 (10 lines), Sabqi Para 3 Rubu, Sabqi Para 4 Complete,
 #    instructions, due date → save draft; reopen → all fields kept.                                     (F08-AC1, F08-AC2)
-# 2. Test control advances the clock past the due date → still in Suggested.                           (F08-AC11)
-# 3. Confirm homework → summary → accept → in Confirmed with teacher name and time.                    (F08-AC10)
-# 4. Next class: Daily Entry S1 shows the due homework portions; record an attempt on one → linked.     (F08-AC16)
-# 5. Confirm a second assignment → the first is unchanged in the Homework tab.                         (F08-AC13)
-# 6. Correct the source attempt → "Confirmed homework was not changed — Revise?"; confirmed unchanged.  (F08-AC14)
-# 7. Sign in as admin.a → Revise → confirm → new assignment in Confirmed; the old one labelled "Superseded". (F08-AC15)
+- runFlow:
+    file: ../../support/maestro/homework-open.yaml
+    env: { STUDENT: EXT-A-001 }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.new" } }
+- extendedWaitUntil:
+    visible: { id: "hwEdit.assigned" }
+    timeout: 30000
+- copyTextFrom: { id: "hwEdit.assigned" }
+- evalScript: ${output.today = maestro.copiedText.replace(/[^0-9-]/g, '')}
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "hwEdit.sabaq.add" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "hwEdit.sabaq.portion.1.surah", TEXT: "2" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "hwEdit.sabaq.portion.1.ayahStart", TEXT: "1" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "hwEdit.sabaq.portion.1.ayahEnd", TEXT: "20" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "hwEdit.sabaq.portion.1.totalLines", TEXT: "10" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "hwEdit.sabqi.add" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "hwEdit.sabqi.portion.1.para", TEXT: "3" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "hwEdit.sabqi.portion.1.unit.RUBU" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "hwEdit.sabqi.add" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "hwEdit.sabqi.portion.2.para", TEXT: "4" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "hwEdit.sabqi.portion.2.unit.COMPLETE" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "hwEdit.instructions", TEXT: "Revise twice" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "hwEdit.due", TEXT: "${output.today}" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "hwEdit.save" } }
+- extendedWaitUntil:
+    visible: { id: "homework.draft.1.label" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.draft.1.portion.1", TEXT: ".*Sabaq.*Ayat.*1–20.*10.* of .*10.* lines.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.draft.1.portion.2", TEXT: ".*Sabqi.*Para.*3.*1/4.*Para.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.draft.1.portion.3", TEXT: ".*Sabqi.*Para.*4.*1.*Para.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.draft.1.instructions", TEXT: ".*Revise twice.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.draft.1.due", TEXT: ".*${output.today}.*" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.draft.1.review" } }
+- extendedWaitUntil:
+    visible: { id: "hwEdit.draftLabel" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "hwEdit.instructions", TEXT: "Revise twice" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "hwEdit.due", TEXT: "${output.today}" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "hwEdit.sabqi.portion.2.origin.TEACHER_ADDED" } }
+- back
+# The server accepted the draft.
+- extendedWaitUntil:
+    notVisible: { id: "homework.draft.1.sync.PENDING" }
+    timeout: 90000
+- assertNotVisible: { id: "homework.draft.1.rejected" }
+# 2. Test control moves the server clock a day past the due date → the draft is still a suggestion.          (F08-AC11)
+- runScript:
+    file: ../../support/maestro/control.js
+    env: { ACTION: clock, ADVANCE_MS: "86400000" }
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow:
+    file: ../../support/maestro/homework-open.yaml
+    env: { STUDENT: EXT-A-001 }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.draft.1.label", TEXT: ".*Suggestion — not confirmed.*" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.tab.confirmed" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.empty.confirmed" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.tab.suggested" } }
+# 3. Confirm homework → summary → accept → Confirmed with the Teacher's name and the time.                      (F08-AC10)
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.draft.1.review" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "hwEdit.confirm" } }
+- extendedWaitUntil:
+    visible: { id: "hwEdit.confirmSheet.summary" }
+    timeout: 15000
+- assertVisible: { id: "hwEdit.confirmSheet.portion.3" }
+- tapOn: { id: "hwEdit.confirmSheet.accept" }
+- extendedWaitUntil:
+    visible: { id: "homework.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.tab.confirmed" } }
+- extendedWaitUntil:
+    visible: { id: "homework.confirmed.1.state" }
+    timeout: 90000
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.confirmed.1.by", TEXT: "Confirmed by .*Teacher.* · .*" } }
+# F08-AC17 on the device: a Teacher sees no Revise control.
+- assertNotVisible: { id: "homework.confirmed.1.revise" }
+- runFlow: ../../support/maestro/back-home.yaml
+# 4. Next class: Daily Entry S1 shows the due homework portions; record an attempt on Sabqi Para 4 → linked.   (F08-AC16)
+- runFlow:
+    file: ../../support/maestro/daily-start.yaml
+    env: { STUDENT: EXT-A-001 }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "daily.homework.3", TEXT: ".*Sabqi.*Para.*4.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "daily.homework.1", TEXT: ".*Sabaq.*" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.homework.3.record" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "daily.sabqi.portion.1.homeworkLink" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.1.status.PARTIAL" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.1.completed.HALF" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.1.mistakes.none" } }
+- runFlow: ../../support/maestro/daily-save.yaml
+- extendedWaitUntil:
+    visible: { id: "record.sync.SYNCED" }
+    timeout: 90000
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "record.sabqi.portion.1.homeworkLink" } }
+- runFlow: ../../support/maestro/back-home.yaml
+# 5. The record's Partial attempt is suggested; confirm this second assignment → the first is unchanged.        (F08-AC13)
+- runFlow:
+    file: ../../support/maestro/homework-open.yaml
+    env: { STUDENT: EXT-A-001 }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.draft.1.portion.1", TEXT: ".*Sabqi.*Para.*4.*1/2.*Para.*" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.draft.1.review" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "hwEdit.confirm" } }
+- extendedWaitUntil:
+    visible: { id: "hwEdit.confirmSheet.summary" }
+    timeout: 15000
+- tapOn: { id: "hwEdit.confirmSheet.accept" }
+- extendedWaitUntil:
+    visible: { id: "homework.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.tab.confirmed" } }
+- extendedWaitUntil:
+    visible: { id: "homework.confirmed.2.state" }
+    timeout: 90000
+- extendedWaitUntil:
+    notVisible: { id: "homework.confirmed.1.onDevice" }
+    timeout: 90000
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.confirmed.1.portion.1", TEXT: ".*Sabqi.*Para.*4.*1/2.*Para.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.confirmed.2.portion.1", TEXT: ".*Sabaq.*10.* of .*10.* lines.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.confirmed.2.portion.2", TEXT: ".*Sabqi.*Para.*3.*1/4.*Para.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.confirmed.2.portion.3", TEXT: ".*Sabqi.*Para.*4.*1.*Para.*" } }
+# FR-HW-015: the first assignment's Sabqi Para 4 shows the next-class attempt recorded against it.
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.confirmed.2.portion.3.progress.PARTIAL" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.confirmed.2.instructions", TEXT: ".*Revise twice.*" } }
+- runFlow: ../../support/maestro/back-home.yaml
+# 6. Correct the source attempt (Half → Rubu) → "Confirmed homework was not changed"; confirmed unchanged.       (F08-AC14)
+- tapOn: { id: "nav.dailyEntry" }
+- extendedWaitUntil:
+    visible: { id: "daily.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "daily.class.Hifz A1" }
+- extendedWaitUntil:
+    visible: { id: "daily.student.EXT-A-001" }
+    timeout: 30000
+- tapOn: { id: "daily.student.EXT-A-001" }
+- extendedWaitUntil:
+    visible: { id: "daily.duplicate.open" }
+    timeout: 30000
+- tapOn: { id: "daily.duplicate.open" }
+- extendedWaitUntil:
+    visible: { id: "record.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "record.edit" } }
+- extendedWaitUntil:
+    visible: { id: "daily.editHelp" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.1.completed.RUBU" } }
+- runFlow: ../../support/maestro/daily-save.yaml
+- extendedWaitUntil:
+    visible: { id: "record.homeworkConfirmedUnchanged" }
+    timeout: 90000
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow:
+    file: ../../support/maestro/homework-open.yaml
+    env: { STUDENT: EXT-A-001 }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.tab.confirmed" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.confirmed.1.portion.1", TEXT: ".*Sabqi.*Para.*4.*1/2.*Para.*" } }
+- runFlow: ../../support/maestro/back-home.yaml
+# 7. admin-a → Revise → confirm → a new assignment in Confirmed; the old one labelled Superseded.               (F08-AC15)
+- runFlow: ../../support/maestro/sign-out.yaml
+- runFlow:
+    file: ../../support/maestro/sign-in-staff.yaml
+    env: { USER_ID: admin-a }
+- runFlow:
+    file: ../../support/maestro/homework-open.yaml
+    env: { STUDENT: EXT-A-001 }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.tab.confirmed" } }
+- extendedWaitUntil:
+    visible: { id: "homework.confirmed.1.revise" }
+    timeout: 60000
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.confirmed.1.revise" } }
+- extendedWaitUntil:
+    visible: { id: "hwEdit.reviseHelp" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "hwEdit.instructions", TEXT: "Revised by admin" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "hwEdit.revise.submit" } }
+- extendedWaitUntil:
+    visible: { id: "homework.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.tab.confirmed" } }
+- extendedWaitUntil:
+    visible: { text: ".*Superseded by a revision.*" }
+    timeout: 30000
+- extendedWaitUntil:
+    visible: { id: "homework.confirmed.1.revisionOf" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.confirmed.1.instructions", TEXT: ".*Revised by admin.*" } }

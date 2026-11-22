@@ -1,7 +1,7 @@
 # F01 · Identity — mobile E2E (docs/specs/01-f01-identity-authentication.md; design.md §13 US-003…005)
 # Covers: F01-AC12, F01-AC13, F01-AC14, F01-AC16, F01-AC18
 # User IDs use hyphens (teacher-new): FR-AUTH-013 allows no dots.
-# Android's Back first closes the keyboard, so `hideKeyboard` comes before every navigating `back`.
+# The keyboard is closed by tapping the page margin (dismiss-keyboard.yaml), never with Back, so every `back` navigates.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F01 accounts — Admin creates Teacher, Student, Parent with shared email
 tags:
@@ -27,7 +27,7 @@ tags:
 - inputText: "New Teacher"
 - tapOn: { id: "accountCreate.password" }
 - inputText: "Fresh-Pass-2026"
-- hideKeyboard
+- runFlow: ../../support/maestro/dismiss-keyboard.yaml
 - tapOn: { id: "accountCreate.submit" }
 - scrollUntilVisible:
     element: { id: "accounts.item.teacher-new" }
@@ -43,7 +43,7 @@ tags:
 - inputText: "Duplicate"
 - tapOn: { id: "accountCreate.password" }
 - inputText: "Fresh-Pass-2026"
-- hideKeyboard
+- runFlow: ../../support/maestro/dismiss-keyboard.yaml
 - tapOn: { id: "accountCreate.submit" }
 - assertVisible: { id: "accountCreate.userId.error" }
 # 4. A password that breaks the policy → field error; nothing saved.                           (F01-AC16)
@@ -53,7 +53,7 @@ tags:
 - tapOn: { id: "accountCreate.password" }
 - eraseText: 40
 - inputText: "Abc-123"
-- hideKeyboard
+- runFlow: ../../support/maestro/dismiss-keyboard.yaml
 - tapOn: { id: "accountCreate.submit" }
 - assertVisible: { id: "accountCreate.password.error" }
 - back
@@ -71,7 +71,7 @@ tags:
 - inputText: "family.new@example.test"
 - tapOn: { id: "accountCreate.password" }
 - inputText: "Fresh-Pass-2026"
-- hideKeyboard
+- runFlow: ../../support/maestro/dismiss-keyboard.yaml
 - tapOn: { id: "accountCreate.submit" }
 - scrollUntilVisible:
     element: { id: "accounts.item.student-new" }
@@ -89,7 +89,7 @@ tags:
 - inputText: "family.new@example.test"
 - tapOn: { id: "accountCreate.password" }
 - inputText: "Fresh-Pass-2026"
-- hideKeyboard
+- runFlow: ../../support/maestro/dismiss-keyboard.yaml
 - tapOn: { id: "accountCreate.submit" }
 - scrollUntilVisible:
     element: { id: "accounts.item.parent-new" }

@@ -1,6 +1,6 @@
 # F09 · Weekly and monthly reports
 
-**Status:** draft
+**Status:** Approved
 **Brief:** [00-product-brief.md](../00-product-brief.md) · **Flow:** Reports ([design.md §4.10, §5.8](../design.md))
 **Requirements:** FR-WKR-001…008, FR-MNR-001…007, FR-RPT-001…009, FR-CAL-005, NFR-PERF-002/004, NFR-OFF-008, FR-RPT-011
 **Stories:** US-039 – US-043, US-073 · **Depends on:** F04, F05, F07, F08

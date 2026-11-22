@@ -255,11 +255,17 @@ export async function countDailyRecords(db: Executor, organizationId: string, da
   return Number(n);
 }
 
-/** F06 `RangeRecordSource` (FR-SAB-007, F06-AC19): every Sabaq portion's range, for the metadata review list. */
-export async function sabaqRanges(db: Executor, organizationId: string): Promise<{ kind: string; id: string; range: { surah: number; ayahStart: number; ayahEnd: number } }[]> {
+/**
+ * F06 `RangeRecordSource` (FR-SAB-007, F06-AC19): every Sabaq portion's range and the Para derived from it when it was
+ * saved (FR-SAB-001), for the metadata review list. Never changes a portion.
+ */
+export async function sabaqRanges(
+  db: Executor,
+  organizationId: string,
+): Promise<{ kind: string; id: string; range: { surah: number; ayahStart: number; ayahEnd: number }; paraNumber: number | null }[]> {
   const rows = await db
     .selectFrom('lesson_portions')
-    .select(['id', 'surah_start', 'ayah_start', 'ayah_end'])
+    .select(['id', 'surah_start', 'ayah_start', 'ayah_end', 'para_number'])
     .where('organization_id', '=', organizationId)
     .where('section', '=', 'SABAQ')
     .where('removed_at', 'is', null)
@@ -269,6 +275,6 @@ export async function sabaqRanges(db: Executor, organizationId: string): Promise
   return rows.flatMap((r) =>
     r.surah_start === null || r.ayah_start === null || r.ayah_end === null
       ? []
-      : [{ kind: 'SABAQ_PORTION', id: r.id, range: { surah: r.surah_start, ayahStart: r.ayah_start, ayahEnd: r.ayah_end } }],
+      : [{ kind: 'SABAQ_PORTION', id: r.id, range: { surah: r.surah_start, ayahStart: r.ayah_start, ayahEnd: r.ayah_end }, paraNumber: r.para_number }],
   );
 }

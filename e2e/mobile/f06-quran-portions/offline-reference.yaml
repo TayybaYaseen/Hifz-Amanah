@@ -32,36 +32,26 @@ tags:
     visible: { id: "quranRef.status.OFFLINE_CACHED" }
     timeout: 30000
 # 3. Surah 1, Ayat 1–4, offline: valid, Para 1, Total Lines pre-filled from the saved layout (2 lines).     (F06-AC24)
-- tapOn: { id: "range.surah" }
-- inputText: "1"
-- tapOn: { id: "range.ayahStart" }
-- inputText: "1"
-- tapOn: { id: "range.ayahEnd" }
-- inputText: "4"
-- hideKeyboard
-- assertVisible: { id: "range.valid" }
-- assertVisible:
-    id: "range.para"
-    text: ".*1.*"
-- assertVisible:
-    id: "range.totalLines"
-    text: "2"
-- assertVisible: { id: "range.linesSource.LAYOUT" }
+# Each field is scrolled to the middle, cleared, typed, and the keyboard closed (type.yaml): an open number pad covers
+# the fields below the one being typed, so a plain tap on the next field would miss it.
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "range.surah", TEXT: "1" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "range.ayahStart", TEXT: "1" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "range.ayahEnd", TEXT: "4" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "range.valid" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "range.para", TEXT: ".*1.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "range.totalLines", TEXT: "2" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "range.linesSource.LAYOUT" } }
 # 4. A corrected count is kept and marked as entered by hand (FR-SAB-008).
-- tapOn: { id: "range.totalLines" }
-- eraseText: 4
-- inputText: "3"
-- hideKeyboard
-- assertVisible: { id: "range.linesSource.MANUAL" }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "range.totalLines", TEXT: "3" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "range.linesSource.MANUAL" } }
 # 5. Ayat 25 in a 20-Ayat Surah, offline: the field names the maximum.                                    (F06-AC24, AC6)
-- tapOn: { id: "range.ayahEnd" }
-- eraseText: 4
-- inputText: "25"
-- hideKeyboard
-- assertVisible: { id: "range.ayahEnd.error" }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "range.ayahEnd", TEXT: "25" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "range.ayahEnd.error" } }
 - assertNotVisible: { id: "range.valid" }
 # 6. Back online: the check runs again and stays up to date.
 - setAirplaneMode: disabled
+# The status card is at the top; the range checks above scrolled it out of view.
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "quranRef.version" } }
 - extendedWaitUntil:
     visible: { id: "quranRef.status.SYNCED" }
     timeout: 60000

@@ -12,6 +12,7 @@
     "./homework": "./homework/index.ts",
     "./quality": "./quality/index.ts",
     "./mistakes": "./mistakes/index.ts",
+    "./reports": "./reports/index.ts",
     "./quran-ref": "./quran-ref/index.ts",
     "./quran-ref/synthetic-fixture": "./quran-ref/synthetic-fixture.ts"
   }

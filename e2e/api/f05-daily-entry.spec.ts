@@ -8,11 +8,12 @@
 // below are synthetic Surahs 1 and 2.
 import { randomBytes } from 'node:crypto';
 import type { APIRequestContext } from '@playwright/test';
+import * as hw from './support/daily-entry';
 import { expect, test, type TestControl } from './support/fixtures';
 
 type StudentKey = 'S1' | 'S2' | 'S3';
 type Ids = { classes: Record<string, string>; students: Record<string, string> };
-type OpResult = { opId: string; status: string; code?: string; fields?: Record<string, string>; rowVersion?: number; entityId?: string };
+type OpResult = { opId: string; status: string; code?: string; fields?: Record<string, string>; rowVersion?: number; entityId?: string; notices?: string[] };
 type Quantity = { unit: string; numerator: number; denominator: number };
 type Progress = { currentStatus: string | null; assigned: Quantity; completed: Quantity | null; remaining: Quantity | null; quality: number | null; attemptCount: number };
 type Attempt = { id: string; attemptNo: number; attemptedAt: string; recordedBy: { userId: string }; status: string; completed: Quantity | null; quality: number | null; mistakeCount: number | null; mistakes: unknown[]; remarks: string | null };
@@ -181,11 +182,65 @@ test.describe('F05 · Daily Hifz entry', { tag: '@F05' }, () => {
     expect(Date.parse(d.record.serverReceivedAt) - Date.parse(savedAt)).toBeGreaterThanOrEqual(24 * 60 * 60 * 1000 - 60_000);
   });
 
-  test.fixme('F05-AC4 (US-018) editing a portion audits, recalculates drafts and reports, and keeps confirmed homework', async () => {
-    // Waits for homework (F08) and weekly reports (F09); the audited edit is covered in apps/api/test/hifz (plan §1).
-    // Seed a Partial portion with a confirmed homework and a draft suggestion; edit the portion.
-    // Audit has the edit; the draft is rebuilt; the weekly report total changes; the confirmed homework is unchanged;
-    // the response carries the "Confirmed homework was not changed" notice.
+  test('F05-AC4 (US-018) editing a portion audits, recalculates drafts and the daily report, and keeps confirmed homework', async ({ as, control }) => {
+    // Seed Partial portions, one carried into confirmed homework and one into a draft suggestion; edit each portion.
+    // Audit has the edit; the draft is rebuilt; the daily report's derived totals change; the confirmed homework is
+    // unchanged; the response carries the "Confirmed homework was not changed" notice. (Weekly report part: F09, below.)
+    const ids = await control.rosterIds();
+    const teacher = await as('teacher.a1');
+    const day = classDay(1);
+    const recordId = await presentRecord(teacher, ids, 'S1', day);
+    const sabqi = await applied(teacher, portion(recordId, { section: 'SABQI', paraNumber: 3, assigned: para(3, 4) }));
+    const sabqiAttempt = await applied(teacher, attempt(sabqi, { status: 'PARTIAL', completed: para(1, 2) }));
+    const manzil = await applied(teacher, portion(recordId, { section: 'MANZIL', paraNumber: 9, assigned: para(1) }));
+    const manzilAttempt = await applied(teacher, attempt(manzil, { status: 'PARTIAL', completed: para(1, 2) }));
+    const confirmed = await hw.applied(teacher, hw.draftOp(ids, 'S1', { assignedDate: day, sourceDailyRecordId: recordId, portions: [hw.suggestedPortion(sabqiAttempt)] }));
+    await hw.applied(teacher, hw.confirmOp(confirmed.id, confirmed.rowVersion, await hw.sourcesOf(teacher, recordId)));
+    const draft = await hw.applied(teacher, hw.draftOp(ids, 'S1', { assignedDate: day, sourceDailyRecordId: recordId, portions: [hw.suggestedPortion(manzilAttempt, { section: 'MANZIL' })] }));
+    expect((await hw.homeworkDetail(teacher, draft.id)).portions[0].assigned).toEqual(para(1, 2));
+    const stored = (v: { portions: Record<string, unknown>[] }) => ({ ...v, portions: v.portions.map(({ source: _source, ...p }) => p) });
+    const confirmedBefore = stored(await hw.homeworkDetail(teacher, confirmed.id));
+    const group = (assigned: Quantity, paraNumber: number) => ({ paraNumber, range: null, totalLines: null, totalLinesSource: null, assigned });
+
+    // Edit the draft's source portion: 3/4 assigned, 1/2 completed → the draft now carries 1/4.
+    const [m] = await push(teacher, [op('lesson_portion', 'UPDATE', manzil, group(para(3, 4), 9), 1)]);
+    expect(m, JSON.stringify(m)).toMatchObject({ status: 'APPLIED' });
+    expect(m!.notices ?? []).toEqual([]);
+    expect((await hw.homeworkDetail(teacher, draft.id)).portions[0].assigned).toEqual(para(1, 4));
+    expect(await actions(control, manzil)).toEqual(['LESSON_PORTION_CREATED', 'LESSON_PORTION_UPDATED']);
+    expect(await actions(control, draft.id)).toEqual(['HOMEWORK_DRAFT_CREATED', 'HOMEWORK_DRAFT_RECALCULATED']);
+
+    // Edit the confirmed homework's source portion: the confirmed homework is unchanged, and the response says so.
+    const [s] = await push(teacher, [op('lesson_portion', 'UPDATE', sabqi, group(para(1), 3), 1)]);
+    expect(s, JSON.stringify(s)).toMatchObject({ status: 'APPLIED', notices: ['CONFIRMED_HOMEWORK_UNCHANGED'] });
+    expect(await actions(control, sabqi)).toEqual(['LESSON_PORTION_CREATED', 'LESSON_PORTION_UPDATED']);
+    expect(stored(await hw.homeworkDetail(teacher, confirmed.id))).toEqual(confirmedBefore);
+    expect(await actions(control, confirmed.id)).toEqual(['HOMEWORK_DRAFT_CREATED', 'HOMEWORK_CONFIRMED']);
+
+    // The daily report is derived from the edited portions.
+    const d = await detail(teacher, recordId);
+    expect(d.portions.find((p) => p.id === sabqi)!.progress).toMatchObject({ assigned: para(1), completed: para(1, 2), remaining: para(1, 2) });
+    expect(d.portions.find((p) => p.id === manzil)!.progress).toMatchObject({ assigned: para(3, 4), completed: para(1, 2), remaining: para(1, 4) });
+    expect(d.sectionSummary.find((x) => x.section === 'MANZIL')!.totals.assigned).toEqual([para(3, 4)]);
+  });
+
+  test('F05-AC4 (US-018) editing a portion changes the weekly report total', async ({ as, control }) => {
+    // Edit a Partial portion's quantity; the weekly report total for that week changes (F09 GET /reports/student).
+    const ids = await control.rosterIds();
+    const teacher = await as('teacher.a1');
+    const day = classDay(1);
+    const recordId = await presentRecord(teacher, ids, 'S1', day);
+    const sabqi = await applied(teacher, portion(recordId, { section: 'SABQI', paraNumber: 3, assigned: para(3, 4) }));
+    await applied(teacher, attempt(sabqi, { status: 'PARTIAL', completed: para(1, 2) }));
+    const week = async () => {
+      const res = await teacher.get(`/reports/student?studentId=${ids.students.S1}&kind=WEEK&date=${day}`);
+      expect(res.status(), await res.text()).toBe(200);
+      return (await res.json()).report.sections.find((s: { section: string }) => s.section === 'SABQI').totals;
+    };
+    expect(await week()).toMatchObject({ assigned: [para(3, 4)], remaining: [para(1, 4)] });
+    const [edit] = await push(teacher, [op('lesson_portion', 'UPDATE', sabqi, { paraNumber: 3, range: null, totalLines: null, totalLinesSource: null, assigned: para(1) }, 1)]);
+    expect(edit, JSON.stringify(edit)).toMatchObject({ status: 'APPLIED' });
+    expect(await week()).toMatchObject({ assigned: [para(1)], completed: [para(1, 2)], remaining: [para(1, 2)] });
   });
 
   test('F05-AC5 (US-018) an Absent day has no failed portion and no quality', async ({ as, control }) => {
@@ -473,8 +528,66 @@ test.describe('F05 · Daily Hifz entry', { tag: '@F05' }, () => {
     await applied(teacher, portion(results[2]!.entityId!, { section: 'SABQI', paraNumber: 3, assigned: para(1) }));
   });
 
-  test.fixme('F05-AC19 (US-023) old records can still be corrected, with audit and recalculation', async () => {
-    // Waits for homework (F08) and weekly reports (F09); the audited 90-day-old correction is covered in apps/api/test/hifz.
-    // Given a daily record from 90 days ago, when an assigned Teacher corrects it, then the edit is accepted and audited, reports and draft homework recalculate, and confirmed homework is unchanged.
+  test('F05-AC19 (US-023) old records can still be corrected, with audit and recalculation', async ({ as, control }) => {
+    // Given a daily record from 90 days ago, when an assigned Teacher corrects it, then the edit is accepted and audited,
+    // the daily report and draft homework recalculate, and confirmed homework is unchanged. (Weekly report part: F09, below.)
+    const ids = await control.rosterIds();
+    const teacher = await as('teacher.a1');
+    const old = hw.classDayFrom(90);
+    const recordId = await presentRecord(teacher, ids, 'S1', old);
+    const sabqi = await applied(teacher, portion(recordId, { section: 'SABQI', paraNumber: 3, assigned: para(3, 4) }));
+    const sabqiAttempt = await applied(teacher, attempt(sabqi, { status: 'PARTIAL', completed: para(1, 4) }));
+    const manzil = await applied(teacher, portion(recordId, { section: 'MANZIL', paraNumber: 9, assigned: para(1) }));
+    const manzilAttempt = await applied(teacher, attempt(manzil, { status: 'NOT_REMEMBERED' }));
+    const confirmed = await hw.applied(teacher, hw.draftOp(ids, 'S1', { assignedDate: old, sourceDailyRecordId: recordId, portions: [hw.suggestedPortion(sabqiAttempt)] }));
+    await hw.applied(teacher, hw.confirmOp(confirmed.id, confirmed.rowVersion, await hw.sourcesOf(teacher, recordId)));
+    const draft = await hw.applied(teacher, hw.draftOp(ids, 'S1', { assignedDate: old, sourceDailyRecordId: recordId, portions: [hw.suggestedPortion(manzilAttempt, { section: 'MANZIL' })] }));
+    expect((await hw.homeworkDetail(teacher, draft.id)).portions[0].assigned).toEqual(para(1));
+    const stored = (v: { portions: Record<string, unknown>[] }) => ({ ...v, portions: v.portions.map(({ source: _source, ...p }) => p) });
+    const confirmedBefore = stored(await hw.homeworkDetail(teacher, confirmed.id));
+
+    // Correct the 90-day-old Manzil attempt: accepted, audited, and the draft follows it.
+    const [m] = await push(teacher, [correctAttempt(manzilAttempt, 1, { status: 'PARTIAL', completed: para(3, 4), quality: 3, noMistakes: true, mistakes: [] })]);
+    expect(m, JSON.stringify(m)).toMatchObject({ status: 'APPLIED', rowVersion: 2 });
+    expect(await actions(control, manzilAttempt)).toEqual(['PORTION_ATTEMPT_CREATED', 'PORTION_ATTEMPT_CORRECTED']);
+    expect((await hw.homeworkDetail(teacher, draft.id)).portions[0].assigned).toEqual(para(1, 4));
+    expect(await actions(control, draft.id)).toEqual(['HOMEWORK_DRAFT_CREATED', 'HOMEWORK_DRAFT_RECALCULATED']);
+
+    // Correct the Sabqi attempt that confirmed homework carried forward: the homework is unchanged, with the notice.
+    const [s] = await push(teacher, [correctAttempt(sabqiAttempt, 1, { status: 'COMPLETED', completed: para(3, 4), quality: 2, noMistakes: true, mistakes: [] })]);
+    expect(s, JSON.stringify(s)).toMatchObject({ status: 'APPLIED', notices: ['CONFIRMED_HOMEWORK_UNCHANGED'] });
+    expect(await actions(control, sabqiAttempt)).toEqual(['PORTION_ATTEMPT_CREATED', 'PORTION_ATTEMPT_CORRECTED']);
+    expect(stored(await hw.homeworkDetail(teacher, confirmed.id))).toEqual(confirmedBefore);
+
+    // The old record's daily report is recalculated from the corrected attempts; its report_date is unchanged.
+    const d = await detail(teacher, recordId);
+    expect(d.record.reportDate).toBe(old);
+    expect(d.portions.find((p) => p.id === sabqi)!.progress).toMatchObject({ currentStatus: 'COMPLETED', remaining: para(0), quality: 2 });
+    expect(d.portions.find((p) => p.id === manzil)!.progress).toMatchObject({ currentStatus: 'PARTIAL', completed: para(3, 4), remaining: para(1, 4), quality: 3 });
+  });
+
+  test('F05-AC19 (US-023) correcting an old record recalculates its weekly report', async ({ as, control }) => {
+    // Correct a 90-day-old record; the weekly report for that week recalculates (F09 GET /reports/student).
+    const ids = await control.rosterIds();
+    const teacher = await as('teacher.a1');
+    const old = hw.classDayFrom(90);
+    const recordId = await presentRecord(teacher, ids, 'S1', old);
+    const manzil = await applied(teacher, portion(recordId, { section: 'MANZIL', paraNumber: 9, assigned: para(1) }));
+    const manzilAttempt = await applied(teacher, attempt(manzil, { status: 'NOT_REMEMBERED' }));
+    const week = async () => {
+      const res = await teacher.get(`/reports/student?studentId=${ids.students.S1}&kind=WEEK&date=${old}`);
+      expect(res.status(), await res.text()).toBe(200);
+      return (await res.json()).report;
+    };
+    const before = await week();
+    expect(before.sections.find((s: { section: string }) => s.section === 'MANZIL').statusCounts).toMatchObject({ NOT_REMEMBERED: 1 });
+    expect(before.quality.count).toBe(0);
+    const [m] = await push(teacher, [correctAttempt(manzilAttempt, 1, { status: 'PARTIAL', completed: para(3, 4), quality: 3, noMistakes: true, mistakes: [] })]);
+    expect(m, JSON.stringify(m)).toMatchObject({ status: 'APPLIED' });
+    const after = await week();
+    const manzilAfter = after.sections.find((s: { section: string }) => s.section === 'MANZIL');
+    expect(manzilAfter.statusCounts).toMatchObject({ NOT_REMEMBERED: 0, PARTIAL: 1 });
+    expect(manzilAfter.totals).toMatchObject({ completed: [para(3, 4)], remaining: [para(1, 4)] });
+    expect(after.quality).toMatchObject({ count: 1, display: '3.0' });
   });
 });

@@ -71,6 +71,14 @@ export class TransactionClosedError extends Error {
   }
 }
 
+/** The workspace database was closed (sign-out, revocation, account switch) before this statement ran. */
+export class DatabaseClosedError extends Error {
+  constructor() {
+    super('The database is closed');
+    this.name = 'DatabaseClosedError';
+  }
+}
+
 export function createDriver(raw: RawSql): SqlDriver {
   let queue: Promise<unknown> = Promise.resolve();
   const serialize = <T>(task: () => Promise<T>): Promise<T> => {
@@ -103,7 +111,7 @@ export function createDriver(raw: RawSql): SqlDriver {
   const direct = executor(() => undefined);
   let closed = false;
   const ensureOpen = () => {
-    if (closed) throw new Error('The database is closed');
+    if (closed) throw new DatabaseClosedError();
   };
 
   return {

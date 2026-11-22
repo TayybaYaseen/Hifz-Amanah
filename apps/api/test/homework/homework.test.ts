@@ -343,8 +343,8 @@ describe('F08 · confirmation (US-037)', () => {
 });
 
 describe('F08 · history and revision (US-038)', () => {
-  async function confirmedHomework(teacher: string) {
-    const lesson = await partialLesson(teacher);
+  async function confirmedHomework(teacher: string, day?: string) {
+    const lesson = await partialLesson(teacher, day);
     const portion = suggested(lesson.sabqi.attemptId);
     const { id, rowVersion } = await applied(h, teacher, draftOp('S1', { assignedDate: lesson.day, sourceDailyRecordId: lesson.recordId, portions: [portion] }));
     await applied(h, teacher, confirmOp(id, rowVersion, await sourcesOf(teacher, lesson.recordId)));
@@ -430,9 +430,13 @@ describe('F08 · history and revision (US-038)', () => {
 
   it('F08-AC16 (US-038) a next-class lesson portion links to its homework portion', async () => {
     const teacher = await h.signIn('teacher.a1');
-    const hw = await confirmedHomework(teacher);
+    // The next class is the latest class day up to today; the homework comes from the class day before it. (On a Sunday,
+    // classDay(h, 1) and classDay(h, 0) are both Saturday, so they cannot be used as two different days.)
     const nextDay = classDay(h, 0);
-    const recordId = await presentRecord(h, teacher, ids, 'S1', nextDay === hw.day ? today(h) : nextDay);
+    let lessonDay = addDays(nextDay, -1);
+    while (weekdayOf(lessonDay) === 7) lessonDay = addDays(lessonDay, -1);
+    const hw = await confirmedHomework(teacher, lessonDay);
+    const recordId = await presentRecord(h, teacher, ids, 'S1', nextDay);
     const lp = portionOp(recordId, { section: 'SABQI', paraNumber: 3, assigned: para(1, 4) });
     (lp.fields as Record<string, unknown>).homeworkPortionId = hw.portionId;
     const { id: portionId } = await applied(h, teacher, lp);

@@ -123,12 +123,17 @@ export type MetadataFindingView =
   | { code: 'PARA_OVERLAP' | 'PARA_GAP'; para: number; next: number }
   | { code: 'LAYOUT_MISSING'; edition: string };
 
-/** A stored record whose Quran range no longer fits the metadata. Listed for review; never changed. */
+/**
+ * A stored record whose Quran range no longer fits the metadata. Listed for review; never changed (F06-AC19).
+ * `paraNumber` is the Para the record stored (Sabaq derives it, FR-SAB-001); after a Para-boundary correction an
+ * issue `{ field: 'paraNumber', code: 'PARA_CHANGED', derived }` names the Para its start falls in now (null: none).
+ */
 export interface ReviewRecordView {
   kind: string;
   id: string;
   range: { surah: number; ayahStart: number; ayahEnd: number };
-  issues: { field: string; code: string; max?: number }[];
+  paraNumber?: number | null;
+  issues: { field: string; code: string; max?: number; derived?: number | null }[];
 }
 
 export interface ReviewResponse {

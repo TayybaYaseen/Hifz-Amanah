@@ -22,9 +22,11 @@ import { errorKeys } from '../../api/errors.ts';
 import { useSession } from '../../auth/SessionContext.tsx';
 import { ConfirmSheet, SavedOnDeviceNotice, SyncBanner } from '../../components/sync.tsx';
 import { AppScreen, AppText, Button, Card, Field, Notice, isolate } from '../../components/ui.tsx';
+import { latestRequests } from '../../api/latest.ts';
+import { cacheWriteFailed, readCacheToken } from '../../sync/cacheEpoch.ts';
 import { useSync } from '../../sync/SyncContext.tsx';
 import { colors, space } from '../../theme/tokens.ts';
-import { attendanceHandler, cacheRoster, cachedClasses, cachedRoster, readMarks, readStudentMark, type LocalMark } from '../attendance/local.ts';
+import { attendanceHandler, cacheRoster, cachedClasses, cachedRoster, forgetRoster, keepRostersOf, readMarks, readStudentMark, type LocalMark } from '../attendance/local.ts';
 import { useQuranReference } from '../quran/QuranReferenceContext.tsx';
 import { Chip, ChipRow } from '../roster/Chip.tsx';
 import {
@@ -44,6 +46,10 @@ import {
 import { cacheReportMode, readCachedReportMode, readRecord, recitedOn, recordsOn, saveCorrection, saveNewEntry, storeDetail, type LocalRecord, type PortionCorrection, type Section } from './local.ts';
 import { PortionCard, portionTitle, type SlotErrors } from './PortionCard.tsx';
 import { recordRejections } from './rejections.ts';
+import { refreshCalendar } from '../homework/api.ts';
+import { formForDuePortion } from '../homework/form.ts';
+import { createDraftForRecordInTx, defaultDueOnDevice, duePortions, type DuePortion } from '../homework/local.ts';
+import { usePortionText } from '../homework/PortionLine.tsx';
 
 interface Student {
   id: string;
@@ -112,6 +118,10 @@ export function DailyEntryScreen({ me, params, onSaved, onOpenRecord, onSyncQueu
   const [record, setRecord] = useState<LocalRecord | null>(null);
   const [recordLoading, setRecordLoading] = useState(editing);
   const keySeq = useRef(0);
+  const sheetRequests = useRef(latestRequests()).current;
+  // F08 · Confirmed homework due for this student by this date (FR-HW-015, F08-AC16).
+  const [due, setDue] = useState<DuePortion[]>([]);
+  const portionText = usePortionText();
 
   const today = sheet?.today ?? calendarDateIn(new Date(), timeZone);
   const future = date > today;
@@ -177,6 +187,8 @@ export function DailyEntryScreen({ me, params, onSaved, onOpenRecord, onSyncQueu
     void (async () => {
       try {
         const list = (await session.authorized<ClassListResponse>('/classes')).items.filter((c: ClassResponse) => c.status === 'ACTIVE');
+        // The server's list is the truth: cached rosters of classes no longer listed leave the device.
+        if (sync.db) await keepRostersOf(sync.db, list.map((c) => c.id));
         if (live) setClasses(list.map((c) => ({ id: c.id, name: c.name })));
       } catch (err) {
         if (err instanceof ApiFailure && err.code === 'NETWORK' && sync.db) {
@@ -191,12 +203,18 @@ export function DailyEntryScreen({ me, params, onSaved, onOpenRecord, onSyncQueu
 
   // The class roster and attendance for the date (online: the attendance sheet; offline: the cached roster).
   const loadSheet = useCallback(async () => {
+    // Only the latest load sets the screen (re-review M2): a late answer for a class or date no longer selected only
+    // does its device-side work (guarded cache write, forgetRoster).
+    const current = sheetRequests.next();
     if (!classId || !sync.db) return;
     const db = sync.db;
     setLoadError(null);
     try {
+      // Read before the request: an answer that arrives after this class was dropped is not cached (sync/cacheEpoch.ts).
+      const token = await readCacheToken(db, classId);
       const res = await session.authorized<AttendanceSheetResponse>(`/attendance/sheet?classId=${classId}&date=${date}`);
-      await cacheRoster(db, classId, res.className, res.students, new Date().toISOString());
+      // A write to a workspace closed meanwhile (sign-out) is ignored, other faults are reported; the sheet is still shown.
+      await cacheRoster(db, token, classId, res.className, res.students, new Date().toISOString()).catch(cacheWriteFailed);
       const local = await readMarks(db, classId, date);
       for (const s of res.students) {
         if (s.record && !local.has(s.id)) {
@@ -204,6 +222,9 @@ export function DailyEntryScreen({ me, params, onSaved, onOpenRecord, onSyncQueu
           await attendanceHandler.upsertFromServer(db, id, rowVersion, fields);
         }
       }
+      // F08: the class calendar, so a homework draft's due date defaults to the next class day on the device too.
+      void refreshCalendar(session, db, classId, res.today).catch(() => undefined);
+      if (!current()) return;
       setSheet({
         students: res.students.map(({ id, name, externalStudentId }) => ({ id, name, externalStudentId })),
         day: res.day,
@@ -213,19 +234,25 @@ export function DailyEntryScreen({ me, params, onSaved, onOpenRecord, onSyncQueu
       setOffline(false);
     } catch (err) {
       if (err instanceof ApiFailure && (err.code === 'FORBIDDEN' || err.code === 'NOT_FOUND')) {
+        // Refused for this class: its cached roster must not be offered again from the device.
+        await forgetRoster(db, classId);
+        if (!current()) return;
+        setSheet(null);
         setDenied(t(`errors.${err.code}`));
         return;
       }
+      if (!current()) return;
       if (!(err instanceof ApiFailure && err.code === 'NETWORK')) {
         setLoadError(t(errorKeys(err).form ?? 'errors.INTERNAL'));
         return;
       }
       const cached = await cachedRoster(db, classId);
+      if (!current()) return;
       setOffline(true);
       setSheet(cached ? { students: cached.students, day: null, recited: new Map(), today: null } : { students: [], day: null, recited: new Map(), today: null });
       if (!cached) setLoadError(t('attendance.offlineNoRoster'));
     }
-  }, [classId, date, session, sync.db, t]);
+  }, [classId, date, session, sheetRequests, sync.db, t]);
 
   useEffect(() => {
     void loadSheet();
@@ -259,6 +286,21 @@ export function DailyEntryScreen({ me, params, onSaved, onOpenRecord, onSyncQueu
       live = false;
     };
   }, [studentId, date, session, sync.db, sheet]);
+
+  // F08: due homework portions for a new entry (re-read when a sync brings confirmed homework).
+  useEffect(() => {
+    if (editing || !studentId || !sync.db) {
+      setDue([]);
+      return;
+    }
+    let live = true;
+    void duePortions(sync.db, studentId, date).then((list) => {
+      if (live) setDue(list);
+    });
+    return () => {
+      live = false;
+    };
+  }, [editing, studentId, date, sync.db, sync.items]);
 
   const students = sheet?.students ?? [];
   const student = students.find((s) => s.id === studentId) ?? null;
@@ -379,6 +421,7 @@ export function DailyEntryScreen({ me, params, onSaved, onOpenRecord, onSyncQueu
     const attendance = draftMark && markChanged ? { input: { studentId, label: studentName, existing: savedMark, mark: draftMark }, ctx: { classId, date, role } } : null;
     const actor = { userId: me.id, name: me.displayName };
     const now = new Date().toISOString();
+    const dueDefault = editing ? null : await defaultDueOnDevice(sync.db!, classId, date);
     setBusy(true);
     try {
       if (!editing) {
@@ -394,6 +437,11 @@ export function DailyEntryScreen({ me, params, onSaved, onOpenRecord, onSyncQueu
           attendance,
           portions: portionList.map((p) => ({ portion: portionWrite(p, numbered.get(p.key) ?? 1, index), attempt: attemptWrite(p, index) })),
           now,
+          // F08 (plan §2.1): the homework draft built by suggest() from this record, in the same transaction.
+          afterSave: async (tx, recordId) => {
+            const saved = await readRecord(tx, recordId);
+            if (saved) await createDraftForRecordInTx(tx, sync.outbox!, saved, { actor, studentName, dueDate: dueDefault });
+          },
         });
         if (id) onSaved(id, false);
         else {
@@ -635,6 +683,26 @@ export function DailyEntryScreen({ me, params, onSaved, onOpenRecord, onSyncQueu
           {portions.map((p) => (
             <AppText key={p.key}>{portionTitle(t, p.section, numbered.get(p.key) ?? 1)}</AppText>
           ))}
+        </Card>
+      ) : null}
+
+      {/* F08 · Homework due: each confirmed portion can be recorded as a portion linked to it (FR-HW-015, F08-AC16). */}
+      {sectionCards && duplicate === null && due.some((d) => !portions.some((p) => p.homeworkPortionId === d.portion.id)) ? (
+        <Card>
+          <AppText role="cardTitle" testID="daily.homework.title">{t('homework.dueTitle')}</AppText>
+          {due
+            .filter((d) => !portions.some((p) => p.homeworkPortionId === d.portion.id))
+            .map((d, i) => (
+              <View key={d.portion.id} style={{ gap: space[1] }}>
+                <AppText testID={`daily.homework.${i + 1}`}>{portionText(d.portion)}</AppText>
+                <Button
+                  testID={`daily.homework.${i + 1}.record`}
+                  variant="secondary"
+                  label={t('homework.recordDue')}
+                  onPress={() => setPortions((list) => [...list, formForDuePortion(d.portion, nextKey())])}
+                />
+              </View>
+            ))}
         </Card>
       ) : null}
 

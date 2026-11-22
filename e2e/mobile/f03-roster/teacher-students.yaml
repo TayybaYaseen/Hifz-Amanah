@@ -33,9 +33,8 @@ tags:
 - tapOn: { id: "studentForm.save" }
 - assertVisible: { id: "studentForm.name.error" }
 # 1. Given a Teacher assigned to Class A, when they add or edit a student in Class A, then it is saved and audited. Adding or editing a student in a class they are not assigned to is refused. (F03-AC15)
-- tapOn: { id: "studentForm.name" }
-- inputText: "Teacher Added"
-- hideKeyboard
+- runFlow: { file: ../../support/maestro/focus-type.yaml, env: { ID: "studentForm.name", TEXT: "Teacher Added" } }
+- runFlow: ../../support/maestro/dismiss-keyboard.yaml  # not hideKeyboard: it presses Back
 - tapOn: { id: "studentForm.save" }
 - assertVisible: { id: "studentProfile.screen" }
 - assertVisible: { id: "studentProfile.class", text: "Class: Hifz A1" }
@@ -43,17 +42,18 @@ tags:
 - assertNotVisible: { id: "studentProfile.deactivate" }
 - assertNotVisible: { id: "studentProfile.move" }
 - tapOn: { id: "studentProfile.edit" }
-- tapOn: { id: "studentForm.name" }
-- eraseText: 64
-- inputText: "Teacher Edited"
-- hideKeyboard
+- runFlow: { file: ../../support/maestro/focus-type.yaml, env: { ID: "studentForm.name", TEXT: "Teacher Edited" } }
+- runFlow: ../../support/maestro/dismiss-keyboard.yaml  # not hideKeyboard: it presses Back
 - tapOn: { id: "studentForm.save" }
 - assertVisible: "Teacher Edited"
 # The audit records of both saves are asserted by the API E2E test of F03-AC15 (e2e/api/f03-roster.spec.ts).
 # Students of Hifz A2 are not listed, so they cannot be opened or edited.
-- back
-- back
-- tapOn: { id: "students.search" }
-- inputText: "Test Student Three"
-- hideKeyboard
+# Return to the Students list by navigation, not by counting Back presses (the stack depth after an edit is the app's
+# choice): Home → More → Students.
+- runFlow: ../../support/maestro/back-home.yaml
+- tapOn: { id: "nav.more" }
+- tapOn: { id: "more.students" }
+- assertVisible: { id: "students.screen" }
+- runFlow: { file: ../../support/maestro/focus-type.yaml, env: { ID: "students.search", TEXT: "Test Student Three" } }
+- runFlow: ../../support/maestro/dismiss-keyboard.yaml  # not hideKeyboard: it presses Back
 - assertVisible: { id: "students.noMatch" }

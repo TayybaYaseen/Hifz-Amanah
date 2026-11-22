@@ -323,6 +323,42 @@ The madrasa's mode is also in `GET /organization` (`dailyReportMode`). F05 suppl
 for the Bulk Entry sheet's `recited` and the Absent-note rule; daily records in `/calendar/exceptions/impact`) and the
 F06 review list's Sabaq ranges (`kind: SABAQ_PORTION`).
 
+## Report routes (F09)
+
+Contract: [`packages/contracts/src/reports.ts`](../../packages/contracts/src/reports.ts); rules in
+`packages/domain/reports` (`buildReport`, `classSummary`, `reportPeriod`); code in
+[`src/modules/reporting`](src/modules/reporting); tables in `migrations/0015_reporting.sql` (`report_stamps`,
+`report_cache`; RLS forced, no DELETE). Plan: [F09-plan](../../docs/handover/F09-plan.md); cache design
+[ADR-020](../../docs/adr/ADR-020-report-cache-source-stamps.md).
+
+Read-only: every report is built from the source records (attendance, daily records, portions, attempts, mistakes,
+homework, timetable, exceptions, enrollments) and nothing is editable (FR-RPT-001). Staff only in F09: Owner, Admin,
+assigned Teacher. A Student or Parent gets `403` before anything is loaded; their published view is F10's portal
+(FR-RPT-010). A Teacher reaches a student enrolled at any time in one of their classes, and the report then holds only
+the days in those classes; a student or class out of reach, or another madrasa's id, is `404`.
+
+| Route | Query | Result |
+|---|---|---|
+| `GET /reports/student` | `studentId`, `kind=WEEK\|MONTH`, `date?` (default today in the madrasa's timezone) | `200 { report: StudentReportView, generatedAt }`. The period holds `date`: week from the madrasa's week start (Monday) 00:00 to 23:59 on its last day, or the calendar month, in its timezone, with `startsAt`/`endsAt` instants. `hasData: false` means "No records for this period" |
+| `GET /reports/class-summary` | `classId`, `kind`, `date?` | `200 { classId, className, period, today, rows: ClassSummaryRowView[], generatedAt }`: one row per student enrolled in the class during the period, each from that student's report scoped to the class |
+| `GET /reports/class-summary/export` | `classId`, `kind`, `date?`, `format=xlsx|pdf`, `locale?` (`en`, `ur`, `ur-Latn`) | `200` the file (`attachment`): the same rows and values as the summary, no notes (F09-AC20). `.xlsx` (exceljs) with a hidden `_meta` sheet and formula-like cells prefixed with `'`; PDF rendered by headless Chromium, A4, header repeated, Urdu right to left. Audited `CLASS_SUMMARY_EXPORTED` (format, period, row count). Same access as the summary |
+
+What a report holds (all derived): attendance counts and one entry per date (Present, Late, Half day, approved Leave,
+Leave awaiting, normal absence = Absent + rejected Leave, not marked, holidays, closures, no-class and unscheduled days;
+days outside the enrollment are not counted); Sabaq, Sabqi, and Manzil apart with per-unit totals (latest attempt per
+portion, assigned counted once, Extra apart), status counts, Para-wise progress, and pending portions; the daily record
+history with each portion on its own line; quality average over recorded ratings with the count; mistake counts;
+recurring difficulty (DEC-B34); homework measures (confirmed, drafts, assigned, attempted, completed, carried forward,
+carried over, outstanding). Records on a date that has since become a non-class day are listed in `excludedRecords` and
+counted nowhere (FR-CAL-009). Staff payloads include attempt remarks and mistake notes with their visibility;
+`projectFor(STUDENT|PARENT, 'report')` removes remarks and every INTERNAL note.
+
+**Cache.** A built report is stored in `report_cache` with the source stamps it was built from, the date, and the
+madrasa's timezone and week start. Triggers bump a per-student stamp (records, portions, attempts, mistakes,
+attendance, homework, enrollments, the student row) or the madrasa stamp (timetables, exceptions) in the same
+transaction as the change, so the next read after any correction rebuilds from source. `ReportService.verifyCache`
+recomputes a sample and lists mismatches (the nightly job waits for a worker entrypoint).
+
 ## Sync routes (F12)
 
 Protocol v1, decisions in [ADR-015](../../docs/adr/ADR-015-sync-protocol-idempotency-conflicts.md); shapes in
@@ -396,6 +432,10 @@ F06 adds:
   refused. Real Quran data is never loaded through test control.
 
 ## Not yet built
+
+- F09: the published Student/Parent report view and publishing (F10, FR-RPT-010); the madrasa's PDF template, stored
+  files behind signed URLs, and the other exports (F13, F14; the class-summary export is minimal and synchronous);
+  scheduling the nightly report-cache verification (needs the pg-boss worker entrypoint).
 
 - F06: the production Quran seed and 16-line layout (blocked on the dataset, licence, edition, and reviewer; SRS §17.3);
   syncing Quran metadata to devices for offline Daily Entry (arrives with F05); the review list's homework ranges (F08);

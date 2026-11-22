@@ -1,22 +1,92 @@
 # F09 · Weekly and monthly reports — mobile E2E (docs/specs/12-f09-weekly-monthly-reports.md; design.md §4.10, §4.14)
 # Covers: F09-AC2, F09-AC8, F09-AC9, F09-AC10, F09-AC11, F09-AC12, F09-AC13
+# SYNTHETIC DATA ONLY: the MONTH scenario of apps/api/src/testing/report-seed.ts for S1 in last month: Sabqi Para 7
+# with a Major mistake on 3 days (ratings 2), Para 9 on 2 days (ratings 3), Manzil Para 20, a holiday, one Absent, one
+# approved and one rejected Leave; one confirmed homework (a carried-forward portion, completed next class, and a
+# Teacher-added one). Expected from the seed: Sabqi assigned 11/4 Para, completed 3/2 Para; average 2.4 (5 ratings).
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F09 monthly report — sections, homework measures, difficulty, attendance categories
 tags:
-  - pending
   - F09
   - US-039
   - US-040
   - US-041
   - US-042
 ---
-- launchApp:
-    clearState: true
-# Precondition: a seeded synthetic month for S1 with known expected totals.
-# 1. Sign in as admin.a → Reports → Monthly → S1: every shown total equals the seed's expected value.   (F09-AC2)
-# 2. Sabaq, Sabqi, Manzil summaries are separate with Para-wise progress and pending portions.         (F09-AC8)
-# 3. Homework: assigned, attempted, completed, carried forward shown separately.                       (F09-AC9)
-# 4. Recurring difficulty lists Para 7 (3 attempts with Major mistakes) with counts and dates; Para 9 (2 attempts) is not listed. (F09-AC10)
-# 5. Attendance: 2 absences; performance lists only recited days, no failed or zero entries.           (F09-AC11)
-# 6. Holiday and Sunday shown as holiday and no class, not absences.                                   (F09-AC12)
-# 7. 1 Leave and 2 normal absences shown separately.                                                   (F09-AC13)
+- runFlow: ../../support/maestro/reset.yaml
+- runScript: { file: ../../support/maestro/control.js, env: { ACTION: quranSeed } }
+- runScript: { file: ../../support/maestro/control.js, env: { ACTION: reportSeed, SCENARIO: MONTH } }
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- runFlow:
+    file: ../../support/maestro/reports-open.yaml
+    env: { STUDENT: EXT-A-001, KIND: month, PREV: "1" }
+# 1. Every shown total equals the seed's expected value.                                              (F09-AC2)
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.range", TEXT: ".*${output.report.from}.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.quality", TEXT: ".*2[.]4.*Good.*[(]5 ratings[)].*" }
+# 5. Attendance: 2 normal absences (Absent + rejected Leave); 7. 1 Leave shown apart.               (F09-AC11, AC13)
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.attendance.absent", TEXT: ".*Absent: .*2.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.attendance.leave", TEXT: ".*Leave .approved.: .*1.*" }
+# 6. The holiday and Sundays are shown as holiday and no class, not absences.                        (F09-AC12)
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.attendance.holidays", TEXT: ".*Holidays: .*1.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.day.${output.report.holiday}", TEXT: ".*Holiday.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.attendance.unscheduled" }
+# 2. Sabaq, Sabqi, Manzil summaries are separate with Para-wise progress and pending portions.       (F09-AC8)
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.section.SABAQ.empty" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.section.SABQI.assigned", TEXT: ".*11/4.*Para.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.section.SABQI.completed", TEXT: ".*3/2.*Para.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.section.SABQI.para.7" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.section.SABQI.pending.1" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.section.MANZIL.completed", TEXT: ".*1.*Para.*" }
+# 4. Recurring difficulty lists Para 7 (3 attempts with Major mistakes) with counts and dates; Para 9 (2) is not. (F09-AC10)
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.difficulty.7", TEXT: ".*Para.*7.*3.*attempts.*${output.report.firstDay}.*" }
+- assertNotVisible: { id: "reports.difficulty.9" }
+# 3. Homework: assigned, attempted, completed, carried forward shown separately.                     (F09-AC9)
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.homework.assigned", TEXT: ".*: .*2.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.homework.attempted", TEXT: ".*: .*1.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.homework.completed", TEXT: ".*: .*1.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.homework.carriedForward", TEXT: ".*: .*1.*" }
+# 5. Performance lists only recited days, with no failed or zero entry for the absent day.           (F09-AC11)
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.dayRecord.${output.report.firstDay}" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.section.SABQI.statuses", TEXT: "^(?!.*Absent).*Partial.*" }

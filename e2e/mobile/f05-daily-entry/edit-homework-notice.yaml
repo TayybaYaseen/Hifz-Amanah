@@ -1,15 +1,92 @@
 # F05 · Daily Hifz entry — mobile E2E (docs/specs/09-us-018-create-individual-daily-report.md; design.md §5.11)
 # Covers: F05-AC4
-# Pending until F08 (homework): confirmed homework and draft suggestions do not exist yet (docs/handover/F05-plan.md §1).
-# The notice itself is checked in validation-and-edits.yaml.
+# The general "edited" notice is checked in validation-and-edits.yaml; this flow checks it with confirmed homework and a
+# draft built from the same record (F08). SYNTHETIC DATA ONLY: seeded personas.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F05 daily entry — editing a record keeps confirmed homework and updates the draft
 tags:
-  - pending
   - F05
   - US-018
 ---
-- launchApp:
-    clearState: true
-# 1. With a confirmed homework from this record (test control), edit a portion →
-#    notice "Confirmed homework was not changed"; the draft suggestion updates.                        (F05-AC4)
+- runFlow: ../../support/maestro/reset.yaml
+- runFlow: ../../support/maestro/ensure-class-day.yaml
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+# Setup: S1 recites Sabqi Para 4 and Manzil Para 2, each Salasah assigned and Half completed (Partial).
+- runFlow:
+    file: ../../support/maestro/daily-start.yaml
+    env: { STUDENT: EXT-A-001 }
+- runFlow:
+    file: ../../support/maestro/daily-revision-portion.yaml
+    env: { SECTION: sabqi, N: "1", PARA: "4", UNIT: SALASAH, STATUS: PARTIAL, COMPLETED: HALF }
+- runFlow:
+    file: ../../support/maestro/daily-revision-portion.yaml
+    env: { SECTION: manzil, N: "1", PARA: "2", UNIT: SALASAH, STATUS: PARTIAL, COMPLETED: HALF }
+- runFlow: ../../support/maestro/daily-save.yaml
+- extendedWaitUntil:
+    visible: { id: "record.sync.SYNCED" }
+    timeout: 90000
+- runFlow: ../../support/maestro/back-home.yaml
+# Confirmed homework from this record (Sabqi Para 4, 1/4 Para), and a draft from the same record (Manzil Para 2).
+- runFlow:
+    file: ../../support/maestro/homework-open.yaml
+    env: { STUDENT: EXT-A-001 }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.draft.1.review" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "hwEdit.manzil.portion.1.remove" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "hwEdit.confirm" } }
+- extendedWaitUntil:
+    visible: { id: "hwEdit.confirmSheet.summary" }
+    timeout: 15000
+- tapOn: { id: "hwEdit.confirmSheet.accept" }
+- extendedWaitUntil:
+    visible: { id: "homework.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.tab.confirmed" } }
+- extendedWaitUntil:
+    visible: { id: "homework.confirmed.1.state" }
+    timeout: 90000
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.tab.suggested" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.buildFrom.${output.today}" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.draft.1.portion.1", TEXT: ".*Manzil.*Para.*2.*1/4.*Para.*" } }
+- extendedWaitUntil:
+    notVisible: { id: "homework.draft.1.sync.PENDING" }
+    timeout: 90000
+- runFlow: ../../support/maestro/back-home.yaml
+# 1. Edit the record (both portions Half → Rubu) → "Confirmed homework was not changed"; the draft is rebuilt.  (F05-AC4)
+- tapOn: { id: "nav.dailyEntry" }
+- extendedWaitUntil:
+    visible: { id: "daily.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "daily.class.Hifz A1" }
+- extendedWaitUntil:
+    visible: { id: "daily.student.EXT-A-001" }
+    timeout: 30000
+- tapOn: { id: "daily.student.EXT-A-001" }
+- extendedWaitUntil:
+    visible: { id: "daily.duplicate.open" }
+    timeout: 30000
+- tapOn: { id: "daily.duplicate.open" }
+- extendedWaitUntil:
+    visible: { id: "record.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "record.edit" } }
+- extendedWaitUntil:
+    visible: { id: "daily.editHelp" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.1.completed.RUBU" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.manzil.portion.1.completed.RUBU" } }
+- runFlow: ../../support/maestro/daily-save.yaml
+- extendedWaitUntil:
+    visible: { id: "record.homeworkConfirmedUnchanged" }
+    timeout: 90000
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow:
+    file: ../../support/maestro/homework-open.yaml
+    env: { STUDENT: EXT-A-001 }
+# The draft now carries the new remaining (3/4 − 1/4 = 1/2 Para); the confirmed homework still assigns 1/4 Para.
+- extendedWaitUntil:
+    visible: { id: "homework.draft.1.portion.1", text: ".*Manzil.*Para.*2.*1/2.*Para.*" }
+    timeout: 60000
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "homework.tab.confirmed" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "homework.confirmed.1.portion.1", TEXT: ".*Sabqi.*Para.*4.*1/4.*Para.*" } }

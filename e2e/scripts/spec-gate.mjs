@@ -21,6 +21,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, loadTests, selectSpecs } from './lib.mjs';
+import { shellArgs } from './win-args.mjs';
 
 const arg = process.argv[2]?.toUpperCase();
 if (!arg || !/^(US-\d{3}|F\d{2}|APP)$/.test(arg)) {
@@ -28,7 +29,11 @@ if (!arg || !/^(US-\d{3}|F\d{2}|APP)$/.test(arg)) {
   process.exit(2);
 }
 
-const run = (cmd, args) => spawnSync(cmd, args, { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
+// On Windows the command runs through cmd.exe (needed for the npx/maestro .cmd/.bat shims), which reads `|`, `&`,
+// `<`, `>`, `^`, `(` `)` and quotes as shell syntax and expands `%NAME%` even inside quotes; shellArgs escapes every
+// argument for that (e2e/scripts/win-args.mjs, tested in win-args.test.mjs). Elsewhere no shell is used.
+const WIN = process.platform === 'win32';
+const run = (cmd, args) => spawnSync(cmd, shellArgs(args), { cwd: ROOT, stdio: 'inherit', shell: WIN });
 const RESULT = { FAIL: 1, INCOMPLETE: 3, PENDING: 4, BLOCKED: 5 };
 const stop = (result, why) => {
   console.error(`\n${arg} gate: ${result} — ${why}`);
@@ -42,7 +47,9 @@ if (arg !== 'APP' && !stories.length) {
 }
 
 // 1. Traceability
-if (arg !== 'APP' && run('node', ['e2e/scripts/traceability.mjs', arg]).status !== 0) {
+// Node itself is started directly (no shell, nothing to escape); `run` is for the npx/maestro shims.
+const node = (args) => spawnSync(process.execPath, args, { cwd: ROOT, stdio: 'inherit' });
+if (arg !== 'APP' && node(['e2e/scripts/traceability.mjs', arg]).status !== 0) {
   stop('INCOMPLETE', 'some acceptance criteria have no E2E test the gate can run');
 }
 

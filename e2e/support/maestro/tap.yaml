@@ -1,0 +1,19 @@
+# Subflow: scroll an element into view (below first, then above) and tap it.
+# Usage: runFlow { file: ../../support/maestro/tap.yaml, env: { ID: "homework.new" } }
+# The downward search only runs when the element is not already on screen, so a visible or higher element does not
+# wait out the 30 s search below it.
+appId: com.hifzamanah.app
+---
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      notVisible: { id: "${ID}" }
+    commands:
+      - scrollUntilVisible: { element: { id: "${ID}" }, direction: DOWN, timeout: 30000, centerElement: true, optional: true }
+# Up to 120 s: on a slow emulator each scroll step takes about 10 s, and once the downward search has gone past a
+# nearby element on a long form, three upward steps are not always enough to come back. The search ends as soon as the
+# element is on screen, so this only costs time when the element really is far away (or missing, and the flow fails).
+- scrollUntilVisible: { element: { id: "${ID}" }, direction: UP, timeout: 120000, centerElement: true }
+- waitForAnimationToEnd
+- tapOn: { id: "${ID}" }
+- waitForAnimationToEnd

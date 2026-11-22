@@ -1,0 +1,40 @@
+# Subflow (F09): Home → Reports → class Hifz A1 → (optionally) a student → (optionally) the previous period.
+# Usage: runFlow { file: ../../support/maestro/reports-open.yaml, env: { STUDENT: EXT-A-001, KIND: week, PREV: "1" } }
+# STUDENT empty opens the class summary instead (Reports → Class summary). KIND is week or month. PREV "1" taps Previous.
+appId: com.hifzamanah.app
+---
+- runFlow:
+    file: tap.yaml
+    env: { ID: "nav.reports" }
+- extendedWaitUntil:
+    visible: { id: "reports.class.Hifz A1" }
+    timeout: 30000
+- runFlow:
+    when:
+      true: ${typeof STUDENT === 'undefined' || STUDENT === ''}
+    commands:
+      - tapOn: { id: "reports.mode.class" }
+- runFlow:
+    when:
+      true: ${typeof KIND !== 'undefined' && KIND === 'month'}
+    commands:
+      - tapOn: { id: "reports.kind.month" }
+- tapOn: { id: "reports.class.Hifz A1" }
+- runFlow:
+    when:
+      true: ${typeof STUDENT !== 'undefined' && STUDENT !== ''}
+    commands:
+      - extendedWaitUntil:
+          visible: { id: "reports.student.${STUDENT}" }
+          timeout: 30000
+      - tapOn: { id: "reports.student.${STUDENT}" }
+- runFlow:
+    when:
+      true: ${typeof PREV !== 'undefined' && PREV === '1'}
+    commands:
+      - runFlow:
+          file: tap.yaml
+          env: { ID: "reports.prev" }
+- extendedWaitUntil:
+    visible: { id: "reports.range" }
+    timeout: 60000

@@ -292,7 +292,16 @@ export class Outbox {
     return this.queueUpdate(tx, update);
   }
 
-  private async queueUpdate(tx: SqlExecutor, update: NewUpdate): Promise<{ opId: string; seq: number }> {
+  /**
+   * Queues a COMMAND on an existing row (F08 CONFIRM_HOMEWORK), with the base version and dependencies derived exactly
+   * as for an UPDATE (`enqueueUpdate`): features never build `baseVersion` themselves.
+   */
+  async enqueueCommand(tx: SqlExecutor, command: NewUpdate & { command: string }): Promise<{ opId: string; seq: number }> {
+    if (this.blocked) throw new OutboxBlockedError();
+    return this.queueUpdate(tx, command, command.command);
+  }
+
+  private async queueUpdate(tx: SqlExecutor, update: NewUpdate, command?: string): Promise<{ opId: string; seq: number }> {
     const handler = this.deps.registry?.get(update.entity);
     if (!handler) throw new OutboxValidationError(`entity "${update.entity}" is not registered`);
     const row = await tx.get<{ row_version: number | null }>(`SELECT row_version FROM ${handler.table} WHERE id = ?`, [update.entityId]);
@@ -313,7 +322,7 @@ export class Outbox {
     return this.queue(tx, {
       entity: update.entity,
       entityId: update.entityId,
-      opType: 'UPDATE',
+      ...(command ? { opType: 'COMMAND' as const, command } : { opType: 'UPDATE' as const }),
       baseVersion,
       fields: update.fields,
       dependsOn: [...dependsOn],

@@ -1,0 +1,23 @@
+# Subflow: scroll to a field, clear it, and type a value.
+# Usage: runFlow { file: ../../support/maestro/type.yaml, env: { ID: "hwEdit.due", TEXT: "2026-11-16" } }
+# It clears 20 characters first. Each is a separate key press (slow on an emulator), and 20 covers every value these
+# flows replace (the longest is "Revise twice"); a flow replacing longer text needs its own eraseText.
+appId: com.hifzamanah.app
+---
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      notVisible: { id: "${ID}" }
+    commands:
+      - scrollUntilVisible: { element: { id: "${ID}" }, direction: DOWN, timeout: 30000, centerElement: true, optional: true }
+- scrollUntilVisible: { element: { id: "${ID}" }, direction: UP, timeout: 30000, centerElement: true }
+- tapOn: { id: "${ID}" }
+# Type only once the field has input focus (see focus-type.yaml): typing earlier can drop the first characters.
+- extendedWaitUntil:
+    visible: { id: "${ID}", focused: true }
+    timeout: 30000  # a slow emulator can take over 15 s to open the keyboard; ends as soon as the field has focus
+- eraseText: 20
+- inputText: ${TEXT}
+# Never `hideKeyboard` (it presses Back, which can leave the screen): an open keyboard hides fields from Maestro, so
+# close it by tapping the empty page margin.
+- runFlow: dismiss-keyboard.yaml

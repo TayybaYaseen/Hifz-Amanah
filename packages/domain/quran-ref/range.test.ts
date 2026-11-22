@@ -5,6 +5,7 @@ import {
   countLines,
   paraFor,
   rangesNeedingReview,
+  recordReviewIssues,
   validateAyahRange,
   validatePara,
   validateParaBoundary,
@@ -112,6 +113,33 @@ describe('F06 · metadata', () => {
     const edited = [{ number: 1, ayahCount: 6 }, ...SURAHS.slice(1)];
     const before = structuredClone(records);
     expect(rangesNeedingReview(records, edited).map((r) => r.id)).toEqual(['a']);
+    expect(records).toEqual(before);
+  });
+
+  it('F06-AC19 (US-024) a Para-boundary correction lists records whose stored Para no longer matches, never changing them', () => {
+    // Invented test values (not Quran metadata): two Surahs of 20 Ayat; Para 1 is first corrected to end at Surah 1.
+    const surahs: SurahMeta[] = [
+      { number: 1, ayahCount: 20 },
+      { number: 2, ayahCount: 20 },
+    ];
+    const original: ParaBoundary[] = [{ number: 1, start: { surah: 1, ayah: 1 }, end: { surah: 2, ayah: 20 } }];
+    const corrected: ParaBoundary[] = [
+      { number: 1, start: { surah: 1, ayah: 1 }, end: { surah: 1, ayah: 20 } },
+      { number: 2, start: { surah: 2, ayah: 1 }, end: { surah: 2, ayah: 20 } },
+    ];
+    const records = [
+      { id: 'kept', range: { surah: 1, ayahStart: 3, ayahEnd: 9 }, paraNumber: 1 },
+      { id: 'moved', range: { surah: 2, ayahStart: 1, ayahEnd: 5 }, paraNumber: 1 },
+      { id: 'no-para', range: { surah: 2, ayahStart: 1, ayahEnd: 5 } },
+    ];
+    const before = structuredClone(records);
+    expect(rangesNeedingReview(records, surahs, original)).toEqual([]);
+    expect(rangesNeedingReview(records, surahs, corrected).map((r) => r.id)).toEqual(['moved']);
+    expect(recordReviewIssues(records[1]!, surahs, corrected)).toEqual([{ field: 'paraNumber', code: 'PARA_CHANGED', derived: 2 }]);
+    // A start no boundary covers any more is listed too; the Para is never guessed.
+    expect(recordReviewIssues(records[1]!, surahs, corrected.slice(0, 1))).toEqual([{ field: 'paraNumber', code: 'PARA_CHANGED', derived: null }]);
+    // An invalid range reports its range issues first.
+    expect(codes(recordReviewIssues({ range: { surah: 2, ayahStart: 1, ayahEnd: 25 }, paraNumber: 1 }, surahs, corrected))).toEqual(['ayahEnd:OUT_OF_RANGE']);
     expect(records).toEqual(before);
   });
 });

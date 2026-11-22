@@ -1,14 +1,27 @@
 // F06 · Quran portions and metadata — API E2E (docs/specs/07-f06-quran-portions-metadata.md)
 // Screen journeys: e2e/mobile/f06-quran-portions/.
 // SYNTHETIC DATA ONLY: Quran values come from the synthetic fixture (control.seedSyntheticQuran) or are invented here;
-// none is real Quran metadata. Criteria that save portions (AC5, AC8…AC17) need F05's daily-entry endpoints and stay
-// test.fixme; AC18 waits for the approved seed (DEFERRED: DEC-B31); AC19's record part waits for F05 records.
+// none is real Quran metadata. Criteria that save portions (AC5, AC8…AC17, AC19) use F05's daily-entry sync endpoints
+// (support/daily-entry.ts); AC18 waits for the approved seed (DEFERRED: DEC-B31).
 import { createHash } from 'node:crypto';
+import type { APIRequestContext } from '@playwright/test';
 // The device's own pure functions (packages/domain), so AC24 checks exactly what the app runs offline.
 import { evaluateRange, referenceIndex, type ReferenceSnapshotV1 } from '../../packages/domain/quran-ref/index.ts';
+import { applied, attemptOp, classDay, lines, para, portionOp, presentRecord, push, recite, recordDetail, type Quantity } from './support/daily-entry';
 import { expect, test, type QuranConversion, type QuranReview, type TestControl } from './support/fixtures';
 
 const SURAH = { nameAr: 'اختبار ١', nameTranslit: 'Synthetic 1', ayahCount: 7, rowVersion: null };
+
+/** Synthetic Surah 2, Ayat 1–10 (never real metadata). */
+const SABAQ_2_1_10 = { surahStart: 2, ayahStart: 1, surahEnd: 2, ayahEnd: 10 };
+
+/** Seeds the synthetic Quran fixture and gives teacher.a1 a Present daily record for S1 to save portions into. */
+async function dayRecord(as: (p: 'teacher.a1') => Promise<APIRequestContext>, control: TestControl) {
+  await control.seedSyntheticQuran();
+  const ids = await control.rosterIds();
+  const teacher = await as('teacher.a1');
+  return { teacher, recordId: await presentRecord(teacher, ids, 'S1', classDay(1)) };
+}
 
 test.describe('F06 · Quran portions and metadata', { tag: '@F06' }, () => {
   test('F06-AC1 (US-024) Admin Surah and Para boundary edits are saved per madrasa and audited', async ({ as, control }) => {
@@ -55,8 +68,13 @@ test.describe('F06 · Quran portions and metadata', { tag: '@F06' }, () => {
     expect((await res.json()).error.fields).toEqual({ end: 'END_BEFORE_START' });
   });
 
-  test.fixme('F06-AC5 (US-025) Para 1–30 is accepted; 0 and 31 are rejected', async () => {
+  test('F06-AC5 (US-025) Para 1–30 is accepted; 0 and 31 are rejected', async ({ as, control }) => {
     // Save portions with Para 1, 30 → ok; 0, 31 → field errors.
+    const { teacher, recordId } = await dayRecord(as, control);
+    const results = await push(teacher, [1, 30, 0, 31].map((paraNumber, i) => portionOp(recordId, { section: 'SABQI', position: i + 1, paraNumber, assigned: para(1) })));
+    expect(results.map((r) => r.status), JSON.stringify(results)).toEqual(['APPLIED', 'APPLIED', 'REJECTED', 'REJECTED']);
+    for (const r of results.slice(2)) expect(r).toMatchObject({ code: 'VALIDATION', fields: { paraNumber: expect.any(String) } });
+    expect((await recordDetail(teacher, recordId)).portions.map((p: { paraNumber: number }) => p.paraNumber)).toEqual([1, 30]);
   });
 
   test('F06-AC6 (US-025) an Ayat past the Surah end is rejected naming the maximum', async ({ as }) => {
@@ -72,49 +90,143 @@ test.describe('F06 · Quran portions and metadata', { tag: '@F06' }, () => {
     expect((await res.json()).issues).toEqual([{ field: 'range', code: 'END_BEFORE_START' }]);
   });
 
-  test.fixme('F06-AC8 (US-026) line quantities are whole LINES', async () => {
+  test('F06-AC8 (US-026) line quantities are whole LINES', async ({ as, control }) => {
     // Save 10 LINES → stored unit LINES, 10/1; save 2.5 LINES → rejected.
+    const { teacher, recordId } = await dayRecord(as, control);
+    const half = { unit: 'LINES', numerator: 5, denominator: 2 };
+    const [fraction] = await push(teacher, [portionOp(recordId, { section: 'SABAQ', range: SABAQ_2_1_10, totalLines: 10, assigned: half })]);
+    expect(fraction).toMatchObject({ status: 'REJECTED', code: 'VALIDATION' });
+    expect((await recordDetail(teacher, recordId)).portions).toEqual([]);
+    await applied(teacher, portionOp(recordId, { section: 'SABAQ', range: SABAQ_2_1_10, totalLines: 10, assigned: lines(10) }));
+    expect((await recordDetail(teacher, recordId)).portions[0]).toMatchObject({ section: 'SABAQ', assigned: { unit: 'LINES', numerator: 10, denominator: 1 }, totalLines: 10 });
   });
 
-  test.fixme('F06-AC9 (US-026) 10 lines assigned and 6 completed leave 4 lines (AC-QTY-02)', async () => {
+  test('F06-AC9 (US-026) 10 lines assigned and 6 completed leave 4 lines (AC-QTY-02)', async ({ as, control }) => {
     // Read remaining for the portion → 4 LINES.
+    const { teacher, recordId } = await dayRecord(as, control);
+    await recite(teacher, recordId, { section: 'SABAQ', range: SABAQ_2_1_10, totalLines: 10, assigned: lines(10) }, { status: 'PARTIAL', completed: lines(6) });
+    expect((await recordDetail(teacher, recordId)).portions[0].progress).toMatchObject({ assigned: lines(10), completed: lines(6), remaining: lines(4) });
   });
 
-  test.fixme('F06-AC10 (US-027) Salasah is stored as 3/4 Para (AC-QTY-01)', async () => {
+  test('F06-AC10 (US-027) Salasah is stored as 3/4 Para (AC-QTY-01)', async ({ as, control }) => {
     // Save SALASAH; stored PARA 3/4.
+    const { teacher, recordId } = await dayRecord(as, control);
+    await applied(teacher, portionOp(recordId, { section: 'SABQI', paraNumber: 3, assigned: para(3, 4) }));
+    expect((await recordDetail(teacher, recordId)).portions[0].assigned).toEqual({ unit: 'PARA', numerator: 3, denominator: 4 });
   });
 
-  test.fixme('F06-AC11 (US-027) Rubu, Half, and Complete are stored exactly', async () => {
+  test('F06-AC11 (US-027) Rubu, Half, and Complete are stored exactly', async ({ as, control }) => {
     // Stored as PARA 1/4, 1/2, 1/1.
+    const { teacher, recordId } = await dayRecord(as, control);
+    const presets = [para(1, 4), para(1, 2), para(1, 1)];
+    const results = await push(teacher, presets.map((assigned, i) => portionOp(recordId, { section: 'MANZIL', position: i + 1, paraNumber: i + 5, assigned })));
+    expect(results.map((r) => r.status)).toEqual(['APPLIED', 'APPLIED', 'APPLIED']);
+    expect((await recordDetail(teacher, recordId)).portions.map((p: { assigned: Quantity }) => p.assigned)).toEqual(presets);
   });
 
-  test.fixme('F06-AC12 (US-027) 3/4 Para assigned and 1/2 completed leave 1/4 Para (AC-QTY-03)', async () => {
+  test('F06-AC12 (US-027) 3/4 Para assigned and 1/2 completed leave 1/4 Para (AC-QTY-03)', async ({ as, control }) => {
     // Read remaining → PARA 1/4.
+    const { teacher, recordId } = await dayRecord(as, control);
+    await recite(teacher, recordId, { section: 'SABQI', paraNumber: 3, assigned: para(3, 4) }, { status: 'PARTIAL', completed: para(1, 2) });
+    expect((await recordDetail(teacher, recordId)).portions[0].progress).toMatchObject({ assigned: para(3, 4), completed: para(1, 2), remaining: para(1, 4) });
   });
 
-  test.fixme('F06-AC13 (US-027) LINES and PARA totals are never combined (AC-QTY-04)', async () => {
+  test('F06-AC13 (US-027) LINES and PARA totals are never combined (AC-QTY-04)', async ({ as, control }) => {
     // One day with a LINES portion and a PARA portion; totals are two entries, one per unit.
+    const { teacher, recordId } = await dayRecord(as, control);
+    await recite(teacher, recordId, { section: 'MANZIL', paraNumber: 4, assigned: lines(10) }, { status: 'PARTIAL', completed: lines(6) });
+    await recite(teacher, recordId, { section: 'MANZIL', position: 2, paraNumber: 5, assigned: para(1, 2) }, { status: 'COMPLETED' });
+    const d = await recordDetail(teacher, recordId);
+    const manzil = d.sectionSummary.find((s: { section: string }) => s.section === 'MANZIL');
+    expect(manzil.totals.assigned).toEqual(expect.arrayContaining([lines(10), para(1, 2)]));
+    expect(manzil.totals.assigned).toHaveLength(2);
+    expect(manzil.totals.completed).toEqual(expect.arrayContaining([lines(6), para(1, 2)]));
+    expect(manzil.totals.completed).toHaveLength(2);
+    expect(manzil.totals.remaining).toEqual(expect.arrayContaining([lines(4), para(0)]));
   });
 
-  test.fixme('F06-AC14 (US-027) completed greater than assigned is rejected (AC-QTY-05)', async () => {
+  test('F06-AC14 (US-027) completed greater than assigned is rejected (AC-QTY-05)', async ({ as, control }) => {
     // Assigned Half, completed Complete → field error on completed.
+    const { teacher, recordId } = await dayRecord(as, control);
+    const portion = await applied(teacher, portionOp(recordId, { section: 'SABQI', paraNumber: 3, assigned: para(1, 2) }));
+    const [over] = await push(teacher, [attemptOp(portion.id, { status: 'PARTIAL', completed: para(1) })]);
+    expect(over).toMatchObject({ status: 'REJECTED', code: 'VALIDATION', fields: { completed: 'ABOVE_ASSIGNED' } });
+    expect((await recordDetail(teacher, recordId)).portions[0].attempts).toEqual([]);
   });
 
   // Added by the decision review of 2026-10-30 (SRS §17).
-  test.fixme('F06-AC16 (US-027) extra work is a separate Extra portion; completed never exceeds assigned', async () => {
+  test('F06-AC16 (US-027) extra work is a separate Extra portion; completed never exceeds assigned', async ({ as, control }) => {
     // Given 1/2 Para assigned and 3/4 Para recited, when the Teacher records completed 1/2 and adds an Extra portion of 1/4, then both portions are saved with completed ≤ assigned, and reports show the 1/4 as extra work. Entering completed 3/4 on the original portion is refused.
+    const { teacher, recordId } = await dayRecord(as, control);
+    const original = await applied(teacher, portionOp(recordId, { section: 'SABQI', paraNumber: 3, assigned: para(1, 2) }));
+    const [over] = await push(teacher, [attemptOp(original.id, { status: 'PARTIAL', completed: para(3, 4) })]);
+    expect(over).toMatchObject({ status: 'REJECTED', fields: { completed: 'ABOVE_ASSIGNED' } });
+    await applied(teacher, attemptOp(original.id, { status: 'COMPLETED', completed: para(1, 2) }));
+    await recite(teacher, recordId, { section: 'SABQI', position: 2, isExtra: true, paraNumber: 3, assigned: para(1, 4) }, { status: 'COMPLETED', completed: para(1, 4) });
+    const d = await recordDetail(teacher, recordId);
+    expect(d.portions.map((p: { isExtra: boolean; assigned: Quantity; progress: { completed: Quantity } }) => [p.isExtra, p.assigned, p.progress.completed])).toEqual([
+      [false, para(1, 2), para(1, 2)],
+      [true, para(1, 4), para(1, 4)],
+    ]);
+    const sabqi = d.sectionSummary.find((s: { section: string }) => s.section === 'SABQI');
+    expect(sabqi.totals).toMatchObject({ assigned: [para(1, 2)], completed: [para(1, 2)] });
+    expect(sabqi.extraTotals).toMatchObject({ assigned: [para(1, 4)], completed: [para(1, 4)] });
   });
 
-  test.fixme('F06-AC17 (US-026) Lines, Ayat, and Pages are whole numbers only', async () => {
+  test('F06-AC17 (US-026) Lines, Ayat, and Pages are whole numbers only', async ({ as, control }) => {
     // Given a Lines, Ayat, or Pages quantity, when 2.5 is entered, then it is rejected; whole numbers are accepted.
+    const { teacher, recordId } = await dayRecord(as, control);
+    const units = ['LINES', 'AYAT', 'PAGES'];
+    const fractions = await push(teacher, units.map((unit, i) => portionOp(recordId, { section: 'MANZIL', position: i + 1, paraNumber: 6, assigned: { unit, numerator: 5, denominator: 2 } })));
+    expect(fractions.map((r) => [r.status, r.code])).toEqual(units.map(() => ['REJECTED', 'VALIDATION']));
+    const whole = await push(teacher, units.map((unit, i) => portionOp(recordId, { section: 'MANZIL', position: i + 1, paraNumber: 6, assigned: { unit, numerator: 3, denominator: 1 } })));
+    expect(whole.map((r) => r.status)).toEqual(['APPLIED', 'APPLIED', 'APPLIED']);
+    // A whole completed amount is accepted; 2.5 completed on a whole-unit portion is refused too.
+    const ayat = whole[1]!.entityId!;
+    const [frac] = await push(teacher, [attemptOp(ayat, { status: 'PARTIAL', completed: { unit: 'AYAT', numerator: 5, denominator: 2 } })]);
+    expect(frac).toMatchObject({ status: 'REJECTED', code: 'VALIDATION' });
+    await applied(teacher, attemptOp(ayat, { status: 'PARTIAL', completed: { unit: 'AYAT', numerator: 2, denominator: 1 } }));
+    expect((await recordDetail(teacher, recordId)).portions.map((p: { assigned: Quantity }) => p.assigned)).toEqual(units.map((unit) => ({ unit, numerator: 3, denominator: 1 })));
   });
 
   test.fixme('F06-AC18 (US-024) a new madrasa starts with the reviewed Quran metadata seed', async () => {
     // Given a newly created madrasa, when Quran metadata is opened, then it already contains 114 Surahs with their Ayat counts and 30 Para boundaries from the reviewed seed.
   });
 
-  test.fixme('F06-AC19 (US-024) a metadata correction flags affected records and never changes them', async () => {
+  test('F06-AC19 (US-024) a metadata correction flags affected records and never changes them', async ({ as, control }) => {
     // Given records that use a Para boundary, when the Admin corrects that boundary, then the records keep their stored ranges, any range that is no longer valid is listed for Admin review, and the edit is audited.
+    // Synthetic fixture: Para 1 = Surahs 1–3, Para 2 starts at Surah 4. Two Sabaq portions derive Para 1.
+    const { teacher, recordId } = await dayRecord(as, control);
+    const s2 = await applied(teacher, portionOp(recordId, { section: 'SABAQ', range: SABAQ_2_1_10, totalLines: 10, assigned: lines(10) }));
+    const s3 = await applied(teacher, portionOp(recordId, { section: 'SABAQ', position: 2, range: { surahStart: 3, ayahStart: 1, surahEnd: 3, ayahEnd: 6 }, totalLines: 3, assigned: lines(3) }));
+    const before = await recordDetail(teacher, recordId);
+    expect(before.portions.map((p: { paraNumber: number }) => p.paraNumber)).toEqual([1, 1]);
+    const admin = await as('admin.a');
+    expect((await (await admin.get('quran/review')).json()).records).toEqual([]);
+
+    // The Admin corrects the boundary: Para 1 now ends at Surah 2, and Para 2 starts at Surah 3.
+    const paras = (await (await admin.get('quran/paras')).json()).items as Array<{ id: string; number: number; start: unknown; end: unknown; rowVersion: number }>;
+    const [p1, p2] = [paras.find((p) => p.number === 1)!, paras.find((p) => p.number === 2)!];
+    const first = await admin.put('quran/paras/1', { data: { start: p1.start, end: { surah: 2, ayah: 20 }, rowVersion: p1.rowVersion } });
+    expect(first.status(), await first.text()).toBe(200);
+    const second = await admin.put('quran/paras/2', { data: { start: { surah: 3, ayah: 1 }, end: p2.end, rowVersion: p2.rowVersion } });
+    expect(second.status(), await second.text()).toBe(200);
+    expect((await second.json()).recordsNeedingReview).toBe(1);
+
+    // Only the Surah 3 portion (stored Para 1, now in Para 2) is listed; nothing stored changed.
+    const review = await (await admin.get('quran/review')).json();
+    expect(review.records).toEqual([
+      { kind: 'SABAQ_PORTION', id: s3.id, range: { surah: 3, ayahStart: 1, ayahEnd: 6 }, paraNumber: 1, issues: [{ field: 'paraNumber', code: 'PARA_CHANGED', derived: 2 }] },
+    ]);
+    expect(review.records.map((r: { id: string }) => r.id)).not.toContain(s2.id);
+    expect(await recordDetail(teacher, recordId)).toEqual(before);
+    // A Teacher cannot read the review list; each edit is audited with its before and after.
+    expect((await teacher.get('quran/review')).status()).toBe(403);
+    for (const [p, end] of [[p1, { surah: 2, ayah: 20 }], [p2, p2.end]] as const) {
+      const audit = await control.auditForTarget(p.id);
+      expect(audit.map((r) => r.action)).toEqual(['QURAN_PARA_UPDATED']);
+      expect(audit[0]!.summary).toMatchObject({ para: p.number, before: { start: p.start, end: p.end }, after: { end } });
+    }
   });
 });
 

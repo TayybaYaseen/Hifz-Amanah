@@ -1,22 +1,164 @@
 # F06 · Quran portions and metadata — mobile E2E (docs/specs/07-f06-quran-portions-metadata.md; design.md §5.3)
 # Covers: F06-AC5, F06-AC6, F06-AC7, F06-AC8, F06-AC9, F06-AC10, F06-AC11, F06-AC12, F06-AC13, F06-AC14, F06-AC15
+# SYNTHETIC DATA ONLY: the madrasa gets the synthetic Quran fixture (20 Ayat per Surah; a test layout of 2 Ayat per line
+# for Surahs 1–3), and the Admin sets synthetic Surah 1 to 7 Ayat for the "7-Ayat Surah" of F06-AC6 (as the API test
+# does). Sabaq is measured in lines over an Ayat range with a derived Para (Sabaq rules of US-020), so the Para and unit steps use a
+# Sabqi portion, where the Teacher enters the Para and picks the unit.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F06 portions — Para and Ayat validation, presets, remaining, units never mixed
 tags:
-  - pending
   - F06
   - US-025
   - US-026
   - US-027
 ---
-- launchApp:
-    clearState: true
-# 1. Sign in as teacher.a1 → Daily Entry S1 → Sabaq.
-# 2. Para 31 → field error; Para 30 → accepted.                                                        (F06-AC5)
+- runFlow: ../../support/maestro/reset.yaml
+- runFlow: ../../support/maestro/ensure-class-day.yaml
+- runScript:
+    file: ../../support/maestro/control.js
+    env: { ACTION: quranSeed }
+# Setup: the Admin gives synthetic Surah 1 seven Ayat.
+- runFlow:
+    file: ../../support/maestro/sign-in-staff.yaml
+    env: { USER_ID: admin-a }
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.quran" } }
+- extendedWaitUntil:
+    visible: { id: "quran.surah.1" }
+    timeout: 30000
+- tapOn: { id: "quran.surah.1" }
+- extendedWaitUntil:
+    visible: { id: "surahForm.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "surahForm.ayahCount", TEXT: "7" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "surahForm.save" } }
+- extendedWaitUntil:
+    visible: { id: "quran.surah.1" }
+    timeout: 30000
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow: ../../support/maestro/sign-out.yaml
+# 1. Sign in as teacher-a1 (the Quran reference snapshot downloads) → Daily Entry S1 → Sabaq.
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- tapOn: { id: "nav.more" }
+- tapOn: { id: "more.quranRef" }
+- extendedWaitUntil:
+    visible: { id: "quranRef.status.SYNCED" }
+    timeout: 60000
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow:
+    file: ../../support/maestro/daily-start.yaml
+    env: { STUDENT: EXT-A-001 }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabaq.add" } }
+- runFlow:
+    when: { notVisible: { id: "daily.sabaq.portion.1.title" } }
+    commands:
+      - tapOn: { id: "daily.sabaq.add" }
+      - waitForAnimationToEnd
 # 3. 7-Ayat Surah, Ayat 3–9 → error naming 7; Ayat 5–2 → range error.                                  (F06-AC6, F06-AC7)
-# 4. Unit picker shows Rubu (1/4), Half (1/2), Salasah (3/4), Complete, Lines, Ayat, Pages.            (F06-AC11)
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "daily.sabaq.portion.1.surah", TEXT: "1" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "daily.sabaq.portion.1.ayahStart", TEXT: "3" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "daily.sabaq.portion.1.ayahEnd", TEXT: "9" } }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- runFlow: ../../support/maestro/daily-save-tap.yaml
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "daily.sabaq.portion.1.ayahEnd.error", TEXT: ".*Ayat must be from 1 to .?7.?.*" } }
+- assertNotVisible: { id: "record.screen" }
+- runFlow: { file: ../../support/maestro/retype.yaml, env: { ID: "daily.sabaq.portion.1.ayahStart", TEXT: "5" } }
+- runFlow: { file: ../../support/maestro/retype.yaml, env: { ID: "daily.sabaq.portion.1.ayahEnd", TEXT: "2" } }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- runFlow: ../../support/maestro/daily-save-tap.yaml
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "daily.sabaq.portion.1.ayahEnd.error", TEXT: ".*ending Ayat must not be before the starting Ayat.*" } }
+- assertNotVisible: { id: "record.screen" }
+# A valid Sabaq in the same Surah: synthetic Surah 1, Ayat 1–6 = 3 lines from the layout; 1 line completed.
+- runFlow: { file: ../../support/maestro/retype.yaml, env: { ID: "daily.sabaq.portion.1.ayahStart", TEXT: "1" } }
+- runFlow: { file: ../../support/maestro/retype.yaml, env: { ID: "daily.sabaq.portion.1.ayahEnd", TEXT: "6" } }
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "daily.sabaq.portion.1.totalLines", TEXT: "3" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabaq.portion.1.status.PARTIAL" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "daily.sabaq.portion.1.completed", TEXT: "1" } }
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "daily.sabaq.portion.1.remaining", TEXT: ".*Remaining: .?2.? lines.*" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabaq.portion.1.mistakes.none" } }
+# 2. Sabqi portion: Para 31 → field error; Para 30 → accepted.                                          (F06-AC5)
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.add" } }
+- runFlow:
+    when: { notVisible: { id: "daily.sabqi.portion.1.title" } }
+    commands:
+      - runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.add" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "daily.sabqi.portion.1.para", TEXT: "31" } }
+# 4. The unit picker shows Rubu (1/4), Half (1/2), Salasah (3/4), Complete, Lines, Ayat, Pages.          (F06-AC11)
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "daily.sabqi.portion.1.unit.RUBU", TEXT: "Rubu \\(1/4 Para\\)" } }
+- assertVisible: { id: "daily.sabqi.portion.1.unit.HALF", text: "Half \\(1/2 Para\\)" }
+- assertVisible: { id: "daily.sabqi.portion.1.unit.SALASAH", text: "Salasah \\(3/4 Para\\)" }
+- assertVisible: { id: "daily.sabqi.portion.1.unit.COMPLETE", text: "Complete \\(1 Para\\)" }
+- assertVisible: { id: "daily.sabqi.portion.1.unit.LINES", text: "Lines" }
+- assertVisible: { id: "daily.sabqi.portion.1.unit.AYAT", text: "Ayat" }
+- assertVisible: { id: "daily.sabqi.portion.1.unit.PAGES", text: "Pages" }
+# The exact stored values (1/4, 1/2, 1) are covered by e2e/api/f06-quran-portions.spec.ts 'F06-AC11 (US-027) Rubu, Half,
+# and Complete are stored exactly'.
 # 5. Assigned Salasah → shown "Salasah (3/4 Para)"; completed Half → remaining 1/4 Para.               (F06-AC10, F06-AC12)
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.1.unit.SALASAH" } }
+- assertVisible: { id: "daily.sabqi.portion.1.unit.SALASAH", text: "✓ Salasah \\(3/4 Para\\)", selected: true }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.1.status.PARTIAL" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.1.completed.HALF" } }
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "daily.sabqi.portion.1.remaining", TEXT: ".*Remaining: .?1/4.? Para.*" } }
 # 6. Completed Complete → error on completed.                                                          (F06-AC14)
-# 7. Sabqi: Lines, assigned 10, completed 6 → remaining 4 lines; 2.5 lines is not accepted.            (F06-AC8, F06-AC9)
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.1.completed.COMPLETE" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.1.mistakes.none" } }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- runFlow: ../../support/maestro/daily-save-tap.yaml
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "daily.sabqi.portion.1.para.error", TEXT: ".*Para must be from 1 to 30.*" } }
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "daily.sabqi.portion.1.completed.error", TEXT: ".*completed cannot be more than assigned.*" } }
+- assertNotVisible: { id: "record.screen" }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "daily.sabqi.portion.1.para", TEXT: "30" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.1.completed.HALF" } }
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "daily.sabqi.portion.1.remaining", TEXT: ".*Remaining: .?1/4.? Para.*" } }
+# 7. Sabqi in Lines: assigned 10, completed 6 → remaining 4 lines; 2.5 lines is not accepted.           (F06-AC8, F06-AC9)
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.add" } }
+- runFlow:
+    when: { notVisible: { id: "daily.sabqi.portion.2.title" } }
+    commands:
+      - runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.add" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "daily.sabqi.portion.2.para", TEXT: "5" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.2.unit.LINES" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "daily.sabqi.portion.2.assignedAmount", TEXT: "6" } }
 # 8. Type 6 then change the unit from Lines to Pages → prompt to keep or clear the value.              (F06-AC15)
-# 9. Save; weekly report shows one Lines total and one Para total, never combined.                     (F06-AC13)
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.2.unit.PAGES" } }
+- extendedWaitUntil:
+    visible: { id: "daily.sabqi.portion.2.unitChange.sheet" }
+    timeout: 15000
+- assertVisible: { id: "daily.sabqi.portion.2.unitChange.keep" }
+- assertVisible: { id: "daily.sabqi.portion.2.unitChange.clear" }
+- tapOn: { id: "daily.sabqi.portion.2.unitChange.cancel" }
+- assertNotVisible: { id: "daily.sabqi.portion.2.unitChange.sheet" }
+# Nothing was reinterpreted: still Lines, still 6.
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "daily.sabqi.portion.2.unit.LINES" } }
+- assertVisible: { id: "daily.sabqi.portion.2.unit.LINES", selected: true }
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "daily.sabqi.portion.2.assignedAmount", TEXT: "6" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "daily.sabqi.portion.2.assignedAmount", TEXT: "10" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.2.status.PARTIAL" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "daily.sabqi.portion.2.completedAmount", TEXT: "2.5" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "daily.sabqi.portion.2.mistakes.none" } }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- runFlow: ../../support/maestro/daily-save-tap.yaml
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "daily.sabqi.portion.2.completedAmount.error", TEXT: ".*use a whole number.*" } }
+- assertNotVisible: { id: "record.screen" }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "daily.sabqi.portion.2.completedAmount", TEXT: "6" } }
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "daily.sabqi.portion.2.remaining", TEXT: ".*Remaining: .?4.? lines.*" } }
+# 9. Save; the record keeps one portion in Lines and one in Para, each with its own unit, never combined.
+- runFlow: ../../support/maestro/daily-save.yaml
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "record.sabqi.portion.1.para", TEXT: ".*30.*" } }
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "record.sabqi.portion.1.assigned", TEXT: ".*.?3/4.? Para.*" } }
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "record.sabqi.portion.1.completed", TEXT: ".*.?1/2.? Para.*" } }
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "record.sabqi.portion.1.remaining", TEXT: ".*Remaining: .?1/4.? Para.*" } }
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "record.sabqi.portion.2.assigned", TEXT: ".*.?10.? lines.*" } }
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "record.sabqi.portion.2.completed", TEXT: ".*.?6.? lines.*" } }
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "record.sabqi.portion.2.remaining", TEXT: ".*Remaining: .?4.? lines.*" } }
+- runFlow: { file: ../../support/maestro/see-plain.yaml, env: { ID: "record.sabaq.portion.1.remaining", TEXT: ".*Remaining: .?2.? lines.*" } }
+# The sync status is at the top of the record screen (it cannot be centred), so scroll up to it plainly.
+- scrollUntilVisible: { element: { id: "record.sync.*" }, direction: UP, timeout: 60000 }
+- extendedWaitUntil:
+    visible: { id: "record.sync.SYNCED" }
+    timeout: 90000
+#    Weekly report shows one Lines total and one Para total, never combined.                             (F06-AC13)
+# Report output: covered by e2e/api/f06-quran-portions.spec.ts 'F06-AC13 (US-027) LINES and PARA totals are never
+# combined (AC-QTY-04)'; the report screen arrives with F09 (US-039).
