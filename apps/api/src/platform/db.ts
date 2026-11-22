@@ -347,9 +347,9 @@ export interface PortionAttemptsTable {
   completed_den: number | null;
   quality: number | null;
   no_mistakes: boolean;
-  /** Internal staff text: never logged, audited by value, or sent to a Student or Parent. */
+  /** Staff text: never logged or audited by value; sent to a Student or Parent only when remarks_visibility is SHARED. */
   remarks: string | null;
-  remarks_visibility: Generated<'INTERNAL'>;
+  remarks_visibility: ColumnType<'INTERNAL' | 'SHARED', 'INTERNAL' | 'SHARED' | undefined, 'INTERNAL' | 'SHARED'>;
   created_at: Timestamp;
   updated_at: Timestamp;
   updated_by: string;
@@ -434,6 +434,8 @@ export interface ReportStampsTable {
   organization_id: string;
   scope_key: string;
   stamp: ColumnType<string, number | string, number | string>;
+  /** F10 (0016): when the sources last changed. */
+  stamped_at: Generated<Date>;
 }
 
 /** A computed report, valid while its stamps, date, and settings are unchanged. Staff payload: project before sending. */
@@ -449,6 +451,51 @@ export interface ReportCacheTable {
   student_stamp: ColumnType<string, number | string, number | string>;
   payload: ColumnType<unknown, string, string>;
   built_at: Timestamp;
+}
+
+// ---------- F10 · Student and Parent access (0016_portal.sql). Row-level security applies: query through withTenant(). ----------
+
+/** The Student login of one student record (FR-PORT-001); an ended link keeps its row. */
+export interface StudentAccountsTable {
+  id: string;
+  organization_id: string;
+  student_id: string;
+  user_id: string;
+  linked_by: string;
+  linked_at: Timestamp;
+  unlinked_by: string | null;
+  unlinked_at: Timestamp | null;
+}
+
+/** A Parent login linked to a student after offline verification (FR-PORT-007); a revoked row is kept. */
+export interface StudentGuardiansTable {
+  id: string;
+  organization_id: string;
+  student_id: string;
+  guardian_user_id: string;
+  verification_method: 'IN_PERSON' | 'MADRASA_RECORDS';
+  verified_by: string;
+  verified_at: Timestamp;
+  linked_by: string;
+  linked_at: Timestamp;
+  revoked_by: string | null;
+  revoked_at: Timestamp | null;
+}
+
+/** One student's published period (FR-RPT-010). */
+export interface ReportPublishedTable {
+  id: string;
+  organization_id: string;
+  student_id: string;
+  period_kind: 'WEEK' | 'MONTH';
+  period_start: string;
+  period_end: string;
+  published_by: string;
+  published_at: Timestamp;
+  content_hash: string;
+  updated_at: Timestamp | null;
+  unpublished_by: string | null;
+  unpublished_at: Timestamp | null;
 }
 
 // ---------- F06 · Quran reference (0009_quran_ref.sql) ----------
@@ -616,6 +663,9 @@ export interface Database {
   homework_portions: HomeworkPortionsTable;
   report_stamps: ReportStampsTable;
   report_cache: ReportCacheTable;
+  student_accounts: StudentAccountsTable;
+  student_guardians: StudentGuardiansTable;
+  report_published: ReportPublishedTable;
   mushaf_editions: MushafEditionsTable;
   quran_imports: QuranImportsTable;
   quran_sources: QuranSourcesTable;

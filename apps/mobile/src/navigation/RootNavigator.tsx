@@ -28,6 +28,9 @@ import { DailyRecordScreen } from '../features/daily-entry/DailyRecordScreen.tsx
 import { HomeworkEditScreen, type HomeworkEditParams } from '../features/homework/HomeworkEditScreen.tsx';
 import { HomeworkScreen } from '../features/homework/HomeworkScreen.tsx';
 import { ReportsScreen } from '../features/reports/ReportsScreen.tsx';
+import { PortalReportScreen } from '../features/portal/PortalReportScreen.tsx';
+import { PortalScreen } from '../features/portal/PortalScreen.tsx';
+import { FamilyAccessScreen } from '../features/students/FamilyAccessScreen.tsx';
 import { HolidaysScreen, LeaveApprovalsScreen, TimetableScreen } from '../features/attendance/CalendarScreens.tsx';
 import { ParaFormScreen, QuranMetadataScreen, QuranReviewScreen, SurahFormScreen } from '../features/quran/QuranScreens.tsx';
 import { QuranReferenceScreen } from '../features/quran/QuranReferenceScreen.tsx';
@@ -84,6 +87,10 @@ type AppStack = {
   SurahForm: { surah: SurahView | null };
   ParaForm: { para: ParaView | null; surahs: SurahView[] };
   QuranReview: undefined;
+  // F10 · Student and Parent reports (online, read-only) and the Admin's family access for a student.
+  Portal: undefined;
+  PortalReport: { reportId: string };
+  FamilyAccess: { studentId: string; studentName: string };
 };
 
 /** Lets the sign-out sheet open the Sync Queue from outside the stack. */
@@ -223,11 +230,34 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
   const { t } = useTranslation();
   const staff = me.role === 'OWNER' || me.role === 'ADMIN';
   const roster = staff || me.role === 'TEACHER';
+  const family = me.role === 'STUDENT' || me.role === 'PARENT';
   return (
     <App.Navigator screenOptions={screenOptions}>
       <App.Screen name="Home" options={{ title: t('common.appName') }}>
-        {({ navigation }) => <HomeScreen me={me} onMore={() => navigation.navigate('More')} onSyncQueue={() => navigation.navigate('SyncQueue')} onAttendance={() => navigation.navigate('BulkEntry')} onDailyEntry={() => navigation.navigate('DailyEntry', {})} onHomework={() => navigation.navigate('Homework', {})} onReports={() => navigation.navigate('Reports')} />}
+        {({ navigation }) => (
+          <HomeScreen
+            me={me}
+            onMore={() => navigation.navigate('More')}
+            onSyncQueue={() => navigation.navigate('SyncQueue')}
+            onAttendance={() => navigation.navigate('BulkEntry')}
+            onDailyEntry={() => navigation.navigate('DailyEntry', {})}
+            onHomework={() => navigation.navigate('Homework', {})}
+            onReports={() => navigation.navigate('Reports')}
+            {...(family ? { onPortal: () => navigation.navigate('Portal') } : {})}
+          />
+        )}
       </App.Screen>
+      {family ? (
+        // F10 · Students and Parents: published reports only, online and read-only (US-044, US-045).
+        <>
+          <App.Screen name="Portal" options={{ title: t('portal.title') }}>
+            {({ navigation }) => <PortalScreen me={me} onOpen={(reportId) => navigation.navigate('PortalReport', { reportId })} />}
+          </App.Screen>
+          <App.Screen name="PortalReport" options={{ title: t('portal.reportTitle') }}>
+            {({ navigation, route }) => <PortalReportScreen reportId={route.params.reportId} onBack={() => navigation.goBack()} />}
+          </App.Screen>
+        </>
+      ) : null}
       <App.Screen name="More" options={{ title: t('more.title') }}>
         {({ navigation }) => (
           <MoreScreen
@@ -394,6 +424,7 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
               <StudentProfileScreen
                 studentId={route.params.studentId}
                 onEdit={(student) => navigation.navigate('StudentForm', { student, classId: null })}
+                {...(staff ? { onFamilyAccess: (student: StudentResponse) => navigation.navigate('FamilyAccess', { studentId: student.id, studentName: student.name }) } : {})}
                 dailyEntry={
                   OFFLINE_ROLES.includes(me.role)
                     ? {
@@ -422,6 +453,10 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
           </App.Screen>
           <App.Screen name="AccountDetail" options={{ title: t('accounts.title') }}>
             {({ route }) => <AccountDetailScreen me={me} account={route.params.account} />}
+          </App.Screen>
+          {/* F10 · Student login and Parent links (Owner/Admin; FR-PORT-007). */}
+          <App.Screen name="FamilyAccess" options={{ title: t('familyAccess.title') }}>
+            {({ route }) => <FamilyAccessScreen studentId={route.params.studentId} studentName={route.params.studentName} />}
           </App.Screen>
         </>
       ) : null}

@@ -18,6 +18,7 @@ import type { AttendanceStatus, DailyRecordDetail, LessonPortionSyncFields, Port
 import type { DailyReportMode } from '@hifz/domain/hifz';
 import { isOverallLabel, type OverallLabel } from '@hifz/domain/quality';
 import { DAILY_RECORD_FIELDS, LESSON_PORTION_FIELDS, PORTION_ATTEMPT_FIELDS, nextAttemptNo, type MistakeEntry, type PortionStatus, type TotalLinesSource } from '@hifz/domain/hifz';
+import type { NoteVisibility } from '@hifz/domain/mistakes';
 import { fractionText, type Quantity, type QuantityUnit } from '@hifz/domain/quantity';
 import type { MarkingRole } from '@hifz/domain/calendar';
 import type { QueueState } from '@hifz/domain/sync';
@@ -103,6 +104,18 @@ export const dailyEntryMigration = (version: number): Migration => ({
  * Local schema for F07 (workspace migration 7): the record's overall performance label. Mistake notes need no column:
  * mistakes are JSON on the attempt row. Additive only: the outbox is untouched (F12-AC16).
  */
+/**
+ * Local schema for F10 (workspace migration 10): each attempt's remark visibility, "Private to staff" (INTERNAL) by
+ * default (F10-AC9). Additive only: the outbox is untouched (F12-AC16).
+ */
+export const remarksVisibilityMigration = (version: number): Migration => ({
+  version,
+  name: 'F10 remark visibility on attempts',
+  up: async (tx) => {
+    await tx.exec("ALTER TABLE portion_attempts ADD COLUMN remarks_visibility TEXT NOT NULL DEFAULT 'INTERNAL';");
+  },
+});
+
 export const mistakesQualityMigration = (version: number): Migration => ({
   version,
   name: 'F07 overall performance label on daily records',
@@ -127,6 +140,8 @@ export interface LocalAttempt {
   noMistakes: boolean;
   mistakes: MistakeEntry[];
   remarks: string | null;
+  /** F10: who may read the remark (FR-PORT-003). */
+  remarksVisibility: NoteVisibility;
 }
 
 export interface LocalRange {
@@ -227,6 +242,7 @@ interface AttemptRow {
   no_mistakes: number;
   mistakes: string;
   remarks: string | null;
+  remarks_visibility: string | null;
 }
 
 const num = (v: number | null | undefined): number | null => (v === null || v === undefined ? null : Number(v));
@@ -268,6 +284,7 @@ const toAttempt = (r: AttemptRow): LocalAttempt => ({
   noMistakes: Boolean(Number(r.no_mistakes)),
   mistakes: parseMistakes(r.mistakes),
   remarks: r.remarks,
+  remarksVisibility: r.remarks_visibility === 'SHARED' ? 'SHARED' : 'INTERNAL',
 });
 
 const toPortion = (r: PortionRow, attempts: LocalAttempt[]): LocalPortion => ({
@@ -355,13 +372,14 @@ async function upsertAttempt(tx: SqlExecutor, id: string, rowVersion: number, f:
   const c = f.completed ?? null;
   await tx.run(
     `INSERT INTO portion_attempts (id, row_version, lesson_portion_id, report_date, attempt_no, attempted_at, recorded_by, status,
-       completed_unit, completed_num, completed_den, quality, no_mistakes, mistakes, remarks)
-     VALUES (?, ?, ?, (SELECT report_date FROM lesson_portions WHERE id = ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       completed_unit, completed_num, completed_den, quality, no_mistakes, mistakes, remarks, remarks_visibility)
+     VALUES (?, ?, ?, (SELECT report_date FROM lesson_portions WHERE id = ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (id) DO UPDATE SET row_version = excluded.row_version, lesson_portion_id = excluded.lesson_portion_id,
        report_date = COALESCE(excluded.report_date, portion_attempts.report_date), attempt_no = excluded.attempt_no,
        attempted_at = excluded.attempted_at, recorded_by = excluded.recorded_by, status = excluded.status,
        completed_unit = excluded.completed_unit, completed_num = excluded.completed_num, completed_den = excluded.completed_den,
-       quality = excluded.quality, no_mistakes = excluded.no_mistakes, mistakes = excluded.mistakes, remarks = excluded.remarks`,
+       quality = excluded.quality, no_mistakes = excluded.no_mistakes, mistakes = excluded.mistakes, remarks = excluded.remarks,
+       remarks_visibility = excluded.remarks_visibility`,
     [
       id,
       rowVersion,
@@ -378,6 +396,7 @@ async function upsertAttempt(tx: SqlExecutor, id: string, rowVersion: number, f:
       f.noMistakes ? 1 : 0,
       JSON.stringify((f.mistakes ?? []).map(mistakeOf)),
       f.remarks ?? null,
+      f.remarksVisibility === 'SHARED' ? 'SHARED' : 'INTERNAL',
     ],
   );
 }
@@ -595,6 +614,7 @@ export async function storeDetail(db: SqlDriver, detail: DailyRecordDetail, name
           noMistakes: a.noMistakes,
           mistakes: a.mistakes.map(({ category, severity, repeated, note, noteVisibility }) => ({ category, severity, repeated, note, noteVisibility })),
           remarks: a.remarks,
+          remarksVisibility: a.remarksVisibility,
         });
         await tx.run('UPDATE portion_attempts SET recorded_by_name = ? WHERE id = ?', [a.recordedBy.displayName, a.id]);
       }
@@ -614,6 +634,8 @@ export interface AttemptWrite {
   noMistakes: boolean;
   mistakes: MistakeEntry[];
   remarks: string | null;
+  /** F10: "Private to staff" (INTERNAL) unless the Teacher chose "Visible to student/guardian" (F10-AC9). */
+  remarksVisibility: NoteVisibility;
 }
 
 export interface PortionWrite {
@@ -691,8 +713,8 @@ async function insertPortion(tx: SqlExecutor, id: string, recordId: string, repo
 async function insertAttempt(tx: SqlExecutor, id: string, portionId: string, reportDate: string, attemptNo: number, at: string, actor: Actor, a: AttemptWrite): Promise<void> {
   await tx.run(
     `INSERT INTO portion_attempts (id, row_version, lesson_portion_id, report_date, attempt_no, attempted_at, recorded_by, recorded_by_name, status,
-       completed_unit, completed_num, completed_den, quality, no_mistakes, mistakes, remarks)
-     VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       completed_unit, completed_num, completed_den, quality, no_mistakes, mistakes, remarks, remarks_visibility)
+     VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       portionId,
@@ -709,6 +731,7 @@ async function insertAttempt(tx: SqlExecutor, id: string, portionId: string, rep
       a.noMistakes ? 1 : 0,
       JSON.stringify(a.mistakes),
       a.remarks,
+      a.remarksVisibility,
     ],
   );
 }
@@ -716,8 +739,8 @@ async function insertAttempt(tx: SqlExecutor, id: string, portionId: string, rep
 async function updateAttemptRow(tx: SqlExecutor, id: string, a: AttemptWrite): Promise<void> {
   await tx.run(
     `UPDATE portion_attempts SET status = ?, completed_unit = ?, completed_num = ?, completed_den = ?, quality = ?, no_mistakes = ?, mistakes = ?,
-       remarks = ? WHERE id = ?`,
-    [a.status, a.completed?.unit ?? null, a.completed?.numerator ?? null, a.completed?.denominator ?? null, a.quality, a.noMistakes ? 1 : 0, JSON.stringify(a.mistakes), a.remarks, id],
+       remarks = ?, remarks_visibility = ? WHERE id = ?`,
+    [a.status, a.completed?.unit ?? null, a.completed?.numerator ?? null, a.completed?.denominator ?? null, a.quality, a.noMistakes ? 1 : 0, JSON.stringify(a.mistakes), a.remarks, a.remarksVisibility, id],
   );
 }
 
@@ -753,7 +776,7 @@ async function createPortionWithAttempt(
     entityId: attemptId,
     opType: 'CREATE',
     baseVersion: null,
-    fields: { lessonPortionId: portionId, attemptNo: 1, attemptedAt: ctx.at, ...attemptOutcome(attempt), remarks: attempt.remarks },
+    fields: { lessonPortionId: portionId, attemptNo: 1, attemptedAt: ctx.at, ...attemptOutcome(attempt), remarks: attempt.remarks, remarksVisibility: attempt.remarksVisibility },
     dependsOn: [portionOp],
     label: ctx.label,
   });
@@ -924,7 +947,7 @@ export async function saveCorrection(outbox: Outbox, input: CorrectionInput): Pr
       }
       if (c.attempt && c.latestAttemptId && (c.outcomeChanged || c.remarksChanged)) {
         await updateAttemptRow(tx, c.latestAttemptId, c.attempt);
-        const fields = { ...(c.outcomeChanged ? attemptOutcome(c.attempt) : {}), ...(c.remarksChanged ? { remarks: c.attempt.remarks } : {}) };
+        const fields = { ...(c.outcomeChanged ? attemptOutcome(c.attempt) : {}), ...(c.remarksChanged ? { remarks: c.attempt.remarks, remarksVisibility: c.attempt.remarksVisibility } : {}) };
         await outbox.enqueueUpdate(tx, { entity: 'portion_attempt', entityId: c.latestAttemptId, fields, dependsOn: deps, label });
         if (c.outcomeChanged) touched.add(c.id);
         ops += 1;
@@ -956,7 +979,7 @@ export async function addAttempt(outbox: Outbox, input: { portionId: string; rep
       entityId: id,
       opType: 'CREATE',
       baseVersion: null,
-      fields: { lessonPortionId: input.portionId, attemptNo, attemptedAt: input.now, ...attemptOutcome(input.attempt), remarks: input.attempt.remarks },
+      fields: { lessonPortionId: input.portionId, attemptNo, attemptedAt: input.now, ...attemptOutcome(input.attempt), remarks: input.attempt.remarks, remarksVisibility: input.attempt.remarksVisibility },
       dependsOn: portionCreate ? [portionCreate] : [],
       label,
     });

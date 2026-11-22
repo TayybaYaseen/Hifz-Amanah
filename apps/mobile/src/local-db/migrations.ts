@@ -10,7 +10,7 @@
 import { PROTOCOL_VERSION } from '@hifz/contracts';
 import { attendanceMigration } from '../features/attendance/local.ts';
 import { quranReferenceMigration } from '../features/quran/referenceCache.ts';
-import { dailyEntryMigration, mistakesQualityMigration } from '../features/daily-entry/local.ts';
+import { dailyEntryMigration, mistakesQualityMigration, remarksVisibilityMigration } from '../features/daily-entry/local.ts';
 import { homeworkMigration } from '../features/homework/local.ts';
 import { cacheEpochMigration } from '../sync/cacheEpoch.ts';
 import type { SqlDriver, SqlExecutor } from './driver.ts';
@@ -155,6 +155,8 @@ export const WORKSPACE_MIGRATIONS: readonly Migration[] = [
   // Security review: cache tokens (sync_meta.cache_epoch, allowed_seq; cache_class_epoch; cache_allowed_classes), so a late
   // server answer never re-caches a dropped class (sync/cacheEpoch.ts).
   cacheEpochMigration(9),
+  // F10: portion_attempts.remarks_visibility ("Private to staff" by default).
+  remarksVisibilityMigration(10),
 ];
 
 /** The device index: which workspace databases exist on this phone, and the device ID. */

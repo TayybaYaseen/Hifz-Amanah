@@ -11,7 +11,10 @@
 // - UPDATE is an audited correction of that attempt through F12 conflict detection: the outcome group (status,
 //   completed, quality, noMistakes, mistakes) conflicts as a unit; never last-write-wins. A corrected mistake list
 //   replaces the old rows by detaching them (superseded_at), never deleting them.
-// - Remarks are internal staff text: never logged, audited by field name only, never sent to a Student or Parent.
+// - Remarks are staff text: never logged and audited by field name only. F10 (FR-PORT-003): each attempt's remarks carry
+//   a visibility, INTERNAL ("Private to staff") by default or SHARED ("Visible to student/guardian"); only a SHARED
+//   remark reaches a Student or Parent, through projectFor (F10-AC9…AC11). A visibility change is audited
+//   NOTE_VISIBILITY_CHANGED with the old and new visibility and never the text (F10-AC12).
 // - F07: each mistake may carry a short note (≤ 200 characters after trimming, DEC-B86), INTERNAL by default or SHARED
 //   (FR-ATT-012). Notes are free text, so `mistakes` is audited by field name only (counts appear in the summary).
 import { v7 as uuidv7 } from 'uuid';
@@ -27,7 +30,7 @@ import {
   type PortionDraft,
   type PortionStatus,
 } from '@hifz/domain/hifz';
-import { cleanNote } from '@hifz/domain/mistakes';
+import { cleanNote, visibilityOrDefault, type NoteVisibility } from '@hifz/domain/mistakes';
 import { valuesEqual } from '@hifz/domain/sync';
 import type { Quantity } from '@hifz/domain/quantity';
 import type { PortionAttemptsTable, Tx } from '../../platform/db.ts';
@@ -53,7 +56,7 @@ import {
 type Row = Pick<
   PortionAttemptsTable,
   'id' | 'lesson_portion_id' | 'attempt_no' | 'attempted_at' | 'recorded_by' | 'status' | 'completed_unit' | 'completed_num' | 'completed_den' | 'quality' | 'no_mistakes' | 'remarks'
-> & { row_version: string | number; student_id: string; class_id: string };
+> & { row_version: string | number; student_id: string; class_id: string; remarks_visibility: NoteVisibility };
 
 const COLUMNS = [
   'a.id',
@@ -68,6 +71,7 @@ const COLUMNS = [
   'a.quality',
   'a.no_mistakes',
   'a.remarks',
+  'a.remarks_visibility',
   'a.row_version',
   'r.student_id',
   'r.class_id',
@@ -89,6 +93,7 @@ const toRow = (r: Row, mistakes: MistakeValue[]): SyncRow => ({
     noMistakes: r.no_mistakes,
     mistakes,
     remarks: r.remarks,
+    remarksVisibility: r.remarks_visibility,
   },
   keys: { studentId: r.student_id, classId: r.class_id },
 });
@@ -192,7 +197,7 @@ export function portionAttemptSyncHandler(deps: PortionAttemptSyncDeps = {}): Sy
     updateSchema: z.strictObject(PortionAttemptUpdateFields.shape),
     fieldSpec: PORTION_ATTEMPT_FIELDS,
     // Remarks and mistakes (which carry notes, F07) are internal text and never appear by value; the rest may.
-    auditValueFields: ['attemptNo', 'attemptedAt', 'status', 'completed', 'quality', 'noMistakes'],
+    auditValueFields: ['attemptNo', 'attemptedAt', 'status', 'completed', 'quality', 'noMistakes', 'remarksVisibility'],
     tables: [],
     async keysForCreate(fields, { tx, organizationId }) {
       const ctx = typeof fields.lessonPortionId === 'string' ? await loadPortionContext(tx, organizationId, fields.lessonPortionId) : null;
@@ -231,6 +236,7 @@ export function portionAttemptSyncHandler(deps: PortionAttemptSyncDeps = {}): Sy
           noMistakes: f.noMistakes,
           mistakes,
           remarks,
+          remarksVisibility: visibilityOrDefault(f.remarksVisibility),
         },
       };
     },
@@ -318,6 +324,7 @@ export function portionAttemptSyncHandler(deps: PortionAttemptSyncDeps = {}): Sy
           quality: (fields.quality as number | null) ?? null,
           no_mistakes: fields.noMistakes as boolean,
           remarks: (fields.remarks as string | null) ?? null,
+          remarks_visibility: visibilityOrDefault(fields.remarksVisibility as NoteVisibility | undefined),
           created_at: meta.at,
           updated_at: meta.at,
           updated_by: meta.actorUserId,
@@ -355,6 +362,9 @@ export function portionAttemptSyncHandler(deps: PortionAttemptSyncDeps = {}): Sy
           case 'remarks':
             set.remarks = value;
             break;
+          case 'remarksVisibility':
+            set.remarks_visibility = value;
+            break;
           case 'mistakes':
             break;
           default:
@@ -387,7 +397,7 @@ export function portionAttemptSyncHandler(deps: PortionAttemptSyncDeps = {}): Sy
         .selectFrom('portion_attempts as a')
         .innerJoin('lesson_portions as p', (j) => j.onRef('p.id', '=', 'a.lesson_portion_id').onRef('p.organization_id', '=', 'a.organization_id'))
         .innerJoin('daily_records as r', (j) => j.onRef('r.id', '=', 'p.daily_record_id').onRef('r.organization_id', '=', 'p.organization_id'))
-        .select(['a.lesson_portion_id', 'a.attempt_no', 'a.status', 'a.completed_unit', 'a.completed_num', 'a.completed_den', 'a.quality', 'a.no_mistakes', 'p.daily_record_id', 'p.section', 'r.student_id', 'r.report_date'])
+        .select(['a.lesson_portion_id', 'a.attempt_no', 'a.status', 'a.completed_unit', 'a.completed_num', 'a.completed_den', 'a.quality', 'a.no_mistakes', 'a.remarks_visibility', 'p.daily_record_id', 'p.section', 'r.student_id', 'r.report_date'])
         .where('a.organization_id', '=', org)
         .where('a.id', '=', change.entityId)
         .executeTakeFirstOrThrow();
@@ -415,12 +425,27 @@ export function portionAttemptSyncHandler(deps: PortionAttemptSyncDeps = {}): Sy
             internal: mistakes.filter((m) => m.note !== null && m.noteVisibility === 'INTERNAL').length,
             shared: mistakes.filter((m) => m.note !== null && m.noteVisibility === 'SHARED').length,
           },
+          remarksVisibility: a.remarks_visibility,
           rowVersion: change.rowVersion,
           // Field names only for remarks: internal staff text (ARCHITECTURE.md §15).
           fields: Object.keys(change.changes).sort(),
         },
         at: change.at,
       });
+      // F10-AC12: a change of the remark's visibility is its own audited event. UPDATE changes hold only fields that
+      // differ from the stored row (F12 detect), and visibility has two values, so the old one is the other value.
+      if (change.opType === 'UPDATE' && Object.hasOwn(change.changes, 'remarksVisibility')) {
+        const to = a.remarks_visibility;
+        await recordAudit(tx, {
+          organizationId: org,
+          actorUserId: change.actor.userId,
+          action: 'NOTE_VISIBILITY_CHANGED',
+          targetType: 'PORTION_ATTEMPT',
+          targetId: change.entityId,
+          summary: { textKind: 'ATTEMPT_REMARKS', studentId: a.student_id, reportDate: a.report_date, section: a.section, attemptNo: a.attempt_no, from: to === 'SHARED' ? 'INTERNAL' : 'SHARED', to },
+          at: change.at,
+        });
+      }
     },
   };
 }

@@ -78,3 +78,27 @@ export function provisionalNotice(input: { source: ReportSource; pendingChanges:
   if (input.source === 'DEVICE') return 'PROVISIONAL';
   return input.pendingChanges > 0 ? 'PENDING_CHANGES' : null;
 }
+
+// ---------- F10 · Publishing (FR-RPT-010, F10-AC13, AC14) ----------
+
+export type PublishBlock = 'OFFLINE' | 'UNSYNCED_CHANGES';
+
+/**
+ * Why this device must not publish right now, before any request: publishing needs a connection, and every change made
+ * on this device must already be on the server (the server also refuses while a conflict for the period is open).
+ */
+export function publishBlock(input: { online: boolean; pendingChanges: number }): PublishBlock | null {
+  if (!input.online) return 'OFFLINE';
+  if (input.pendingChanges > 0) return 'UNSYNCED_CHANGES';
+  return null;
+}
+
+export interface PublicationLike {
+  publishedAt: string | null;
+  updatedAt: string | null;
+}
+
+/** A class's publication at a glance: how many of its students' reports are published, of how many. */
+export function publicationSummary(items: readonly PublicationLike[]): { published: number; total: number } {
+  return { published: items.filter((i) => i.publishedAt !== null).length, total: items.length };
+}

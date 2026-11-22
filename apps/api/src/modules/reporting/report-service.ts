@@ -45,10 +45,12 @@ void asView;
 void asRowView;
 
 /** The organization settings a report depends on. */
-interface ReportSettings {
+export interface ReportSettings {
   timeZone: string;
   weekStart: WeekStart;
 }
+
+const isUuid = (v: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 
 const settingsKey = (s: ReportSettings): string => `${s.timeZone}|${s.weekStart}`;
 
@@ -94,15 +96,8 @@ export class ReportService {
     if (q.date !== undefined && !isCalendarDate(q.date)) throw fieldError('date', 'INVALID');
     const org = actor.organizationId;
     return withTenant(this.db, org, async (tx) => {
-      const student = await tx.selectFrom('students').select(['id', 'name']).where('organization_id', '=', org).where('id', '=', q.studentId).executeTakeFirst();
-      if (!student) throw new AppError('NOT_FOUND');
-      const reach = await this.reach(tx, actor);
-      if (reach) {
-        const enrolled = reach.length
-          ? await tx.selectFrom('student_enrollments').select('id').where('organization_id', '=', org).where('student_id', '=', student.id).where('class_id', 'in', reach).executeTakeFirst()
-          : undefined;
-        if (!enrolled) throw new AppError('NOT_FOUND');
-      }
+      const reach = await this.reachOf(tx, actor);
+      const student = await this.studentInReach(tx, org, q.studentId, reach);
       const settings = await this.settings(tx, org);
       const today = calendarDateIn(this.clock.now(), settings.timeZone);
       const period = reportPeriod(q.kind, q.date ?? today, settings);
@@ -163,25 +158,12 @@ export class ReportService {
     const org = actor.organizationId;
     const cls = await tx.selectFrom('classes').select(['id', 'name']).where('organization_id', '=', org).where('id', '=', q.classId).executeTakeFirst();
     if (!cls) throw new AppError('NOT_FOUND');
-    const reach = await this.reach(tx, actor);
+    const reach = await this.reachOf(tx, actor);
     if (reach && !reach.includes(cls.id)) throw new AppError('NOT_FOUND');
     const settings = await this.settings(tx, org);
     const today = calendarDateIn(this.clock.now(), settings.timeZone);
     const period = reportPeriod(q.kind, q.date ?? today, settings);
-
-    // Every student enrolled in the class at any time during the period, whatever their status today (FR-STU-004).
-    const enrolledRows = await tx
-      .selectFrom('student_enrollments as e')
-      .innerJoin('students as s', (j) => j.onRef('s.id', '=', 'e.student_id').onRef('s.organization_id', '=', 'e.organization_id'))
-      .select(['s.id', 's.name'])
-      .where('e.organization_id', '=', org)
-      .where('e.class_id', '=', cls.id)
-      .where('e.start_date', '<=', period.to)
-      .where((eb) => eb.or([eb('e.end_date', 'is', null), eb('e.end_date', '>=', period.from)]))
-      .execute();
-    const students = [...new Map(enrolledRows.map((r) => [r.id, { id: r.id, name: r.name }])).values()];
-    const enrollments = await enrollmentsOf(tx, org, students.map((s) => s.id));
-    const inClass = students.filter((s) => inReportPeriod(enrollments.get(s.id) ?? [], period, cls.id));
+    const inClass = await this.studentsOfClass(tx, org, cls.id, period);
     const reports = await this.reports(tx, org, inClass, period, today, [cls.id], settings);
     const summary = classSummary(cls.id, period, today, reports);
     return { className: cls.name, summary: projectFor('STAFF', 'class_summary', summary as unknown as Record<string, unknown>) as unknown as ClassSummary };
@@ -224,13 +206,61 @@ export class ReportService {
     });
   }
 
-  // ---------- Internals ----------
+  // ---------- For publishing and the portal (F10) ----------
 
   /** Class ids a Teacher reaches, or null for the whole madrasa (Owner, Admin, "all classes"). */
-  private async reach(tx: Tx, actor: Actor): Promise<string[] | null> {
+  async reachOf(tx: Tx, actor: Actor): Promise<string[] | null> {
     if (actor.role !== 'TEACHER' || actor.allClasses) return null;
     return assignedClassIds(tx, actor.organizationId, actor.userId);
   }
+
+  /**
+   * A student the reach includes: anyone in the madrasa for a null reach, otherwise a student enrolled (at any time) in
+   * one of the reached classes. Anything else, including another madrasa's id, is 404 like a missing id.
+   */
+  async studentInReach(tx: Tx, org: string, studentId: string, reach: readonly string[] | null): Promise<StudentRef> {
+    if (!isUuid(studentId)) throw new AppError('NOT_FOUND');
+    const student = await tx.selectFrom('students').select(['id', 'name']).where('organization_id', '=', org).where('id', '=', studentId).executeTakeFirst();
+    if (!student) throw new AppError('NOT_FOUND');
+    if (reach) {
+      const enrolled = reach.length
+        ? await tx.selectFrom('student_enrollments').select('id').where('organization_id', '=', org).where('student_id', '=', student.id).where('class_id', 'in', [...reach]).executeTakeFirst()
+        : undefined;
+      if (!enrolled) throw new AppError('NOT_FOUND');
+    }
+    return { id: student.id, name: student.name };
+  }
+
+  /** Every student enrolled in the class at any time during the period, whatever their status today (FR-STU-004). */
+  async studentsOfClass(tx: Tx, org: string, classId: string, period: ReportPeriod): Promise<StudentRef[]> {
+    const enrolledRows = await tx
+      .selectFrom('student_enrollments as e')
+      .innerJoin('students as s', (j) => j.onRef('s.id', '=', 'e.student_id').onRef('s.organization_id', '=', 'e.organization_id'))
+      .select(['s.id', 's.name'])
+      .where('e.organization_id', '=', org)
+      .where('e.class_id', '=', classId)
+      .where('e.start_date', '<=', period.to)
+      .where((eb) => eb.or([eb('e.end_date', 'is', null), eb('e.end_date', '>=', period.from)]))
+      .execute();
+    const students = [...new Map(enrolledRows.map((r) => [r.id, { id: r.id, name: r.name }])).values()];
+    const enrollments = await enrollmentsOf(tx, org, students.map((s) => s.id));
+    return students.filter((s) => inReportPeriod(enrollments.get(s.id) ?? [], period, classId));
+  }
+
+  /** The madrasa's settings, its today, and the period of `kind` holding `date` (default today). */
+  async periodIn(tx: Tx, org: string, kind: PeriodKind, date?: string): Promise<{ settings: ReportSettings; today: string; period: ReportPeriod }> {
+    if (date !== undefined && !isCalendarDate(date)) throw fieldError('date', 'INVALID');
+    const settings = await this.settings(tx, org);
+    const today = calendarDateIn(this.clock.now(), settings.timeZone);
+    return { settings, today, period: reportPeriod(kind, date ?? today, settings) };
+  }
+
+  /** The reports of these students (whole madrasa unless `scope`) as of `asOf`, cache-checked like every staff read. */
+  reportsFor(tx: Tx, org: string, students: readonly StudentRef[], period: ReportPeriod, asOf: string, settings: ReportSettings, scope: readonly string[] | null = null): Promise<StudentReport[]> {
+    return this.reports(tx, org, students, period, asOf, scope, settings);
+  }
+
+  // ---------- Internals ----------
 
   private async settings(tx: Tx, org: string): Promise<ReportSettings> {
     const o = await tx.selectFrom('organizations').select(['timezone', 'week_start']).where('id', '=', org).executeTakeFirstOrThrow();

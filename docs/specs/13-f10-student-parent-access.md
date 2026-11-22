@@ -1,6 +1,6 @@
 # F10 · Student and Parent access
 
-**Status:** draft
+**Status:** Approved
 **Brief:** [00-product-brief.md](../00-product-brief.md) · **Flow:** Student read-only experience ([design.md §4.11](../design.md)); Guardian read-only experience ([§4.12](../design.md)); note visibility control ([§5.4](../design.md))
 **Requirements:** FR-PORT-001…005, FR-SEC-004…006, NFR-PORT-001…006, NFR-PRV-004, FR-RPT-010, FR-PORT-006/007
 **Stories:** US-044 – US-046 · **Depends on:** F09

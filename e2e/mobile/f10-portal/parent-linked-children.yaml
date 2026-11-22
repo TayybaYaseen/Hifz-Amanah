@@ -1,15 +1,100 @@
 # F10 · Student and Parent access — mobile E2E (docs/specs/13-f10-student-parent-access.md; design.md §4.12)
 # Covers: F10-AC5, F10-AC6, F10-AC7, F10-AC8
+# SYNTHETIC DATA ONLY: parent.p1 verified-linked to S1 and S2; parent.p2's only link (S3) revoked; the PORTAL scenario
+# of apps/api/src/testing/report-seed.ts, last week published for Hifz A1. The audit records of F10-AC8 are checked in
+# e2e/api/f10-portal.spec.ts; here the Admin links and revokes on the screen.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F10 parent — switch linked children, no search, revoked link
 tags:
-  - pending
   - F10
   - US-045
 ---
-- launchApp:
-    clearState: true
-# 1. Sign in as parent.p1 → the switcher lists S1 and S2 only; no student search anywhere.             (F10-AC5, F10-AC6)
-# 2. Sign in as admin.a → revoke parent.p1's link to S2 → Audit history shows the revoke.              (F10-AC8)
-# 3. Sign in as parent.p1 → the switcher lists S1 only; a deep link to S2 → permission-revoked state.  (F10-AC7)
-# 4. Sign in as a Parent with no links → "No student linked yet".
+- runFlow: ../../support/maestro/reset.yaml
+- runScript: { file: ../../support/maestro/control.js, env: { ACTION: quranSeed } }
+- runScript: { file: ../../support/maestro/control.js, env: { ACTION: reportSeed, SCENARIO: PORTAL } }
+- runScript: { file: ../../support/maestro/control.js, env: { ACTION: reportPublish, KIND: WEEK } }
+# 1. Sign in as parent.p1 → the switcher lists S1 and S2 only; no student search anywhere.                (F10-AC5, F10-AC6)
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: parent-p1 }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "nav.portal" }
+- extendedWaitUntil:
+    visible: { id: "portal.child.1" }
+    timeout: 30000
+- assertVisible: { id: "portal.child.1", text: ".*Test Student One.*" }
+- assertVisible: { id: "portal.child.2", text: ".*Test Student Two.*" }
+- assertNotVisible: { id: "portal.child.3" }
+- assertNotVisible: { text: ".*Test Student Three.*" }
+- assertNotVisible: { id: "students.search" }
+- tapOn: { id: "portal.child.2" }
+- extendedWaitUntil:
+    visible: { id: "portal.report.WEEK.${output.report.from}" }
+    timeout: 30000
+- assertVisible: { id: "portal.student", text: ".*Test Student Two.*" }
+- runFlow: ../../support/maestro/back-home.yaml
+# No search in More either.
+- tapOn: { id: "nav.more" }
+- assertNotVisible: { id: "more.students" }
+- assertNotVisible: { id: "more.classes" }
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow: ../../support/maestro/sign-out.yaml
+# 2. Sign in as admin.a → S2 → Family access → revoke parent.p1's link.                                    (F10-AC8)
+- runFlow:
+    file: ../../support/maestro/sign-in-staff.yaml
+    env: { USER_ID: admin-a }
+- tapOn: { id: "nav.more" }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "more.students" }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "students.item.EXT-A-002" }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "studentProfile.familyAccess" }
+- extendedWaitUntil:
+    visible: { id: "familyAccess.link.parent-p1" }
+    timeout: 30000
+- assertVisible: { id: "familyAccess.link.parent-p1.active" }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "familyAccess.link.parent-p1.revoke" }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "familyAccess.link.parent-p1.revokeConfirm" }
+- extendedWaitUntil:
+    visible: { id: "familyAccess.success" }
+    timeout: 30000
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "familyAccess.link.parent-p1.revoked" }
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow: ../../support/maestro/sign-out.yaml
+# 3. Sign in as parent.p1 → only S1 is left: no switcher, S2 is gone.                                     (F10-AC7)
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: parent-p1 }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "nav.portal" }
+- extendedWaitUntil:
+    visible: { id: "portal.student" }
+    timeout: 30000
+- assertVisible: { id: "portal.student", text: ".*Test Student One.*" }
+- assertNotVisible: { id: "portal.child.2" }
+- assertNotVisible: { text: ".*Test Student Two.*" }
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow: ../../support/maestro/sign-out.yaml
+# 4. Sign in as a Parent with no active link → "No student linked yet", contact the madrasa.
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: parent-p2 }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "nav.portal" }
+- extendedWaitUntil:
+    visible: { id: "portal.noLink" }
+    timeout: 30000
+- assertVisible: { id: "portal.noLink", text: "No student linked yet" }

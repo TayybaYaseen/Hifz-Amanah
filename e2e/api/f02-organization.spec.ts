@@ -289,8 +289,22 @@ test.describe('F02 · Organization and roles', { tag: '@F02' }, () => {
     expect(JSON.stringify(after)).not.toContain(note);
   });
 
-  test.fixme('F02-AC10 (US-009) a guardian link change writes one audit record', async () => {
-    // Waits for F10 (guardian links). Link, verify, and revoke a guardian link; each writes exactly one audit record.
+  test('F02-AC10 (US-009) a guardian link change writes one audit record', async ({ as, control }) => {
+    // F10 guardian links: link, verify, and revoke; each writes exactly one audit record.
+    const admin = await as('admin.a');
+    const { students } = await control.rosterIds();
+    const parent2 = await control.userIdOf('parent.p2');
+    const linked = await admin.post(`/students/${students.S1}/guardians`, { data: { parentUserId: parent2, verificationMethod: 'IN_PERSON' } });
+    expect(linked.status(), await linked.text()).toBe(200);
+    const link = ((await linked.json()).guardians as { id: string; parent: { userId: string }; revokedAt: string | null }[]).find((g) => g.parent.userId === parent2 && g.revokedAt === null)!;
+    const count = async () => ((await control.auditForTarget(link.id)) as unknown[]).length;
+    expect(await count()).toBe(1);
+    await admin.post(`/guardian-links/${link.id}/verify`, { data: { verificationMethod: 'MADRASA_RECORDS' } });
+    expect(await count()).toBe(2);
+    await admin.post(`/guardian-links/${link.id}/revoke`);
+    expect(await count()).toBe(3);
+    const actions = ((await control.auditForTarget(link.id)) as { action: string }[]).map((r) => r.action);
+    expect(actions).toEqual(['GUARDIAN_LINKED', 'GUARDIAN_VERIFIED', 'GUARDIAN_LINK_REVOKED']);
   });
 
   test('F02-AC11 (US-009) reset and creation audits contain no password, OTP, or token', async ({ as, anon, control }) => {

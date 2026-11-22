@@ -15,17 +15,20 @@ import {
 import { parse } from '../../platform/errors.ts';
 import type { Actor } from '../identity/auth-service.ts';
 import type { ClassService } from './class-service.ts';
+import type { FamilyAccessService } from './family-access-service.ts';
 import type { StudentService } from './student-service.ts';
 
 export interface RosterServices {
   authenticate: (request: FastifyRequest) => Promise<Actor>;
   classes: ClassService;
   students: StudentService;
+  /** F10: Student logins and Parent links (Owner, Admin). */
+  family: FamilyAccessService;
 }
 
 const idParam = (request: FastifyRequest) => (request.params as { id: string }).id;
 
-export function registerRosterRoutes(app: FastifyInstance, { authenticate, classes, students }: RosterServices): void {
+export function registerRosterRoutes(app: FastifyInstance, { authenticate, classes, students, family }: RosterServices): void {
   // ---------- Classes (US-010) ----------
 
   app.get('/classes', async (request) => classes.list(await authenticate(request), parse(ListClassesQuery, request.query)));
@@ -72,6 +75,16 @@ export function registerRosterRoutes(app: FastifyInstance, { authenticate, class
     const actor = await authenticate(request);
     return students.enroll(actor, idParam(request), parse(EnrollStudentRequest, request.body));
   });
+
+  // ---------- Family access (F10; FR-PORT-007; Owner and Admin only, a Teacher gets 403) ----------
+
+  app.get('/students/:id/access', async (request) => family.access(await authenticate(request), idParam(request)));
+  app.get('/family-accounts', async (request) => family.accounts(await authenticate(request), request.query));
+  app.post('/students/:id/student-account', async (request) => family.linkStudentAccount(await authenticate(request), idParam(request), request.body));
+  app.post('/students/:id/student-account/unlink', async (request) => family.unlinkStudentAccount(await authenticate(request), idParam(request)));
+  app.post('/students/:id/guardians', async (request) => family.linkGuardian(await authenticate(request), idParam(request), request.body));
+  app.post('/guardian-links/:id/verify', async (request) => family.verifyGuardian(await authenticate(request), idParam(request), request.body));
+  app.post('/guardian-links/:id/revoke', async (request) => family.revokeGuardian(await authenticate(request), idParam(request)));
 
   // ---------- Entry pickers (F03-AC4, AC9, AC10; consumed by F04 Bulk Entry and F05 Daily Entry) ----------
 

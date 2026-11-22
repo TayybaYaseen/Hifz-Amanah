@@ -33,6 +33,8 @@ const STATUS: Record<ErrorCode, number> = {
   LEAVE_NOT_AWAITING: 409,
   // Daily Hifz entry (F05).
   MODE_CONFLICTS: 409,
+  // Student and Parent access (F10).
+  PUBLISH_REFUSED: 409,
 };
 
 const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
@@ -62,6 +64,7 @@ const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
   RECORDS_EXIST: 'Records already exist for this date. Confirm to continue',
   LEAVE_NOT_AWAITING: 'This leave is no longer waiting for a decision',
   MODE_CONFLICTS: 'Some students have more than one record on a date. Resolve them before switching to one report per day',
+  PUBLISH_REFUSED: 'These reports cannot be published yet',
 };
 
 export class AppError extends Error {

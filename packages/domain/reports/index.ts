@@ -2,3 +2,4 @@
 export * from './period.ts';
 export * from './build-report.ts';
 export * from './class-summary.ts';
+export * from './publish.ts';

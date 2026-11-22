@@ -221,9 +221,11 @@ export function StudentFormScreen({ student, initialClassId, onSaved }: { studen
 }
 
 /** Student profile, Details tab: fields, enrollment history (F03-AC13), and actions. */
-export function StudentProfileScreen({ studentId, onEdit, dailyEntry = null }: {
+export function StudentProfileScreen({ studentId, onEdit, dailyEntry = null, onFamilyAccess }: {
   studentId: string;
   onEdit: (student: StudentResponse) => void;
+  /** F10: Owner/Admin manage the student's login and Parent links (FR-PORT-007). Absent for a Teacher. */
+  onFamilyAccess?: (student: StudentResponse) => void;
   /** F05: Teacher/Admin/Owner with a workspace record Daily Hifz and open daily records from the profile. */
   dailyEntry?: { onRecordHifz: (classId: string) => void; onOpenRecord: (recordId: string) => void } | null;
 }) {
@@ -332,6 +334,7 @@ export function StudentProfileScreen({ studentId, onEdit, dailyEntry = null }: {
       ) : null}
       {dailyEntry ? <StudentDailyRecords studentId={student.id} onOpen={dailyEntry.onOpenRecord} /> : null}
       {student.canEdit ? <Button testID="studentProfile.edit" variant="secondary" label={t('students.edit')} disabled={busy} onPress={() => onEdit(student)} /> : null}
+      {onFamilyAccess ? <Button testID="studentProfile.familyAccess" variant="secondary" label={t('familyAccess.open')} disabled={busy} onPress={() => onFamilyAccess(student)} /> : null}
       {student.canManage ? (
         <>
           {moving ? (

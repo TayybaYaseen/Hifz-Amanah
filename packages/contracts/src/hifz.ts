@@ -320,6 +320,8 @@ export const PortionAttemptCreateFields = z
     noMistakes: z.boolean(),
     mistakes: z.array(MistakeSchema).max(MISTAKES_MAX),
     remarks,
+    /** F10 (FR-PORT-003): omitted, the remark is saved "Private to staff" (INTERNAL, F10-AC9). */
+    remarksVisibility: z.enum(NOTE_VISIBILITIES).default('INTERNAL'),
   })
   .superRefine(attemptRules);
 export type PortionAttemptCreateFields = z.infer<typeof PortionAttemptCreateFields>;
@@ -334,6 +336,8 @@ export const PortionAttemptUpdateFields = z
     noMistakes: z.boolean().optional(),
     mistakes: z.array(MistakeSchema).max(MISTAKES_MAX).optional(),
     remarks: remarks.optional(),
+    /** F10: a visibility change is audited NOTE_VISIBILITY_CHANGED (F10-AC12). */
+    remarksVisibility: z.enum(NOTE_VISIBILITIES).optional(),
   })
   .superRefine((f, ctx) => {
     notEmpty(f, ctx);
@@ -417,6 +421,8 @@ export interface PortionAttemptView {
   mistakeCount: number | null;
   mistakes: MistakeView[];
   remarks: string | null;
+  /** INTERNAL ("Private to staff") or SHARED ("Visible to student/guardian"), F10. */
+  remarksVisibility: NoteVisibility;
   rowVersion: number;
 }
 
@@ -520,6 +526,8 @@ export interface PortionAttemptSyncFields {
   noMistakes: boolean;
   mistakes: MistakeValue[];
   remarks: string | null;
+  /** F10: INTERNAL ("Private to staff", the default) or SHARED. */
+  remarksVisibility: NoteVisibility;
 }
 
 // ---------- REST: performance summary (F07; staff only) ----------

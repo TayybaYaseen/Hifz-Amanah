@@ -39,7 +39,7 @@ const record: LocalRecord = {
       totalLinesSource: null,
       lineCountEdition: null,
       removed: false,
-      attempts: [{ id: id(20), rowVersion: null, lessonPortionId: id(12), attemptNo: 1, attemptedAt: '2026-11-09T05:00:00.000Z', recordedBy: null, recordedByName: null, status: 'PARTIAL', completed: null, quality: null, noMistakes: false, mistakes: [], remarks: null }],
+      attempts: [{ id: id(20), rowVersion: null, lessonPortionId: id(12), attemptNo: 1, attemptedAt: '2026-11-09T05:00:00.000Z', recordedBy: null, recordedByName: null, status: 'PARTIAL', completed: null, quality: null, noMistakes: false, mistakes: [], remarks: null, remarksVisibility: 'INTERNAL' }],
     },
   ],
 };

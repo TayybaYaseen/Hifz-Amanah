@@ -72,7 +72,16 @@ export type AuditAction =
   | 'HOMEWORK_REVISED'
   | 'HOMEWORK_SUPERSEDED'
   // F09-AC20: a class summary exported as a file (ARCHITECTURE §15 "import/export jobs"). Target CLASS.
-  | 'CLASS_SUMMARY_EXPORTED';
+  | 'CLASS_SUMMARY_EXPORTED'
+  // F10 · Student and Parent access (FR-PORT-005, FR-SEC-007, NFR-PORT-006; ARCHITECTURE §15)
+  | 'NOTE_VISIBILITY_CHANGED'
+  | 'STUDENT_ACCOUNT_LINKED'
+  | 'STUDENT_ACCOUNT_UNLINKED'
+  | 'GUARDIAN_LINKED'
+  | 'GUARDIAN_VERIFIED'
+  | 'GUARDIAN_LINK_REVOKED'
+  | 'REPORT_PUBLISHED'
+  | 'REPORT_UNPUBLISHED';
 
 export interface AuditEvent {
   organizationId: string | null;
@@ -86,7 +95,8 @@ export interface AuditEvent {
     | 'DAILY_RECORD'
     | 'LESSON_PORTION'
     | 'PORTION_ATTEMPT'
-    | 'HOMEWORK_ASSIGNMENT';
+    | 'HOMEWORK_ASSIGNMENT'
+    | 'GUARDIAN_LINK';
   targetId: string | null;
   summary?: Record<string, unknown>;
   at: Date;

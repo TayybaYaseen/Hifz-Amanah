@@ -1,9 +1,10 @@
 // Weekly and monthly report contracts (F09; FR-WKR-001…008, FR-MNR-001…007, FR-RPT-001…009, FR-RPT-011, FR-CAL-005,
 // NFR-OFF-008; US-039…043, US-073; plan docs/handover/F09-plan.md).
 //
-// Reports are read-only and derived: there is no write route and no stored total (FR-RPT-001). Both routes are staff
-// only in F09 (Owner, Admin, assigned Teacher); Students and Parents get 403 until F10 adds the published portal
-// (FR-RPT-010). The shapes below mirror @hifz/domain/reports; the API's return types keep them in step.
+// Reports are read-only and derived: there is no write route and no stored total (FR-RPT-001). These routes are staff
+// only (Owner, Admin, assigned Teacher); Students and Parents read published reports through the F10 portal
+// (packages/contracts/src/portal.ts, FR-RPT-010). The shapes below mirror @hifz/domain/reports; the API's return types
+// keep them in step.
 //
 // Quantities are exact `{unit, numerator, denominator}` and listed per unit (never summed across units). A missing value
 // is null ("Not recorded"), never 0.
@@ -163,8 +164,9 @@ export interface ReportPortionLineView {
   quality: number | null;
   mistakeCount: number | null;
   mistakes: ReportMistakeView[];
-  /** Internal staff text (FR-WKR-008); never sent to a Student or Parent. */
+  /** Staff text (FR-WKR-008); sent to a Student or Parent only when `remarksVisibility` is SHARED (F10). */
   remarks: string | null;
+  remarksVisibility: NoteVisibility;
   attempts: { attemptNo: number; attemptedAt: string; status: PortionStatus; completed: ReportQuantity | null; quality: number | null; mistakeCount: number | null }[];
 }
 

@@ -14,6 +14,9 @@
 //   carried-forward one completed the next class day.
 // - SUMMARY: last week — S1 Mon Present with Sabaq 10/10 lines quality 1; S2 Mon Late, Tue Absent.
 // `correct` changes the WEEK scenario's Tuesday rating 3 → 5 (another device's correction, F09-AC3).
+// - PORTAL (F10): last week — S1 Mon Present, Sabqi Para 4 Partial 1/2 (quality 2, a remark "Private to staff") and
+//   Para 5 Completed (quality 1, a remark "Visible to student/guardian"); S2 Mon Present, Manzil Para 1 Completed.
+// `publish` publishes a period for class A1 as admin.a through POST /reports/publish (F10-AC13).
 import type { FastifyInstance } from 'fastify';
 import { v7 as uuidv7 } from 'uuid';
 import { weekOf } from '@hifz/domain/calendar';
@@ -36,7 +39,11 @@ export interface ReportSeedDeps {
   secret: string;
 }
 
-export type ReportScenario = 'WEEK' | 'MONTH' | 'SUMMARY';
+export type ReportScenario = 'WEEK' | 'MONTH' | 'SUMMARY' | 'PORTAL';
+
+/** The PORTAL scenario's two remarks (synthetic). */
+export const PORTAL_PRIVATE_REMARK = 'Synthetic F10 private remark';
+export const PORTAL_SHARED_REMARK = 'Synthetic F10 shared remark';
 
 export class ReportSeeder {
   private seq = 0;
@@ -102,7 +109,7 @@ export class ReportSeeder {
     token: string,
     recordId: string,
     p: { section: string; position?: number; paraNumber?: number | null; range?: object | null; totalLines?: number | null; assigned: Quantity; homeworkPortionId?: string },
-    a: { status: string; completed?: Quantity | null; quality?: number | null; mistakes?: object[]; remarks?: string | null; attemptNo?: number },
+    a: { status: string; completed?: Quantity | null; quality?: number | null; mistakes?: object[]; remarks?: string | null; remarksVisibility?: 'INTERNAL' | 'SHARED'; attemptNo?: number },
   ) {
     const fields: Record<string, unknown> = {
       dailyRecordId: recordId,
@@ -121,7 +128,7 @@ export class ReportSeeder {
     return { portionId: portion!.id, attemptId: attempt!.id };
   }
 
-  private attemptOp(portionId: string, a: { status: string; completed?: Quantity | null; quality?: number | null; mistakes?: object[]; remarks?: string | null; attemptNo?: number }) {
+  private attemptOp(portionId: string, a: { status: string; completed?: Quantity | null; quality?: number | null; mistakes?: object[]; remarks?: string | null; remarksVisibility?: 'INTERNAL' | 'SHARED'; attemptNo?: number }) {
     return this.op('portion_attempt', 'CREATE', uuidv7(), {
       lessonPortionId: portionId,
       attemptNo: a.attemptNo ?? 1,
@@ -132,6 +139,7 @@ export class ReportSeeder {
       noMistakes: false,
       mistakes: a.mistakes ?? [],
       remarks: a.remarks ?? null,
+      ...(a.remarksVisibility ? { remarksVisibility: a.remarksVisibility } : {}),
     });
   }
 
@@ -182,6 +190,15 @@ export class ReportSeeder {
       return { from: d(0), to: d(6), tuesday: d(1), wednesday: d(2) };
     }
 
+    if (scenario === 'PORTAL') {
+      const mon = await this.record(teacher, ids.classId, ids.S1, d(0));
+      await this.recite(teacher, mon, { section: 'SABQI', position: 1, paraNumber: 4, assigned: para(1) }, { status: 'PARTIAL', completed: para(1, 2), quality: 2, remarks: PORTAL_PRIVATE_REMARK });
+      await this.recite(teacher, mon, { section: 'SABQI', position: 2, paraNumber: 5, assigned: para(1, 2) }, { status: 'COMPLETED', completed: para(1, 2), quality: 1, remarks: PORTAL_SHARED_REMARK, remarksVisibility: 'SHARED' });
+      const mon2 = await this.record(teacher, ids.classId, ids.S2, d(0));
+      await this.recite(teacher, mon2, { section: 'MANZIL', paraNumber: 1, assigned: para(1) }, { status: 'COMPLETED', completed: para(1) });
+      return { from: d(0), to: d(6) };
+    }
+
     if (scenario === 'SUMMARY') {
       const mon = await this.record(teacher, ids.classId, ids.S1, d(0));
       await this.recite(teacher, mon, { section: 'SABAQ', range: { surahStart: 2, ayahStart: 1, surahEnd: 2, ayahEnd: 20 }, totalLines: 10, assigned: lines(10) }, { status: 'COMPLETED', completed: lines(10), quality: 1 });
@@ -212,6 +229,14 @@ export class ReportSeeder {
     const carried = hw.portions.find((p: { origin: string }) => p.origin === 'SUGGESTED');
     await this.recite(teacher, rec[1]!, { section: 'SABQI', position: 2, paraNumber: 7, assigned: carried.assigned, homeworkPortionId: carried.id }, { status: 'COMPLETED', completed: carried.assigned });
     return { from: first, firstDay: c[0]!, holiday: c[6]! };
+  }
+
+  /** F10-AC13: admin.a publishes the period of `kind` holding `date` (default: last week) for class A1. */
+  async publish(kind: 'WEEK' | 'MONTH' = 'WEEK', date?: string): Promise<{ count: number; from: string; to: string }> {
+    const ids = await this.ids();
+    const admin = await this.signIn('admin-a');
+    const res = await this.inject('POST', '/reports/publish', admin, { kind, date: date ?? addDays(ids.today, -7), classId: ids.classId, pendingChanges: 0 });
+    return { count: res.count, from: res.period.from, to: res.period.to };
   }
 
   /** Another device corrects the WEEK scenario's Tuesday rating 3 → 5 (F09-AC3). */

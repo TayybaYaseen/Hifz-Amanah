@@ -9,12 +9,16 @@
 //   holidays and no-class days are never absences (F09-AC11…AC13, AC17). Missing values read "Not recorded".
 // - Every figure is text (no chart without its text equivalent, design.md §4.10). Private staff text (remarks, internal
 //   mistake notes) is labelled "Private to staff"; Students and Parents never reach this screen (F09-AC15).
+// - F10 (FR-RPT-010): "Publish for class" (class summary) and "Publish for this student" (student report) make the
+//   period visible to the students and their linked Parents; "Unpublish" hides it again. Online only, and only once
+//   every change on this device is synced; the server also refuses while a conflict for the period is open, and says
+//   why (F10-AC13, AC14). Each student's published state shows "Published on …" and "Updated on …".
 // Every rule is @hifz/domain/reports; this screen only renders its results.
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
-import type { AttendanceSheetResponse, ClassListResponse, ClassResponse, ClassSummaryRowView, ReportPortionLineView, ReportSectionView, StudentReportView } from '@hifz/contracts';
+import type { AttendanceSheetResponse, ClassListResponse, ClassResponse, ClassSummaryRowView, PublicationResponse, PublishReportsResponse, ReportPortionLineView, ReportSectionView, StudentReportView } from '@hifz/contracts';
 import { reportPeriod, shiftPeriod, type PeriodKind, type ReportPeriod } from '@hifz/domain/reports';
 import { calendarDateIn } from '@hifz/domain/roster';
 import { ApiFailure } from '../../api/client.ts';
@@ -32,7 +36,7 @@ import { refreshCalendar } from '../homework/api.ts';
 import { Chip, ChipRow } from '../roster/Chip.tsx';
 import { fetchClassSummary, fetchStudentReport } from './api.ts';
 import { deviceClassSummary, deviceReport, hasCalendar } from './local.ts';
-import { attendanceRows, averageText, provisionalNotice, reportSource, totalsLines, type ReportSource } from './view.ts';
+import { attendanceRows, averageText, provisionalNotice, publicationSummary, publishBlock, reportSource, totalsLines, type ReportSource } from './view.ts';
 
 type Mode = 'STUDENT' | 'CLASS';
 
@@ -69,6 +73,11 @@ export function ReportsScreen({ onSyncQueue }: { onSyncQueue: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [denied, setDenied] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  // F10 · publishing.
+  const [publication, setPublication] = useState<PublicationResponse['items'] | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [publishNotice, setPublishNotice] = useState<{ tone: 'error' | 'success' | 'info'; text: string } | null>(null);
+  const [publicationKey, setPublicationKey] = useState(0);
 
   const period = reportPeriod(kind, anchor, { timeZone });
   const syncState = { offline: true, pendingChanges: sync.unsynced, lastSyncedAt: sync.meta?.lastSuccessAt ?? null };
@@ -189,6 +198,74 @@ export function ReportsScreen({ onSyncQueue }: { onSyncQueue: () => void }) {
     // syncState and period are derived from the listed inputs.
   }, [mode, classId, studentId, kind, anchor, reloadKey, sync.online, sync.db, sync.unsynced, students, today, session, t]);
 
+  // F10: whether the period is published, for the chosen student or every student of the class (online only).
+  useEffect(() => {
+    setPublication(null);
+    if (!classId || !sync.online) return;
+    if (mode === 'STUDENT' && !studentId) return;
+    let live = true;
+    const target = mode === 'STUDENT' ? `studentId=${studentId}` : `classId=${classId}`;
+    void session
+      .authorized<PublicationResponse>(`/reports/publication?kind=${kind}&date=${anchor}&${target}`)
+      .then((res) => {
+        if (live) setPublication(res.items);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [mode, classId, studentId, kind, anchor, sync.online, session, reloadKey, publicationKey]);
+
+  const publish = async (action: 'publish' | 'unpublish') => {
+    setPublishNotice(null);
+    const block = action === 'publish' ? publishBlock({ online: sync.online, pendingChanges: sync.unsynced }) : sync.online ? null : 'OFFLINE';
+    if (block) {
+      setPublishNotice({ tone: 'error', text: t(`publish.refused.${block}`, { count: sync.unsynced }) });
+      return;
+    }
+    setPublishing(true);
+    try {
+      const target = mode === 'STUDENT' ? { studentId } : { classId };
+      const body = action === 'publish' ? { kind, date: anchor, ...target, pendingChanges: sync.unsynced } : { kind, date: anchor, ...target };
+      const res = await session.authorized<PublishReportsResponse>(`/reports/${action}`, { method: 'POST', body });
+      setPublishNotice({ tone: 'success', text: t(action === 'publish' ? 'publish.done' : 'publish.undone', { count: res.count }) });
+      setPublicationKey((k) => k + 1);
+    } catch (err) {
+      if (err instanceof ApiFailure && err.code === 'PUBLISH_REFUSED') setPublishNotice({ tone: 'error', text: t(`publish.refused.${err.fields.reason ?? 'UNSYNCED_CHANGES'}`, { count: sync.unsynced }) });
+      else if (err instanceof ApiFailure && err.code === 'NETWORK') setPublishNotice({ tone: 'error', text: t('publish.refused.OFFLINE') });
+      else setPublishNotice({ tone: 'error', text: t(errorKeys(err).form ?? 'errors.INTERNAL') });
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const publishPanel = () => {
+    const own = mode === 'STUDENT' ? (publication?.[0] ?? null) : null;
+    const counts = publication ? publicationSummary(publication) : null;
+    return (
+      <Card>
+        <View testID="reports.publish" style={styles.block}>
+          <AppText role="cardTitle" accessibilityRole="header">{t('publish.title')}</AppText>
+          <AppText role="helper" color={colors.textSecondary}>{t('publish.help')}</AppText>
+          {!sync.online ? <AppText color={colors.textSecondary} testID="reports.publish.offline">{t('publish.refused.OFFLINE')}</AppText> : null}
+          {mode === 'STUDENT' && own ? (
+            <AppText testID={own.publishedAt ? 'reports.publish.status.published' : 'reports.publish.status.none'}>
+              {own.publishedAt ? t('publish.publishedOn', { time: formatTime(own.publishedAt, true) }) : t('publish.notPublished')}
+              {own.updatedAt ? `
+${t('portal.updatedOn', { time: formatTime(own.updatedAt, true) })}` : ''}
+            </AppText>
+          ) : null}
+          {mode === 'CLASS' && counts ? <AppText testID="reports.publish.status.class">{t('publish.classStatus', { published: isolate(String(counts.published)), total: isolate(String(counts.total)) })}</AppText> : null}
+          {publishNotice ? <Notice tone={publishNotice.tone} testID={`reports.publish.${publishNotice.tone}`}>{publishNotice.text}</Notice> : null}
+          <Button testID="reports.publish.go" label={t(mode === 'STUDENT' ? 'publish.forStudent' : 'publish.forClass')} busy={publishing} onPress={() => void publish('publish')} />
+          {(mode === 'STUDENT' ? own?.publishedAt : counts && counts.published > 0) ? (
+            <Button testID="reports.publish.undo" variant="tertiary" label={t('publish.unpublish')} disabled={publishing} onPress={() => void publish('unpublish')} />
+          ) : null}
+        </View>
+      </Card>
+    );
+  };
+
   // ---------- Pieces ----------
 
   const rangeText = (p: { from: string; to: string; timeZone: string }) => t('reports.range', { from: isolate(p.from), to: isolate(p.to), timeZone: isolate(p.timeZone) });
@@ -283,7 +360,7 @@ export function ReportsScreen({ onSyncQueue }: { onSyncQueue: () => void }) {
           </AppText>
         ) : null,
       )}
-      {p.remarks ? <AppText role="helper" testID={`${testID}.remarks`} color={colors.textSecondary}>{`${p.remarks} (${t('reports.privateToStaff')})`}</AppText> : null}
+      {p.remarks ? <AppText role="helper" testID={`${testID}.remarks`} color={colors.textSecondary}>{`${p.remarks} (${t(p.remarksVisibility === 'SHARED' ? 'reports.sharedNote' : 'reports.privateToStaff')})`}</AppText> : null}
     </View>
   );
 
@@ -491,6 +568,7 @@ export function ReportsScreen({ onSyncQueue }: { onSyncQueue: () => void }) {
       {loading ? <AppText color={colors.textSecondary} testID="reports.loading">{t('common.loading')}</AppText> : null}
       {!loading && shown && mode === 'STUDENT' && report ? studentBody(report.data, report.source) : null}
       {!loading && shown && mode === 'CLASS' && summary ? summaryBody(summary.data, summary.source) : null}
+      {!loading && shown && classId && (mode === 'CLASS' || studentId) ? publishPanel() : null}
     </AppScreen>
   );
 }

@@ -36,6 +36,13 @@ const KNOWN_FIELD_ISSUES = new Set([
   'END_BEFORE_START',
   'UNKNOWN_SURAH',
   'UNKNOWN',
+  // F10 family access (apps/api/src/modules/roster/family-access-service.ts)
+  'NOT_A_PARENT_ACCOUNT',
+  'NOT_A_STUDENT_ACCOUNT',
+  'ALREADY_LINKED',
+  'STUDENT_ALREADY_LINKED',
+  'ACCOUNT_ALREADY_LINKED',
+  'LINK_REVOKED',
 ]);
 
 /** Limit suffixes the API adds beside a field issue (F06-AC6: the error names the maximum Ayat). */

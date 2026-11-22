@@ -95,6 +95,9 @@ export const ERROR_CODES = [
   // Daily Hifz entry (F05; plan docs/handover/F05-plan.md §4). HIFZ_ERROR_CODES in hifz.ts.
   /** 409: switching to SINGLE is blocked while a student has more than one record on a date (F05-AC8). */
   'MODE_CONFLICTS',
+  // Student and Parent access (F10; plan docs/handover/F10-plan.md).
+  /** 409: publishing was refused; `fields.reason` is a PUBLISH_REFUSALS code (portal.ts, F10-AC14). */
+  'PUBLISH_REFUSED',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

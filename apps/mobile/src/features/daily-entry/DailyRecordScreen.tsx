@@ -164,7 +164,10 @@ export function DailyRecordScreen({ me, recordId, edited, onEdit, onAddAttempt, 
         {latest ? <AppText role="helper" testID={`${prefix}.mistakes`}>{mistakesText(latest)}</AppText> : null}
         {latest?.remarks ? (
           <View>
-            <AppText role="helper" color={colors.textSecondary}>{`🔒 ${t('daily.privateToStaff')}`}</AppText>
+            {/* F10: the remark's visibility as a text label (design.md §5.4). */}
+            <AppText role="helper" color={colors.textSecondary} testID={`${prefix}.remarksVisibility.${latest.remarksVisibility}`}>
+              {latest.remarksVisibility === 'SHARED' ? `👪 ${t('visibility.SHARED')}` : `🔒 ${t('visibility.INTERNAL')}`}
+            </AppText>
             <AppText testID={`${prefix}.remarks`}>{t('dailyRecord.remarks', { text: latest.remarks })}</AppText>
           </View>
         ) : null}
@@ -200,7 +203,7 @@ export function DailyRecordScreen({ me, recordId, edited, onEdit, onAddAttempt, 
                   <AppText role="helper" testID={`${ap}.completed`}>{t('dailyRecord.completed', { amount: a.completed ? amount(a.completed) : t('quality.notRecorded') })}</AppText>
                   <AppText role="helper" testID={`${ap}.mistakes`}>{mistakesText(a)}</AppText>
                   <AppText role="helper" testID={`${ap}.quality`}>{t('quality.value', { value: qualityText(a.quality) })}</AppText>
-                  {a.remarks ? <AppText role="helper" testID={`${ap}.remarks`}>{`🔒 ${t('dailyRecord.remarks', { text: a.remarks })}`}</AppText> : null}
+                  {a.remarks ? <AppText role="helper" testID={`${ap}.remarks`}>{`${a.remarksVisibility === 'SHARED' ? '👪' : '🔒'} ${t('dailyRecord.remarks', { text: a.remarks })}`}</AppText> : null}
                 </View>
               );
             })
