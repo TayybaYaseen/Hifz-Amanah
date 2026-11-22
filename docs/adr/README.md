@@ -12,3 +12,4 @@ file here, numbered after the last one in §19, and a row in that table.
 | [ADR-017](ADR-017-quran-reference-data-model.md) | Quran reference data: model, 16-line layout, offline distribution, import and validation | Accepted 2026-11-09 (DEC-B72); §8 delivery waits on OD-QR-7 |
 | [ADR-019](ADR-019-database-access-layer.md) | Database access layer: Kysely over `pg` on the server, a small typed SQL driver over `expo-sqlite` on mobile (no Drizzle) | Accepted 2026-11-12 (DEC-B85) |
 | [ADR-020](ADR-020-report-cache-source-stamps.md) | Report cache invalidated by trigger-maintained per-student and per-madrasa source stamps (refines ARCHITECTURE §9.3 `source_seq`) | Proposed 2026-11-21 (F09), awaiting review |
+| [ADR-021](ADR-021-published-report-updated-on.md) | "Updated on" for published reports: a fingerprint of what the family sees, timed by the source stamps | Proposed 2026-11-22 (F10), awaiting review |

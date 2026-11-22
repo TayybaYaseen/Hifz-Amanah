@@ -27,6 +27,7 @@ import {
   type TotalLinesSource,
 } from '@hifz/domain/hifz';
 import { PARA_PRESETS, fractionText, presetOf, remaining, rulesFor, type ParaPreset, type Quantity, type QuantityUnit } from '@hifz/domain/quantity';
+import type { NoteVisibility } from '@hifz/domain/mistakes';
 import { evaluateRange, lineCountSource, type ReferenceIndex } from '@hifz/domain/quran-ref';
 import { checkRange } from '../quran/rangeCheck.ts';
 import type { AttemptWrite, LocalAttempt, LocalPortion, PortionWrite, Section } from './local.ts';
@@ -73,6 +74,8 @@ export interface PerformanceForm {
   noMistakes: boolean;
   mistakes: MistakeForm[];
   remarks: string;
+  /** F10: "Private to staff" (INTERNAL, the default) or "Visible to student/guardian" (SHARED). */
+  remarksVisibility: NoteVisibility;
 }
 
 export interface PortionForm {
@@ -108,7 +111,7 @@ export interface PortionForm {
   homeworkPortionId: string | null;
 }
 
-export const emptyPerformance = (): PerformanceForm => ({ status: null, completedText: '', completedPreset: null, quality: null, noMistakes: false, mistakes: [], remarks: '' });
+export const emptyPerformance = (): PerformanceForm => ({ status: null, completedText: '', completedPreset: null, quality: null, noMistakes: false, mistakes: [], remarks: '', remarksVisibility: 'INTERNAL' });
 
 export function newPortion(key: string, section: Section, opts: { isExtra?: boolean; sabqiPara?: number | null } = {}): PortionForm {
   return {
@@ -182,6 +185,7 @@ export function portionFromSaved(p: LocalPortion): PortionForm {
         noteVisibility: m.noteVisibility ?? 'INTERNAL',
       })),
       remarks: latest?.remarks ?? '',
+      remarksVisibility: latest?.remarksVisibility ?? 'INTERNAL',
     },
     attemptCount: p.attempts.length,
     latestAttemptId: latest?.id ?? null,
@@ -617,6 +621,7 @@ export function attemptWrite(form: PortionForm, index: ReferenceIndex | null): A
     noMistakes: v.attempt.mistakes && v.attempt.mistakes.length > 0 ? false : Boolean(v.attempt.noMistakes),
     mistakes: [...(v.attempt.mistakes ?? [])],
     remarks: v.attempt.remarks ?? null,
+    remarksVisibility: form.perf.remarksVisibility,
   };
 }
 
@@ -641,7 +646,7 @@ export function portionDiff(saved: LocalPortion, write: PortionWrite, attempt: A
     latest.quality !== attempt.quality ||
     latest.noMistakes !== attempt.noMistakes ||
     JSON.stringify(latest.mistakes) !== JSON.stringify(attempt.mistakes);
-  const remarksChanged = (latest?.remarks ?? null) !== attempt.remarks;
+  const remarksChanged = (latest?.remarks ?? null) !== attempt.remarks || (latest?.remarksVisibility ?? 'INTERNAL') !== attempt.remarksVisibility;
   return { portionChanged, positionChanged: saved.position !== write.position, outcomeChanged, remarksChanged };
 }
 

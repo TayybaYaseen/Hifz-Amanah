@@ -3,14 +3,21 @@
 // the published Student/Parent view is F10's portal (FR-RPT-010). The class summary has a minimal PDF/Excel export (F09-AC20); report templates and other exports are F13 and F14.
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Actor } from '../identity/auth-service.ts';
+import type { PublishedReports } from './published.ts';
 import type { ReportService } from './report-service.ts';
 
 export interface ReportRouteDeps {
   authenticate: (request: FastifyRequest) => Promise<Actor>;
   reports: ReportService;
+  /** F10: publishing (FR-RPT-010). */
+  published: PublishedReports;
 }
 
-export function registerReportRoutes(app: FastifyInstance, { authenticate, reports }: ReportRouteDeps): void {
+export function registerReportRoutes(app: FastifyInstance, { authenticate, reports, published }: ReportRouteDeps): void {
+  // F10 · Publishing (Teacher for assigned classes, Owner, Admin; F10-AC13, AC14). Needs a connection by nature.
+  app.post('/reports/publish', async (request) => published.publish(await authenticate(request), request.body));
+  app.post('/reports/unpublish', async (request) => published.unpublish(await authenticate(request), request.body));
+  app.get('/reports/publication', async (request) => published.publication(await authenticate(request), request.query));
   app.get('/reports/student', async (request) => reports.studentReport(await authenticate(request), request.query));
   app.get('/reports/class-summary', async (request) => reports.classSummary(await authenticate(request), request.query));
   // F09-AC20: the class summary as .xlsx or PDF (staff only, audited).

@@ -230,7 +230,7 @@ export function PerformanceBlock({ form, onChange, prefix, index, errors }: { fo
       <Field
         testID={`${prefix}.remarks`}
         label={t('daily.remarks')}
-        helper={`🔒 ${t('daily.privateToStaff')}`}
+        helper={perf.remarksVisibility === 'SHARED' ? `👪 ${t('visibility.SHARED')}` : `🔒 ${t('visibility.INTERNAL')}`}
         value={perf.remarks}
         onChangeText={(text) => setPerf({ remarks: text })}
         multiline
@@ -238,6 +238,13 @@ export function PerformanceBlock({ form, onChange, prefix, index, errors }: { fo
         maxLength={REMARKS_MAX}
         error={errors.remarks}
       />
+      {/* F10 (design.md §5.4, FR-PORT-003): who may read the remark, as a text label. "Private to staff" by default
+          (F10-AC9); only "Visible to student/guardian" reaches a Student or Parent (F10-AC10, AC11). */}
+      <ChipRow label={t('visibility.label')}>
+        {(['INTERNAL', 'SHARED'] as const).map((v) => (
+          <Chip key={v} testID={`${prefix}.remarksVisibility.${v}`} label={t(`visibility.${v}`)} selected={perf.remarksVisibility === v} onPress={() => setPerf({ remarksVisibility: v })} />
+        ))}
+      </ChipRow>
     </View>
   );
 }

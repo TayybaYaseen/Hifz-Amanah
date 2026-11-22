@@ -1,16 +1,92 @@
 # F10 · Student and Parent access — mobile E2E (docs/specs/13-f10-student-parent-access.md; design.md §4.11)
 # Covers: F10-AC1, F10-AC2, F10-AC3, F10-AC4
+# SYNTHETIC DATA ONLY: the PORTAL scenario of apps/api/src/testing/report-seed.ts, last week published for Hifz A1.
+# F10-AC2 on screen: the app has no student search, no deep link, and no way to type an id, so another student's report
+# cannot even be asked for; the server's identical "not found" for it is checked in e2e/api/f10-portal.spec.ts.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F10 student — own published reports, read-only, offline state
 tags:
-  - pending
   - F10
   - US-044
 ---
-- launchApp:
-    clearState: true
-# 1. Sign in as student.s1 → Reports lists only S1's published periods; no edit control on any screen. (F10-AC1)
-# 2. An unpublished period is not listed.                                                              (F10-AC3)
-# 3. Open a deep link to S2's report → permission-denied state, same as a missing report.             (F10-AC2)
-# 4. Go offline; relaunch → "network unavailable" state with no cached report data.                    (F10-AC4)
-# 5. With no published data (fresh student) → "No report is available yet", no empty chart.
+- runFlow: ../../support/maestro/reset.yaml
+- runScript: { file: ../../support/maestro/control.js, env: { ACTION: quranSeed } }
+- runScript: { file: ../../support/maestro/control.js, env: { ACTION: reportSeed, SCENARIO: PORTAL } }
+- runScript: { file: ../../support/maestro/control.js, env: { ACTION: reportPublish, KIND: WEEK } }
+# 1. Sign in as student.s1 → Reports lists only S1's published periods; no edit control on any screen.   (F10-AC1)
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: student-s1 }
+# Students have no staff entry points on Home.
+- assertNotVisible: { id: "nav.dailyEntry" }
+- assertNotVisible: { id: "nav.attendance" }
+- assertNotVisible: { id: "nav.reports" }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "nav.portal" }
+- extendedWaitUntil:
+    visible: { id: "portal.report.WEEK.${output.report.from}" }
+    timeout: 30000
+- assertVisible: { id: "portal.readOnly" }
+- assertVisible: { id: "portal.student", text: ".*Test Student One.*" }
+# Only the Student's own record: no switcher, no other student.
+- assertNotVisible: { id: "portal.child.1" }
+- assertNotVisible: { text: ".*Test Student Two.*" }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "portal.report.WEEK.${output.report.from}" }
+- extendedWaitUntil:
+    visible: { id: "portalReport.student" }
+    timeout: 30000
+- assertVisible: { id: "portalReport.student", text: ".*Test Student One.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "portalReport.teachers", TEXT: ".*Test teacher.a1.*" }
+# The shared remark is shown; the private one is not.
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "portalReport.day.${output.report.from}.portion.2.remarks", TEXT: ".*Synthetic F10 shared remark.*" }
+- assertNotVisible: { text: ".*Synthetic F10 private remark.*" }
+- assertNotVisible: { id: "portalReport.day.${output.report.from}.portion.1.remarks" }
+# No edit, publish, or comment controls anywhere.
+- assertNotVisible: { id: "reports.publish.go" }
+- assertNotVisible: { id: "record.edit" }
+- assertNotVisible: { text: "Edit" }
+- runFlow: ../../support/maestro/back-home.yaml
+# 2. An unpublished period is not listed: last month was never published.                                (F10-AC3)
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "nav.portal" }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "portal.kind.month" }
+- extendedWaitUntil:
+    visible: { id: "portal.noReports" }
+    timeout: 30000
+- assertVisible: { id: "portal.noReports", text: "No report is available yet" }
+- runFlow: ../../support/maestro/back-home.yaml
+# 4. Go offline; open Reports → "network unavailable", with no cached report data.                       (F10-AC4)
+- runFlow: ../../support/maestro/go-offline.yaml
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "nav.portal" }
+- extendedWaitUntil:
+    visible: { id: "portal.offline" }
+    timeout: 60000
+- assertVisible: { id: "portal.offline", text: "Network unavailable.*" }
+- assertNotVisible: { id: "portal.report.WEEK.${output.report.from}" }
+# Students have no sync banner (go-online.yaml waits for it): turn the connection back on directly.
+- setAirplaneMode: disabled
+- waitForAnimationToEnd
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow: ../../support/maestro/sign-out.yaml
+# 5. A student with no published report → "No report is available yet", no empty chart.
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: student-s3 }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "nav.portal" }
+- extendedWaitUntil:
+    visible: { id: "portal.noReports" }
+    timeout: 30000

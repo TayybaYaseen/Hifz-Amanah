@@ -1,12 +1,60 @@
 # F10 · Student and Parent access — mobile E2E (docs/specs/13-f10-student-parent-access.md; decision review 2026-10-30, SRS §17)
 # Covers: F10-AC13
+# SYNTHETIC DATA ONLY: the PORTAL scenario of apps/api/src/testing/report-seed.ts (last week: S1 and S2 of Hifz A1).
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F10 Teacher publishes reports for a class
 tags:
-  - pending
   - F10
   - US-044
 ---
-- launchApp:
-    clearState: true
-# 1. Given a week whose records are all synced, when the Teacher of that class or an Admin publishes it for the class, then every student's weekly report becomes visible to that student and their linked Parents, and the publish action is audited. (F10-AC13)
+- runFlow: ../../support/maestro/reset.yaml
+- runScript: { file: ../../support/maestro/control.js, env: { ACTION: quranSeed } }
+- runScript: { file: ../../support/maestro/control.js, env: { ACTION: reportSeed, SCENARIO: PORTAL } }
+# 1. Given a week whose records are all synced, when the Teacher of that class publishes it for the class, then every
+#    student's weekly report becomes visible to that student and their linked Parents. (F10-AC13; the audit is checked
+#    in e2e/api/f10-portal.spec.ts.)
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- runFlow:
+    file: ../../support/maestro/reports-open.yaml
+    env: { STUDENT: "", KIND: week, PREV: "1" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.publish.status.class", TEXT: ".*0.* of .*2.*" }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "reports.publish.go" }
+- extendedWaitUntil:
+    visible: { id: "reports.publish.success" }
+    timeout: 30000
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.publish.success", TEXT: ".*Published: .*2.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.publish.status.class", TEXT: ".*2.* of .*2.*" }
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow: ../../support/maestro/sign-out.yaml
+# The Student now sees that week.
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: student-s1 }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "nav.portal" }
+- extendedWaitUntil:
+    visible: { id: "portal.report.WEEK.${output.report.from}" }
+    timeout: 30000
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow: ../../support/maestro/sign-out.yaml
+# And a linked Parent too.
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: parent-p1 }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "nav.portal" }
+- extendedWaitUntil:
+    visible: { id: "portal.report.WEEK.${output.report.from}" }
+    timeout: 30000

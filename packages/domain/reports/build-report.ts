@@ -67,8 +67,10 @@ export interface ReportAttempt {
   mistakes: readonly ReportMistake[];
   /** An imported uncategorized MistakeCount (F14), or null. */
   uncategorizedCount?: number | null;
-  /** Internal staff text (FR-WKR-008): never shown to a Student or Parent. */
+  /** Staff text (FR-WKR-008); a Student or Parent sees it only when the Teacher made it SHARED (FR-PORT-003, F10). */
   remarks: string | null;
+  /** INTERNAL ("Private to staff", the default) or SHARED ("Visible to student/guardian"). Absent means INTERNAL. */
+  remarksVisibility?: NoteVisibility;
 }
 
 export interface ReportPortion {
@@ -199,8 +201,9 @@ export interface ReportPortionLine {
   mistakeCount: number | null;
   /** The latest attempt's mistakes, with their notes and visibility (staff view). */
   mistakes: ReportMistake[];
-  /** The latest attempt's remarks (internal staff text). */
+  /** The latest attempt's remarks (staff text, INTERNAL unless the Teacher shared it). */
   remarks: string | null;
+  remarksVisibility: NoteVisibility;
   /** Every attempt, oldest first (FR-RPT-006: full history stays available, never double-counted). */
   attempts: ReportAttemptSummary[];
 }
@@ -391,6 +394,7 @@ function lineOf(record: ReportRecord, portion: ReportPortion): ReportPortionLine
     mistakeCount: latest ? countOf(latest) : null,
     mistakes: latest ? latest.mistakes.map((m) => ({ ...m })) : [],
     remarks: latest?.remarks ?? null,
+    remarksVisibility: latest?.remarksVisibility === 'SHARED' ? 'SHARED' : 'INTERNAL',
     attempts: history.map((a) => ({ attemptNo: a.attemptNo, attemptedAt: a.attemptedAt, status: a.status, completed: a.completed, quality: a.quality, mistakeCount: countOf(a) })),
   };
 }

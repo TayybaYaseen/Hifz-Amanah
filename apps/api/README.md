@@ -332,9 +332,9 @@ Contract: [`packages/contracts/src/reports.ts`](../../packages/contracts/src/rep
 [ADR-020](../../docs/adr/ADR-020-report-cache-source-stamps.md).
 
 Read-only: every report is built from the source records (attendance, daily records, portions, attempts, mistakes,
-homework, timetable, exceptions, enrollments) and nothing is editable (FR-RPT-001). Staff only in F09: Owner, Admin,
-assigned Teacher. A Student or Parent gets `403` before anything is loaded; their published view is F10's portal
-(FR-RPT-010). A Teacher reaches a student enrolled at any time in one of their classes, and the report then holds only
+homework, timetable, exceptions, enrollments) and nothing is editable (FR-RPT-001). Staff only: Owner, Admin,
+assigned Teacher. A Student or Parent gets `403` before anything is loaded; they read published reports through the F10
+portal (below). A Teacher reaches a student enrolled at any time in one of their classes, and the report then holds only
 the days in those classes; a student or class out of reach, or another madrasa's id, is `404`.
 
 | Route | Query | Result |
@@ -358,6 +358,53 @@ madrasa's timezone and week start. Triggers bump a per-student stamp (records, p
 attendance, homework, enrollments, the student row) or the madrasa stamp (timetables, exceptions) in the same
 transaction as the change, so the next read after any correction rebuilds from source. `ReportService.verifyCache`
 recomputes a sample and lists mismatches (the nightly job waits for a worker entrypoint).
+
+## Portal, publishing, and family access routes (F10)
+
+Contract: [`packages/contracts/src/portal.ts`](../../packages/contracts/src/portal.ts); rules in
+`packages/domain/reports/publish.ts` and `src/modules/access/projection.ts`; code in
+[`src/modules/portal`](src/modules/portal), [`src/modules/reporting/published.ts`](src/modules/reporting/published.ts),
+and [`src/modules/roster/family-access-service.ts`](src/modules/roster/family-access-service.ts); tables in
+`migrations/0016_portal.sql` (`student_accounts`, `student_guardians`, `report_published`, `report_stamps.stamped_at`,
+`portion_attempts.remarks_visibility` opened to `SHARED`; RLS forced, no DELETE). Plan:
+[F10-plan](../../docs/handover/F10-plan.md); "Updated on" design [ADR-021](../../docs/adr/ADR-021-published-report-updated-on.md).
+
+**Portal (Student, Parent; online, read-only; `cache-control: no-store`).** A Student follows the student record their
+login is linked to; a Parent, the students with an active (verified, not revoked) link. The set is read on every
+request, so a revoked link is refused on the next one. Anything else (another student, an unpublished or unknown
+report, another madrasa's id) is the same `404`. Staff get `403`. There is no write route and no search.
+
+| Route | Query | Result |
+|---|---|---|
+| `GET /portal/students` | — | `200 { items: [{ id, name }] }` (the Parent's switcher) |
+| `GET /portal/reports` | `studentId`, `kind?`, `cursor?` | `200 { items: [{ id, kind, from, to, publishedAt, updatedAt }], nextCursor }`, published periods only, newest first, 25 a page |
+| `GET /portal/reports/:id` | — | `200 { id, publishedAt, updatedAt, teachers: [{ name }], report: FamilyReportView, generatedAt }`: the FR-PORT-006 field set through `projectFor(STUDENT\|PARENT, 'published_report')`; remarks and mistake notes only when SHARED; no draft homework, Leave reason, provisional state, or excluded-record list |
+
+**Publishing (Teacher for assigned classes, Owner, Admin; `reports.publish`).** Exactly one of `classId` (every student
+enrolled in the class during the period) or `studentId`.
+
+| Route | Body / query | Result |
+|---|---|---|
+| `POST /reports/publish` | `{ kind, date, classId \| studentId, pendingChanges }` | `200 { period, count }`, audited `REPORT_PUBLISHED`. `409 PUBLISH_REFUSED { fields: { reason } }`: `UNSYNCED_CHANGES` (the device reports pending changes, or a sync conflict is open for those students on a date in the period) or `PERIOD_NOT_STARTED` |
+| `POST /reports/unpublish` | `{ kind, date, classId \| studentId }` | `200 { period, count }`, audited `REPORT_UNPUBLISHED`; the period leaves the portal on the next request |
+| `GET /reports/publication` | `kind`, `date?`, `classId \| studentId` | `200 { period, items: [{ studentId, studentName, publishedAt, updatedAt }] }` |
+
+**Family access (Owner, Admin; `guardians.manage`; a Teacher gets `403`).** Every change is audited in the same
+transaction, with ids and the method only.
+
+| Route | Body / query | Result |
+|---|---|---|
+| `GET /students/:id/access` | — | `200 StudentAccessResponse`: the linked Student login and every Parent link (active first, revoked kept) |
+| `GET /family-accounts` | `role=STUDENT\|PARENT`, `page?` | `200 { items: [{ userId, loginId, displayName }], page, pageSize, total }`: the madrasa's active logins of that role |
+| `POST /students/:id/student-account` | `{ userId }` | Links a Student login (`STUDENT_ACCOUNT_LINKED`). `400` `NOT_A_STUDENT_ACCOUNT`, `STUDENT_ALREADY_LINKED`, `ACCOUNT_ALREADY_LINKED` |
+| `POST /students/:id/student-account/unlink` | — | `STUDENT_ACCOUNT_UNLINKED` |
+| `POST /students/:id/guardians` | `{ parentUserId, verificationMethod: IN_PERSON\|MADRASA_RECORDS }` | Links a Parent after offline verification; the method is required (`GUARDIAN_LINKED`). `400` `NOT_A_PARENT_ACCOUNT`, `ALREADY_LINKED` |
+| `POST /guardian-links/:id/verify` | `{ verificationMethod }` | Records a new verification (`GUARDIAN_VERIFIED`); `400 LINK_REVOKED` on a revoked link |
+| `POST /guardian-links/:id/revoke` | — | Ends the link (`GUARDIAN_LINK_REVOKED`); revoking twice is a no-op |
+
+**Remark visibility.** `portion_attempt` sync operations carry `remarksVisibility` (`INTERNAL`, the default, "Private to
+staff"; or `SHARED`, "Visible to student/guardian"). A change is audited `NOTE_VISIBILITY_CHANGED { from, to }`, never
+with the text.
 
 ## Sync routes (F12)
 
@@ -426,6 +473,11 @@ F03 seeds the fixture classes, Teachers, and students of `e2e/fixtures/personas.
 from 90 days before today) and adds:
 - `GET /__test/roster/ids`: `{ classes: { A1, A2, B1 }, students: { S1, S2, S3, SB1 } }` ids of the seeded fixtures.
 
+F10 seeds each Student persona's login link and each Parent persona's links (VERIFIED, or REVOKED) on every reset,
+assigns the fixture Teachers from the enrollment date, and adds:
+- `POST /__test/reports/seed { scenario: 'PORTAL' }` (with the F09 scenarios): last week with a private and a shared remark.
+- `POST /__test/reports/publish { kind?, date? }`: admin.a publishes that period for class Hifz A1 through the real route.
+
 F06 adds:
 - `POST /__test/quran/seed { organizationCode, seed? }`: applies a **synthetic** Quran seed (default: the fixture in
   `packages/domain/quran-ref/synthetic-fixture.ts`, which matches no real Mushaf) to that madrasa. `400 { issues }` if
@@ -433,7 +485,10 @@ F06 adds:
 
 ## Not yet built
 
-- F09: the published Student/Parent report view and publishing (F10, FR-RPT-010); the madrasa's PDF template, stored
+- F10: family PDF and Excel exports (F13, F14) and the "Report published" push (F16): each adds its own internal-note
+  leak test. The mobile portal has no component-test harness (screen rules are unit-tested in `view.ts`).
+
+- F09: the madrasa's PDF template, stored
   files behind signed URLs, and the other exports (F13, F14; the class-summary export is minimal and synchronous);
   scheduling the nightly report-cache verification (needs the pg-boss worker entrypoint).
 

@@ -58,7 +58,7 @@ const sabqi = (position: number, para: number): PortionWrite => ({
   totalLines: null,
   totalLinesSource: null,
 });
-const attempt = (over: Partial<AttemptWrite> = {}): AttemptWrite => ({ status: 'COMPLETED', completed: null, quality: null, noMistakes: false, mistakes: [], remarks: null, ...over });
+const attempt = (over: Partial<AttemptWrite> = {}): AttemptWrite => ({ status: 'COMPLETED', completed: null, quality: null, noMistakes: false, mistakes: [], remarks: null, remarksVisibility: 'INTERNAL', ...over });
 
 const entry = (over: Partial<NewEntryInput> = {}): NewEntryInput => ({
   studentId: STUDENT,

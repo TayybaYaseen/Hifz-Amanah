@@ -99,7 +99,7 @@ async function loadRecords(tx: Tx, org: string, studentIds: readonly string[], p
   const attempts = portions.length
     ? await tx
         .selectFrom('portion_attempts')
-        .select(['id', 'lesson_portion_id', 'attempt_no', 'attempted_at', 'status', 'completed_unit', 'completed_num', 'completed_den', 'quality', 'no_mistakes', 'remarks'])
+        .select(['id', 'lesson_portion_id', 'attempt_no', 'attempted_at', 'status', 'completed_unit', 'completed_num', 'completed_den', 'quality', 'no_mistakes', 'remarks', 'remarks_visibility'])
         .where('organization_id', '=', org)
         .where(
           'lesson_portion_id',
@@ -124,6 +124,7 @@ async function loadRecords(tx: Tx, org: string, studentIds: readonly string[], p
         noMistakes: a.no_mistakes,
         mistakes: (mistakes.get(a.id) ?? []).map((m) => ({ category: m.category, severity: m.severity, repeated: m.repeated, note: m.note ?? null, noteVisibility: m.noteVisibility ?? 'INTERNAL' })),
         remarks: a.remarks,
+        remarksVisibility: a.remarks_visibility,
       },
     ]);
   }

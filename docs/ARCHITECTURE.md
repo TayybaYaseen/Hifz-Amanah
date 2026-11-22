@@ -259,9 +259,12 @@ roster (as built in F03, migration 0007; RLS on all four; DELETE refused for eve
            status, deactivated_at, row_version)     -- external_student_id unique per org, case-insensitive
   student_enrollments(id, organization_id, student_id, class_id, start_date, end_date NULL,   -- dates inclusive
                       created_by, ended_at, ended_by)  -- one open per student (FR-STU-006); a move ends the old one the day before
-  student_accounts(organization_id, student_id, user_id)               -- student login
-  student_guardians(organization_id, student_id, guardian_user_id,
-                    verified_by, verified_at, verification_method, revoked_at)   -- FR-PORT-007
+  -- F10, migration 0016 (RLS forced, no DELETE; an ended link keeps its row):
+  student_accounts(id, organization_id, student_id, user_id, linked_by, linked_at,
+                   unlinked_by, unlinked_at)              -- student login; one active per student and per login
+  student_guardians(id, organization_id, student_id, guardian_user_id,
+                    verification_method[IN_PERSON|MADRASA_RECORDS], verified_by, verified_at,
+                    linked_by, linked_at, revoked_by, revoked_at)   -- FR-PORT-007; one active per student and parent
 
 calendar
   class_schedules(id, organization_id, class_id, weekday, start_time, end_time,
@@ -328,8 +331,9 @@ hifz
                    category[HARKAAT|TAJWEED|LAFZI|AYAT_BHOOLNA|TARTEEB|WAQF_IBTIDA],
                    severity[MINOR|MAJOR], repeated BOOLEAN, note NULL,
                    note_visibility[INTERNAL|SHARED] DEFAULT 'INTERNAL')   -- FR-ATT-012
-  notes(id, organization_id, target_type, target_id, body,
-        visibility[INTERNAL|SHARED] DEFAULT 'INTERNAL', author_id, row_version)
+  -- F10: the staff notes are attempt remarks (portion_attempts.remarks_visibility[INTERNAL|SHARED] DEFAULT
+  -- 'INTERNAL') and mistake notes (attempt_mistakes.note_visibility); no separate notes table was needed.
+  -- Leave reasons, absence notes, and students.private_notes are always internal.
 
 homework
   homework_assignments(id, organization_id, student_id, class_id NULL, source_daily_record_id NULL,
@@ -341,11 +345,12 @@ homework
                     source_attempt_id NULL, origin[SUGGESTED|TEACHER_ADDED|TEACHER_EDITED], instructions)
 
 reporting / platform
-  report_published(organization_id, student_id, period_kind, period_start, published_by, published_at,
-                   updated_after_publish_at NULL)                      -- FR-RPT-010
+  report_published(id, organization_id, student_id, period_kind, period_start, period_end, published_by,
+                   published_at, content_hash, updated_at NULL,
+                   unpublished_by NULL, unpublished_at NULL)           -- FR-RPT-010; F10 migration 0016 (ADR-021)
   report_cache(organization_id, student_id, period_kind, period_start, scope_key, settings_key, as_of,
                org_stamp, student_stamp, payload jsonb, built_at)   -- F09, migration 0015 (ADR-020)
-  report_stamps(organization_id, scope_key['ORG'|student id], stamp)  -- bumped by triggers on every report source table
+  report_stamps(organization_id, scope_key['ORG'|student id], stamp, stamped_at)  -- bumped by triggers on every report source table; stamped_at F10
   -- sync tables as built in F12 (migrations 0004/0005/0006, ADR-015); RLS forced on all four (ADR-016)
   change_log(seq BIGSERIAL, organization_id, entity, entity_id, row_version, op[UPSERT|REMOVE],
              changed_fields text[], student_id NULL, class_id NULL,       -- scope keys at change time (F12-AC7)

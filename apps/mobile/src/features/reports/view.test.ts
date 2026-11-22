@@ -9,7 +9,7 @@ import { buildReport, reportPeriod } from '@hifz/domain/reports';
 import { en } from '../../i18n/locales/en.ts';
 import { ur } from '../../i18n/locales/ur.ts';
 import { urLatn } from '../../i18n/locales/ur-Latn.ts';
-import { ATTENDANCE_ROWS, attendanceRows, averageText, provisionalNotice, reportSource, totalsLines, type Translate } from './view.ts';
+import { ATTENDANCE_ROWS, attendanceRows, averageText, provisionalNotice, publicationSummary, publishBlock, reportSource, totalsLines, type Translate } from './view.ts';
 
 const get = (obj: unknown, path: string): unknown => path.split('.').reduce<unknown>((o, k) => (o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined), obj);
 
@@ -101,5 +101,34 @@ describe('F09 · report strings exist in all three locales', () => {
   ])('F09 unit: every report key is in %s', (_locale, catalogue) => {
     const missing = [...used].filter((k) => typeof get(catalogue, k) !== 'string');
     expect(missing).toEqual([]);
+  });
+});
+
+describe('F10 · publishing (FR-RPT-010)', () => {
+  it('F10-AC14 (US-044) offline, or with unsynced changes on this device, publishing is refused before any request', () => {
+    expect(publishBlock({ online: false, pendingChanges: 0 })).toBe('OFFLINE');
+    expect(publishBlock({ online: false, pendingChanges: 4 })).toBe('OFFLINE');
+    expect(publishBlock({ online: true, pendingChanges: 1 })).toBe('UNSYNCED_CHANGES');
+    expect(publishBlock({ online: true, pendingChanges: 0 })).toBeNull();
+  });
+
+  it('F10-AC13 (US-044) a class shows how many of its students\' reports are published', () => {
+    expect(publicationSummary([{ publishedAt: '2026-11-09T10:00:00.000Z', updatedAt: null }, { publishedAt: null, updatedAt: null }])).toEqual({ published: 1, total: 2 });
+    expect(publicationSummary([])).toEqual({ published: 0, total: 0 });
+  });
+
+  it.each([
+    ['en', en],
+    ['ur', ur],
+    ['ur-Latn', urLatn],
+  ])('F10 unit: every publish and portal string is in %s', (_locale, catalogue) => {
+    const keys = [
+      ...['OFFLINE', 'UNSYNCED_CHANGES', 'PERIOD_NOT_STARTED'].map((r) => `publish.refused.${r}`),
+      ...['title', 'help', 'done', 'undone', 'publishedOn', 'notPublished', 'classStatus', 'forStudent', 'forClass', 'unpublish'].map((k) => `publish.${k}`),
+      ...['title', 'reportTitle', 'offline', 'unavailable', 'noReports', 'noLinkParent', 'noLinkStudent', 'updatedOn', 'teachers', 'remark'].map((k) => `portal.${k}`),
+      'errors.PUBLISH_REFUSED',
+      'home.portal',
+    ];
+    expect(keys.filter((k) => typeof get(catalogue, k) !== 'string')).toEqual([]);
   });
 });

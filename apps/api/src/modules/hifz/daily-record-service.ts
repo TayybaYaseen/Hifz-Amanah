@@ -203,6 +203,7 @@ export class DailyRecordService {
               'a.quality',
               'a.no_mistakes',
               'a.remarks',
+              'a.remarks_visibility',
               'a.row_version',
             ])
             .where('a.organization_id', '=', org)
@@ -231,6 +232,7 @@ export class DailyRecordService {
           mistakes: list.map((m, i) => ({ ...m, position: i + 1 })),
           // Internal staff text: this route is staff-only (daily.write); Students and Parents never reach it.
           remarks: a.remarks,
+          remarksVisibility: a.remarks_visibility,
           rowVersion: Number(a.row_version),
         };
         attemptsOf.set(a.lesson_portion_id, [...(attemptsOf.get(a.lesson_portion_id) ?? []), view]);

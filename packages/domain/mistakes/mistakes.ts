@@ -95,6 +95,17 @@ export const withRepeated = <M extends { repeated: boolean }>(mistake: M, repeat
 export const noteForFamily = (mistake: { note: string | null; noteVisibility: NoteVisibility }): string | null =>
   mistake.noteVisibility === 'SHARED' ? mistake.note : null;
 
+/**
+ * Any staff text (attempt remarks, a mistake note) as a Student or Parent may see it (FR-PORT-003, F10-AC10/AC11):
+ * the text only when its visibility is exactly SHARED. A missing, unknown, or INTERNAL visibility yields null, so a
+ * new value or a bad row can never open a note (fail closed).
+ */
+export const textForFamily = (text: unknown, visibility: unknown): string | null =>
+  visibility === 'SHARED' && typeof text === 'string' && text.length > 0 ? text : null;
+
+/** The visibility a note is saved with when the Teacher did not choose one: "Private to staff" (F10-AC9). */
+export const visibilityOrDefault = (visibility: NoteVisibility | null | undefined): NoteVisibility => visibility ?? DEFAULT_NOTE_VISIBILITY;
+
 // ---------- Counts ----------
 
 /** The attempt fields the counts need. */

@@ -1,7 +1,7 @@
 // Role home (F01-AC1, AC17). F01 shows who is signed in and in which madrasa; the operational cards of
 // design.md §4.4 (classes, entries, homework) arrive with their features. No invented metrics are shown.
 // F12: Teacher/Admin/Owner see the sync banner (design.md §5.9) and, once, the changes kept from a previous
-// sign-in (plan Q14). Students and Parents are online-only and never see sync UI.
+// sign-in (plan Q14). Students and Parents are online-only and never see sync UI; F10 gives them "Reports" (the portal).
 import { useTranslation } from 'react-i18next';
 import type { MeResponse } from '@hifz/contracts';
 import { AppScreen, AppText, Button, Card, Notice } from '../../components/ui.tsx';
@@ -10,7 +10,7 @@ import { isolate } from '../../i18n/direction.ts';
 import { useSync } from '../../sync/SyncContext.tsx';
 import { colors } from '../../theme/tokens.ts';
 
-export function HomeScreen({ me, onMore, onSyncQueue, onAttendance, onDailyEntry, onHomework, onReports }: { me: MeResponse; onMore: () => void; onSyncQueue: () => void; onAttendance: () => void; onDailyEntry: () => void; onHomework?: () => void; onReports?: () => void }) {
+export function HomeScreen({ me, onMore, onSyncQueue, onAttendance, onDailyEntry, onHomework, onReports, onPortal }: { me: MeResponse; onMore: () => void; onSyncQueue: () => void; onAttendance: () => void; onDailyEntry: () => void; onHomework?: () => void; onReports?: () => void; onPortal?: () => void }) {
   const { t } = useTranslation();
   const sync = useSync();
   return (
@@ -38,6 +38,8 @@ export function HomeScreen({ me, onMore, onSyncQueue, onAttendance, onDailyEntry
       {sync.enabled && onHomework ? <Button testID="nav.homework" variant="secondary" label={t('home.homework')} onPress={onHomework} /> : null}
       {/* F09: Weekly and monthly reports and the class summary (design.md §4.10). */}
       {sync.enabled && onReports ? <Button testID="nav.reports" variant="secondary" label={t('home.reports')} onPress={onReports} /> : null}
+      {/* F10: Students and Parents read their published reports (design.md §4.11, §4.12). */}
+      {onPortal ? <Button testID="nav.portal" label={t('home.portal')} onPress={onPortal} /> : null}
       <Button testID="nav.more" variant="secondary" label={t('home.more')} onPress={onMore} />
     </AppScreen>
   );

@@ -94,6 +94,10 @@ const TABLES = [
   // The source catalogue is global; tests register synthetic sources only, so a reset clears it.
   'quran_source_licences',
   'quran_sources',
+  // F10 published reports, Student logins, and Parent links (they reference students and users).
+  'report_published',
+  'student_accounts',
+  'student_guardians',
   // F09 report cache and source stamps (they reference students and organizations).
   'report_cache',
   'report_stamps',
@@ -478,8 +482,13 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
 
       // ---------- F09 · Report scenarios (e2e/mobile/f09-reports) ----------
       scope.post('/reports/seed', async (request) => {
-        const { scenario } = parse(z.strictObject({ scenario: z.enum(['WEEK', 'MONTH', 'SUMMARY']) }), request.body);
+        const { scenario } = parse(z.strictObject({ scenario: z.enum(['WEEK', 'MONTH', 'SUMMARY', 'PORTAL']) }), request.body);
         return reportSeeder.seed(scenario);
+      });
+      // F10-AC13: admin.a publishes a period for class A1 through the real POST /reports/publish.
+      scope.post('/reports/publish', async (request) => {
+        const { kind, date } = parse(z.strictObject({ kind: z.enum(['WEEK', 'MONTH']).default('WEEK'), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }), request.body ?? {});
+        return reportSeeder.publish(kind, date);
       });
       scope.post('/reports/correct', async () => {
         await reportSeeder.correct();
