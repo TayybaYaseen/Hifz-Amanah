@@ -419,6 +419,8 @@ export interface PortionAttemptView {
   noMistakes: boolean;
   /** Mistake count: the list length, 0 only for "No mistakes", null when not recorded (FR-ATT-011). */
   mistakeCount: number | null;
+  /** F14: an imported uncategorized MistakeCount (included in mistakeCount), shown apart from categories; null = none. */
+  uncategorizedMistakes?: number | null;
   mistakes: MistakeView[];
   remarks: string | null;
   /** INTERNAL ("Private to staff") or SHARED ("Visible to student/guardian"), F10. */

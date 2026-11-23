@@ -1,12 +1,39 @@
 # F14 · Excel import and export — mobile E2E (docs/specs/14-f14-excel-import-export.md; decision review 2026-10-30, SRS §17)
 # Covers: F14-AC21
+# SYNTHETIC DATA ONLY. students-two-classes.xlsx (pushed by e2e/scripts/push-workbooks.mjs): sheet rows 2–5 are new
+# students for Hifz A1 (teacher.a1's class), rows 6–7 for Hifz A2 (not theirs). That no login account is created is
+# checked by the API test 'F14-AC21 (US-058) …' (e2e/api/f14-excel.spec.ts); this flow covers what the Teacher sees.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F14 Teacher imports students into assigned classes
 tags:
-  - pending
   - F14
   - US-058
 ---
-- launchApp:
-    clearState: true
+- runFlow: ../../support/maestro/reset.yaml
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
 # 1. Given a Teacher assigned to Class A, when they import a Students workbook with rows for Class A and Class B, then the preview marks the Class B rows invalid ("Not your class"), and confirming creates only the Class A students, with no login accounts. (F14-AC21)
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.importExport" } }
+- extendedWaitUntil:
+    visible: { id: "importExport.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/pick-workbook.yaml, env: { FILE: students-two-classes.xlsx } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.count.NEW", TEXT: ".*: 4" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.count.INVALID", TEXT: ".*: 2" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.row.6.issue.0", TEXT: ".*Not your class" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.row.7.issue.0", TEXT: ".*Not your class" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "import.confirm" } }
+- extendedWaitUntil:
+    visible: { id: "android:id/button1" }
+    timeout: 10000
+- tapOn: { id: "android:id/button1" }
+- extendedWaitUntil:
+    visible: { id: "import.results" }
+    timeout: 120000
+# Only the four Hifz A1 students are created; the two Hifz A2 rows are not imported.
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.result.COMMITTED", TEXT: ".*: 4" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.result.SKIPPED", TEXT: ".*: 2" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.result.FAILED", TEXT: ".*: 0" } }
+- runFlow: ../../support/maestro/back-home.yaml

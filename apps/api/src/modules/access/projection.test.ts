@@ -319,3 +319,41 @@ describe('F09 · reports through projectFor()', async () => {
     expect(projectFor('STAFF', 'class_summary', summary)).toEqual(summary);
   });
 });
+
+describe('F14 · Excel export rows (new outbound channel)', () => {
+  const row = (remarks: string, remarksVisibility: Vis) => ({
+    externalRecordId: 'R-1',
+    externalStudentId: 'EXT-A-001',
+    recordDate: '2026-11-18',
+    sessionLabel: null,
+    section: 'SABQI',
+    position: 1,
+    paraNumber: 3,
+    surahStart: null,
+    ayahStart: null,
+    surahEnd: null,
+    ayahEnd: null,
+    totalLines: null,
+    assigned: 1,
+    completed: 1,
+    unit: 'HALF',
+    mistakeCount: 2,
+    status: 'COMPLETED',
+    quality: 2,
+    remarks,
+    remarksVisibility,
+    internalOnlyField: PRIVATE_NOTE,
+  });
+
+  it('F14-AC17 (US-061) a family export row never carries an internal note; a shared remark stays (AC-XLS-06)', () => {
+    for (const audience of FAMILY) {
+      const priv = projectFor(audience, 'export_daily_record_row', row(PRIVATE_REMARK, 'INTERNAL'));
+      expect(JSON.stringify(priv)).not.toContain(PRIVATE_REMARK);
+      expect(JSON.stringify(priv)).not.toContain(PRIVATE_NOTE);
+      expect(priv).not.toHaveProperty('remarks');
+      expect(priv).toMatchObject({ externalRecordId: 'R-1', status: 'COMPLETED', quality: 2, mistakeCount: 2, unit: 'HALF' });
+      expect(projectFor(audience, 'export_daily_record_row', row(SHARED_REMARK, 'SHARED')).remarks).toBe(SHARED_REMARK);
+    }
+    expect(projectFor('STAFF', 'export_daily_record_row', row(PRIVATE_REMARK, 'INTERNAL')).remarks).toBe(PRIVATE_REMARK);
+  });
+});

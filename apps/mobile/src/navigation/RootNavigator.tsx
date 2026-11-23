@@ -35,6 +35,7 @@ import { HolidaysScreen, LeaveApprovalsScreen, TimetableScreen } from '../featur
 import { ParaFormScreen, QuranMetadataScreen, QuranReviewScreen, SurahFormScreen } from '../features/quran/QuranScreens.tsx';
 import { QuranReferenceScreen } from '../features/quran/QuranReferenceScreen.tsx';
 import { MoreScreen } from '../features/home/MoreScreen.tsx';
+import { ImportExportScreen } from '../features/import-export/ImportExportScreen.tsx';
 import { ProfileScreen } from '../features/profile/ProfileScreen.tsx';
 import { WorkspaceScreen } from '../features/settings/WorkspaceScreen.tsx';
 import { AppLockScreen, AppLockSetupScreen, AppLockSignInScreen } from '../features/app-lock/AppLockScreens.tsx';
@@ -84,6 +85,8 @@ type AppStack = {
   QuranMetadata: undefined;
   // F06 Quran references on this device (offline snapshot; Owner/Admin/Teacher with a workspace)
   QuranReference: undefined;
+  // F14 Excel import and export (Owner/Admin; Teacher for assigned classes). Online only.
+  ImportExport: undefined;
   SurahForm: { surah: SurahView | null };
   ParaForm: { para: ParaView | null; surahs: SurahView[] };
   QuranReview: undefined;
@@ -272,6 +275,7 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
             onHolidays={() => navigation.navigate('Holidays')}
             onQuran={() => navigation.navigate('QuranMetadata')}
             onQuranReference={() => navigation.navigate('QuranReference')}
+            onImportExport={() => navigation.navigate('ImportExport')}
           />
         )}
       </App.Screen>
@@ -392,6 +396,10 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
           {/* F06: the cached reference snapshot and the offline range check (ADR-018; plan P4). */}
           <App.Screen name="QuranReference" options={{ title: t('quranRef.title') }}>
             {() => <QuranReferenceScreen />}
+          </App.Screen>
+          {/* F14: Excel import and export (design.md §4.15). The server checks role and scope on every call. */}
+          <App.Screen name="ImportExport" options={{ title: t('importExport.title') }}>
+            {() => <ImportExportScreen me={me} />}
           </App.Screen>
           {/* F06: Quran metadata. Owner/Admin edit; a Teacher reads it with no edit controls (F06-AC2). */}
           <App.Screen name="QuranMetadata" options={{ title: t('quran.title') }}>

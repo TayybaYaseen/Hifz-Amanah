@@ -13,6 +13,7 @@ import type { Db } from '../platform/db.ts';
 import { AppError, body, parse } from '../platform/errors.ts';
 import type { MemoryMailer } from '../platform/mailer.ts';
 import { auditFaults } from '../modules/audit/audit.ts';
+import { importFaults } from '../modules/import-export/import-service.ts';
 import { decryptSecret, encryptSecret } from '../modules/identity/secrets.ts';
 import type { OrganizationService } from '../modules/organization/organization-service.ts';
 import type { SyncControl } from '../modules/sync/control-state.ts';
@@ -83,6 +84,10 @@ const NewWorkspaceInput = z.strictObject({
 });
 
 const TABLES = [
+  // F14 import jobs (they reference organizations, users, and lesson portions).
+  'import_record_keys',
+  'import_rows',
+  'import_jobs',
   // F06 Quran reference tables (mushaf_editions is a global catalogue and is not reset).
   'quran_reference_snapshots',
   'mushaf_layout_lines',
@@ -171,6 +176,7 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
         deps.mailer.clear();
         deps.logSink?.clear();
         auditFaults.failNext = false;
+        importFaults.failBatch = null;
         reportSeeder.forget();
         await seedPersonas(deps.db, deps.clock, deps.totpKey);
         return { status: 'reset' };
@@ -206,6 +212,20 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
             .execute();
         }
         return reply.status(201).send(created);
+      });
+
+      // F14-AC15: the import commit batch with this number fails after its writes, so it rolls back whole.
+      scope.post('/import/fail-batch', async (request) => {
+        importFaults.failBatch = parse(z.strictObject({ batch: z.number().int().min(1) }), request.body).batch;
+        return { status: 'armed' };
+      });
+
+      // F14-AC20: audit records of one action (import/export audits of exports have no target id), oldest first.
+      scope.get('/audit-action/:action', async (request) => {
+        const { action } = request.params as { action: string };
+        if (!/^[A-Z_]{3,64}$/.test(action)) throw new AppError('NOT_FOUND');
+        const rows = await deps.db.selectFrom('audit_logs').selectAll().where('action', '=', action).orderBy('created_at').orderBy('id').execute();
+        return { items: rows };
       });
 
       // The next audit write fails, so tests can prove the change rolls back with it (F02-AC13).
@@ -482,7 +502,7 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
 
       // ---------- F09 · Report scenarios (e2e/mobile/f09-reports) ----------
       scope.post('/reports/seed', async (request) => {
-        const { scenario } = parse(z.strictObject({ scenario: z.enum(['WEEK', 'MONTH', 'SUMMARY', 'PORTAL']) }), request.body);
+        const { scenario } = parse(z.strictObject({ scenario: z.enum(['WEEK', 'MONTH', 'SUMMARY', 'PORTAL', 'IMPORT']) }), request.body);
         return reportSeeder.seed(scenario);
       });
       // F10-AC13: admin.a publishes a period for class A1 through the real POST /reports/publish.

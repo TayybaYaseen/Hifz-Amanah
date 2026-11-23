@@ -99,7 +99,7 @@ async function loadRecords(tx: Tx, org: string, studentIds: readonly string[], p
   const attempts = portions.length
     ? await tx
         .selectFrom('portion_attempts')
-        .select(['id', 'lesson_portion_id', 'attempt_no', 'attempted_at', 'status', 'completed_unit', 'completed_num', 'completed_den', 'quality', 'no_mistakes', 'remarks', 'remarks_visibility'])
+        .select(['id', 'lesson_portion_id', 'attempt_no', 'attempted_at', 'status', 'completed_unit', 'completed_num', 'completed_den', 'quality', 'no_mistakes', 'mistake_count_summary', 'remarks', 'remarks_visibility'])
         .where('organization_id', '=', org)
         .where(
           'lesson_portion_id',
@@ -122,6 +122,8 @@ async function loadRecords(tx: Tx, org: string, studentIds: readonly string[], p
         completed: quantityOf(a.completed_unit, a.completed_num, a.completed_den),
         quality: a.quality,
         noMistakes: a.no_mistakes,
+        // F14: an imported MistakeCount, kept apart from the categories (SRS §15.1).
+        uncategorizedCount: a.mistake_count_summary,
         mistakes: (mistakes.get(a.id) ?? []).map((m) => ({ category: m.category, severity: m.severity, repeated: m.repeated, note: m.note ?? null, noteVisibility: m.noteVisibility ?? 'INTERNAL' })),
         remarks: a.remarks,
         remarksVisibility: a.remarks_visibility,

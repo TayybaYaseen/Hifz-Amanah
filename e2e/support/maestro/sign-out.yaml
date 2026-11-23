@@ -3,8 +3,13 @@ appId: com.hifzamanah.app
 ---
 - tapOn:
     id: "nav.more"
-- tapOn:
-    id: "settings.signOut"
+# Sign out is the last button on More, at the bottom of the screen, where a development build's warning toast can
+# cover it and swallow the tap; close the toast first (a no-op in release builds).
+- waitForAnimationToEnd
+- runFlow: dismiss-dev-warning.yaml
+- runFlow:
+    file: tap.yaml
+    env: { ID: "settings.signOut" }
 # Sign-out first checks the device for unsynced work and then ends the session on the server, which can take several
 # seconds on a slow emulator: wait for whichever comes first, the unsynced-changes warning or the sign-in screen.
 - extendedWaitUntil:

@@ -81,7 +81,12 @@ export type AuditAction =
   | 'GUARDIAN_VERIFIED'
   | 'GUARDIAN_LINK_REVOKED'
   | 'REPORT_PUBLISHED'
-  | 'REPORT_UNPUBLISHED';
+  | 'REPORT_UNPUBLISHED'
+  // F14 · Excel import and export (FR-XLS-008, FR-XLS-016; F14-AC20). Counts and codes only, never student details.
+  | 'IMPORT_REJECTED'
+  | 'IMPORT_PREVIEWED'
+  | 'IMPORT_COMMITTED'
+  | 'EXPORT_CREATED';
 
 export interface AuditEvent {
   organizationId: string | null;
@@ -96,7 +101,9 @@ export interface AuditEvent {
     | 'LESSON_PORTION'
     | 'PORTION_ATTEMPT'
     | 'HOMEWORK_ASSIGNMENT'
-    | 'GUARDIAN_LINK';
+    | 'GUARDIAN_LINK'
+    | 'IMPORT_JOB'
+    | 'EXPORT';
   targetId: string | null;
   summary?: Record<string, unknown>;
   at: Date;

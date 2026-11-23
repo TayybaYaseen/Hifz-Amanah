@@ -27,6 +27,10 @@ export interface RequestOptions {
   /** Bearer access token, when the call needs a session. */
   token?: string | null;
   timeoutMs?: number;
+  /** F14: raw bytes as the body (an .xlsx upload) instead of JSON. */
+  upload?: { data: Blob; contentType: string };
+  /** F14: the response body as bytes (a file download) instead of JSON. */
+  binary?: boolean;
 }
 
 export async function request<T>(baseUrl: string, fetchFn: Fetch, path: string, opts: RequestOptions = {}): Promise<T> {
@@ -35,13 +39,13 @@ export async function request<T>(baseUrl: string, fetchFn: Fetch, path: string, 
   let response: Response;
   try {
     response = await fetchFn(`${baseUrl}${path}`, {
-      method: opts.method ?? (opts.body === undefined ? 'GET' : 'POST'),
+      method: opts.method ?? (opts.body === undefined && opts.upload === undefined ? 'GET' : 'POST'),
       headers: {
-        Accept: 'application/json',
-        ...(opts.body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        Accept: opts.binary ? '*/*' : 'application/json',
+        ...(opts.upload ? { 'Content-Type': opts.upload.contentType } : opts.body === undefined ? {} : { 'Content-Type': 'application/json' }),
         ...(opts.token ? { Authorization: `Bearer ${opts.token}` } : {}),
       },
-      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+      body: opts.upload ? opts.upload.data : opts.body === undefined ? undefined : JSON.stringify(opts.body),
       signal: controller.signal,
     });
   } catch {
@@ -50,6 +54,7 @@ export async function request<T>(baseUrl: string, fetchFn: Fetch, path: string, 
     clearTimeout(timer);
   }
   if (response.status === 204) return undefined as T;
+  if (opts.binary && response.ok) return (await response.arrayBuffer()) as T;
   let payload: unknown = null;
   try {
     payload = await response.json();

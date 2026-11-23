@@ -51,6 +51,9 @@ import { registerSyncRoutes } from './modules/sync/routes.ts';
 import type { SyncScopeProvider } from './modules/sync/scope.ts';
 import { SyncService } from './modules/sync/sync-service.ts';
 import { registerTestControl, type LogSink } from './testing/control.ts';
+import { ExportService } from './modules/import-export/export-service.ts';
+import { ImportService } from './modules/import-export/import-service.ts';
+import { registerImportExportRoutes } from './modules/import-export/routes.ts';
 
 export interface AppDeps {
   config: Config;
@@ -179,6 +182,14 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     sync: new SyncService({ ...syncDeps, control: syncControl }),
     conflicts: new ConflictService(syncDeps),
     control: syncControl,
+  });
+
+  // ---------- Excel import and export (F14) ----------
+  // Imports write through the same entity handlers as sync (validation, audit, change_log, homework hooks).
+  registerImportExportRoutes(app, {
+    authenticate: (request) => auth.authenticate(bearer(request)),
+    imports: new ImportService({ db: deps.db, clock: deps.clock, registry: syncRegistry, quran: quranMetadata }),
+    exports: new ExportService(deps.db, deps.clock, reportService),
   });
 
   if (deps.config.testControlSecret) {

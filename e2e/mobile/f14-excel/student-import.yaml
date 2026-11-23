@@ -1,20 +1,96 @@
 # F14 · Excel import and export — mobile E2E (docs/specs/14-f14-excel-import-export.md; design.md §4.15)
 # Covers: F14-AC1, F14-AC2, F14-AC3, F14-AC4, F14-AC5, F14-AC11, F14-AC12
-# Workbooks are pushed to the device from e2e/fixtures/workbooks (built by the test; see workbooks.md).
+# SYNTHETIC DATA ONLY. The workbooks are put on the device by e2e/scripts/push-workbooks.mjs (run by
+# `npm run e2e:mobile` and the gate; contents in e2e/fixtures/workbooks.ts and workbooks.md) and picked in Android's
+# file picker (pick-workbook.yaml). Server messages are matched in English, except step 4, which checks they are Urdu.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
-name: F14 student import — preview, confirm, re-import, rejections
+name: F14 student import - preview, confirm, re-import, rejections
 tags:
-  - pending
   - F14
   - US-058
   - US-060
 ---
-- launchApp:
-    clearState: true
+- runFlow: ../../support/maestro/reset.yaml
+- runFlow:
+    file: ../../support/maestro/sign-in-staff.yaml
+    env: { USER_ID: admin-a }
 # 1. Sign in as admin.a → More → Import → Students → explains the template version.
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.importExport" } }
+- extendedWaitUntil:
+    visible: { id: "importExport.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.templateVersion", TEXT: ".*Students, version 1.*" } }
 # 2. Pick students-1001.xlsx → "Maximum 1,000 rows per file — split into several files".               (F14-AC2)
+- runFlow: { file: ../../support/maestro/pick-workbook.yaml, env: { FILE: students-1001.xlsx } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "importExport.error", TEXT: "Maximum 1,000 rows per file . split into several files" } }
+- assertNotVisible: { id: "import.jobTitle" }
 # 3. Pick students-missing-name.xlsx → names the expected version and the missing column.              (F14-AC3)
+- runFlow: { file: ../../support/maestro/pick-workbook.yaml, env: { FILE: students-missing-name.xlsx } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "importExport.error", TEXT: ".*StudentName.*Students.*version 1.*" } }
+- assertNotVisible: { id: "import.jobTitle" }
+- runFlow: ../../support/maestro/back-home.yaml
 # 4. Pick students-mixed.xlsx (Urdu UI) → counts per row class; errors on their row and field in Urdu;
 #    the name-only row is a suspected duplicate.                                                       (F14-AC11, F14-AC12, F14-AC5)
+#    Sheet rows: 2 new, 3 exact match, 4 name-only match of S1, 5 bad date, 6 bad status, 7–8 the same key.
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.profile" } }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+- runFlow: { file: ../../support/maestro/set-language.yaml, env: { LOCALE: ur } }
+- runFlow: ../../support/maestro/back-home.yaml
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.importExport" } }
+- extendedWaitUntil:
+    visible: { id: "importExport.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/pick-workbook.yaml, env: { FILE: students-mixed.xlsx } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.count.NEW", TEXT: ".*: 1" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.count.EXACT_MATCH", TEXT: ".*: 1" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.count.SUSPECTED_DUPLICATE", TEXT: ".*: 1" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.count.INVALID", TEXT: ".*: 4" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.count.PROPOSED_UPDATE", TEXT: ".*: 0" } }
+# Each problem on its own row and field, in Urdu script (the field name is the template's column name).
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.row.4.issue.0", TEXT: "StudentName: .*\\p{IsArabic}.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.row.5.issue.0", TEXT: "AdmissionDate: .*\\p{IsArabic}.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.row.6.issue.0", TEXT: "Status: .*\\p{IsArabic}.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.row.7.issue.0", TEXT: "ExternalStudentID: .*\\p{IsArabic}.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.row.8.issue.0", TEXT: "ExternalStudentID: .*\\p{IsArabic}.*" } }
+- runFlow: ../../support/maestro/back-home.yaml
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.profile" } }
+- runFlow: ../../support/maestro/dismiss-dev-warning.yaml
+# The profile is much taller in Urdu (larger script), longer than set-language.yaml's 20 s search covers on a slow
+# emulator: bring the picker into view first.
+- scrollUntilVisible: { element: { id: "language.option.en" }, direction: DOWN, timeout: 120000 }
+- runFlow: { file: ../../support/maestro/set-language.yaml, env: { LOCALE: en } }
+- runFlow: ../../support/maestro/back-home.yaml
 # 5. Pick students-50.xlsx → 50 new → Confirm → results: 50 created.                                   (F14-AC1)
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.importExport" } }
+- extendedWaitUntil:
+    visible: { id: "importExport.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/pick-workbook.yaml, env: { FILE: students-50.xlsx } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.count.NEW", TEXT: ".*: 50" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.count.INVALID", TEXT: ".*: 0" } }
+# Nothing is written before the explicit confirmation.
+- assertNotVisible: { id: "import.results" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "import.confirm" } }
+# The confirmation dialog is Android's own: its positive button confirms (locale-independent id).
+- extendedWaitUntil:
+    visible: { id: "android:id/button1" }
+    timeout: 10000
+- tapOn: { id: "android:id/button1" }
+- extendedWaitUntil:
+    visible: { id: "import.results" }
+    timeout: 120000
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.result.COMMITTED", TEXT: ".*: 50" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.result.FAILED", TEXT: ".*: 0" } }
 # 6. Pick students-50.xlsx again → 50 exact matches, 0 new.                                            (F14-AC4)
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "import.another" } }
+- runFlow: { file: ../../support/maestro/pick-workbook.yaml, env: { FILE: students-50.xlsx } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.count.NEW", TEXT: ".*: 0" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.count.EXACT_MATCH", TEXT: ".*: 50" } }
+# Nothing left to write, so no confirmation is offered.
+- assertNotVisible: { id: "import.confirm" }
+- runFlow: ../../support/maestro/back-home.yaml

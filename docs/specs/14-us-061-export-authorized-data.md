@@ -6,7 +6,7 @@
 | **User story** | US-061 |
 | **Feature** | [F14 · Excel import and export](14-f14-excel-import-export.md) |
 | **Epic** | EPIC 14 — Excel Import and Export ([user-stories.md](../user-stories.md)) |
-| **Status** | draft |
+| **Status** | Approved |
 | **Priority** | Not specified in the source documents (SRS, user-stories.md, feature specs). None is assigned here. |
 | **Split from** | `docs/specs/F14-excel-import-export.md` on 2026-10-30 |
 

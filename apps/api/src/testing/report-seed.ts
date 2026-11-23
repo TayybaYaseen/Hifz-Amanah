@@ -17,6 +17,9 @@
 // - PORTAL (F10): last week — S1 Mon Present, Sabqi Para 4 Partial 1/2 (quality 2, a remark "Private to staff") and
 //   Para 5 Completed (quality 1, a remark "Visible to student/guardian"); S2 Mon Present, Manzil Para 1 Completed.
 // `publish` publishes a period for class A1 as admin.a through POST /reports/publish (F10-AC13).
+// - IMPORT (F14, e2e/mobile/f14-excel): attendance only — S1 and S2 (Hifz A1) and S3 (Hifz A2) Present last week's
+//   Monday, marked by admin.a, so the DailyRecords workbook that e2e/scripts/push-workbooks.mjs dates that Monday
+//   imports onto it (an import never creates attendance; F14-plan §2.1). Returns { date }.
 import type { FastifyInstance } from 'fastify';
 import { v7 as uuidv7 } from 'uuid';
 import { weekOf } from '@hifz/domain/calendar';
@@ -39,7 +42,7 @@ export interface ReportSeedDeps {
   secret: string;
 }
 
-export type ReportScenario = 'WEEK' | 'MONTH' | 'SUMMARY' | 'PORTAL';
+export type ReportScenario = 'WEEK' | 'MONTH' | 'SUMMARY' | 'PORTAL' | 'IMPORT';
 
 /** The PORTAL scenario's two remarks (synthetic). */
 export const PORTAL_PRIVATE_REMARK = 'Synthetic F10 private remark';
@@ -90,10 +93,11 @@ export class ReportSeeder {
     const org = await this.deps.db.selectFrom('organizations').select(['id', 'timezone']).where('code', '=', 'ALIF').executeTakeFirst();
     if (!org) throw new AppError('NOT_FOUND');
     const cls = await this.deps.db.selectFrom('classes').select('id').where('organization_id', '=', org.id).where('name', '=', fixtureClasses.A1.name).executeTakeFirst();
+    const a2 = await this.deps.db.selectFrom('classes').select('id').where('organization_id', '=', org.id).where('name', '=', fixtureClasses.A2.name).executeTakeFirst();
     const students = await this.deps.db.selectFrom('students').select(['id', 'external_student_id']).where('organization_id', '=', org.id).execute();
     const sid = (ext: string) => students.find((s) => s.external_student_id === ext)?.id ?? '';
-    if (!cls) throw new AppError('NOT_FOUND');
-    return { classId: cls.id, S1: sid('EXT-A-001'), S2: sid('EXT-A-002'), today: calendarDateIn(this.deps.clock.now(), org.timezone) };
+    if (!cls || !a2) throw new AppError('NOT_FOUND');
+    return { classId: cls.id, classA2: a2.id, S1: sid('EXT-A-001'), S2: sid('EXT-A-002'), S3: sid('EXT-A-003'), today: calendarDateIn(this.deps.clock.now(), org.timezone) };
   }
 
   private mark(classId: string, studentId: string, date: string, status: string, leaveReason: string | null = null) {
@@ -204,6 +208,12 @@ export class ReportSeeder {
       await this.recite(teacher, mon, { section: 'SABAQ', range: { surahStart: 2, ayahStart: 1, surahEnd: 2, ayahEnd: 20 }, totalLines: 10, assigned: lines(10) }, { status: 'COMPLETED', completed: lines(10), quality: 1 });
       await this.push(teacher, [this.mark(ids.classId, ids.S2, d(0), 'LATE'), this.mark(ids.classId, ids.S2, d(1), 'ABSENT')]);
       return { from: d(0), to: d(6) };
+    }
+
+    if (scenario === 'IMPORT') {
+      const admin = await this.signIn('admin-a');
+      await this.push(admin, [this.mark(ids.classId, ids.S1, d(0), 'PRESENT'), this.mark(ids.classId, ids.S2, d(0), 'PRESENT'), this.mark(ids.classA2, ids.S3, d(0), 'PRESENT')]);
+      return { date: d(0) };
     }
 
     // MONTH: the first class days (Monday–Saturday) of last month.

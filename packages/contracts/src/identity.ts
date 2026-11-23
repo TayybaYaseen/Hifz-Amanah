@@ -98,6 +98,13 @@ export const ERROR_CODES = [
   // Student and Parent access (F10; plan docs/handover/F10-plan.md).
   /** 409: publishing was refused; `fields.reason` is a PUBLISH_REFUSALS code (portal.ts, F10-AC14). */
   'PUBLISH_REFUSED',
+  // Excel import and export (F14; plan docs/handover/F14-plan.md).
+  /** 422: the workbook was refused before any row was processed; `fields.reason` is a WORKBOOK_REJECTIONS code. */
+  'WORKBOOK_REJECTED',
+  /** 422: an export would hold more than 1,000 students or records (FR-XLS-017); narrow the filters. */
+  'EXPORT_TOO_LARGE',
+  /** 409: the import job is not in a state that allows this (already committing, or its values were purged). */
+  'IMPORT_STATE',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

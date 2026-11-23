@@ -177,7 +177,38 @@ const FAMILY_PROJECTIONS: Readonly<Record<string, (fields: Fields) => Record<str
   published_report: familyPublishedReport,
   published_period: familyPublishedPeriod,
   portal_student: (f) => ({ id: f.id, name: f.name }),
+  export_daily_record_row: familyExportRow,
 };
+
+/**
+ * One DailyRecords export row for a student/guardian file (F14-AC17, FR-XLS-007, BR-13): the portion, its result, and
+ * the mistake count; the remark only when the Teacher shared it. Never an internal note.
+ */
+function familyExportRow(f: Fields): Record<string, unknown> {
+  const out: Record<string, unknown> = {
+    externalRecordId: f.externalRecordId,
+    externalStudentId: f.externalStudentId,
+    recordDate: f.recordDate,
+    sessionLabel: f.sessionLabel,
+    section: f.section,
+    position: f.position,
+    paraNumber: f.paraNumber,
+    surahStart: f.surahStart,
+    ayahStart: f.ayahStart,
+    surahEnd: f.surahEnd,
+    ayahEnd: f.ayahEnd,
+    totalLines: f.totalLines,
+    assigned: f.assigned,
+    completed: f.completed,
+    unit: f.unit,
+    mistakeCount: f.mistakeCount,
+    status: f.status,
+    quality: f.quality,
+  };
+  const remarks = textForFamily(f.remarks, f.remarksVisibility);
+  if (remarks !== null) out.remarks = remarks;
+  return out;
+}
 
 /**
  * Returns the fields of one `entity` row that `audience` may receive. STAFF (Owner, Admin, assigned Teacher;

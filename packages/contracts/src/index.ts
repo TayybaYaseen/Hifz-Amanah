@@ -9,3 +9,4 @@ export * from './hifz.ts';
 export * from './homework.ts';
 export * from './reports.ts';
 export * from './portal.ts';
+export * from './import-export.ts';

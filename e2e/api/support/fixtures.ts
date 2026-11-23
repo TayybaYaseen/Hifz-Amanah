@@ -37,6 +37,10 @@ export interface TestControl {
   createWorkspace(input: { name: string; code: string; ownerLoginId: string; kind?: 'MADRASA' | 'INDIVIDUAL' }): Promise<{ organizationId: string; ownerUserId: string }>;
   /** The next audit write fails (F02-AC13). Cleared by reset. */
   failNextAuditWrite(): Promise<void>;
+  /** F14-AC15: that import commit batch fails after its writes and rolls back. Cleared by reset. */
+  failImportBatch(batch: number): Promise<void>;
+  /** F14-AC20: audit records of one action, oldest first. */
+  auditForAction(action: string): Promise<Array<Record<string, unknown>>>;
   totpFor(who: Who): Promise<string>;
   userIdOf(who: Who): Promise<string>;
   /** Counts a string in every database table and in the captured API logs. */
@@ -146,6 +150,8 @@ export const test = base.extend<Fixtures>({
       auditForTarget: async (target) => (await json(await ctx.get(`audit-target/${encodeURIComponent(target)}`))).items,
       createWorkspace: async ({ ownerLoginId, ...rest }) => json(await ctx.post('organizations', { data: { ...rest, owner: { loginId: ownerLoginId } } })),
       failNextAuditWrite: async () => void (await json(await ctx.post('audit/fail-next'))),
+      failImportBatch: async (batch) => void (await json(await ctx.post('import/fail-batch', { data: { batch } }))),
+      auditForAction: async (action) => (await json(await ctx.get(`audit-action/${encodeURIComponent(action)}`))).items,
       totpFor: async (who) => (await json(await ctx.get(`totp/${id(who)}`))).code,
       userIdOf: async (who) => (await json(await ctx.get(`users/${id(who)}`))).id,
       search: async (text) => json(await ctx.post('search', { data: { text } })),

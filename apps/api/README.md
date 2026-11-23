@@ -447,6 +447,39 @@ session with `401 SESSION_EXPIRED`.
   ([`src/modules/sync/change-log.ts`](src/modules/sync/change-log.ts)).
 - Request bodies are never logged, so operation fields and note bodies never reach the logs.
 
+## Import and export routes (F14)
+
+Contract: [`packages/contracts/src/import-export.ts`](../../packages/contracts/src/import-export.ts); code in
+[`src/modules/import-export`](src/modules/import-export); tables in `migrations/0017_import_export.sql` (`import_jobs`,
+`import_rows`, `import_record_keys`, and `portion_attempts.mistake_count_summary`; RLS forced, no DELETE). Plan:
+[F14-plan](../../docs/handover/F14-plan.md). Online only, staff only (Owner, Admin, Teacher for assigned classes); the
+tenant is always the caller's membership and any organization column in a workbook is ignored (FR-XLS-015).
+
+| Route | Body / query | Result |
+|---|---|---|
+| `POST /imports` | `?template=Students\|DailyRecords&locale?`; body: the `.xlsx` bytes (`Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` or `application/octet-stream`, at most 5 MB) | `201 ImportJobView` in `PREVIEWED`, mode `ADD_ONLY`, with counts per class (`NEW`, `EXACT_MATCH`, `SUSPECTED_DUPLICATE`, `INVALID`, `PROPOSED_UPDATE`) and `ignoredColumns`. `422 WORKBOOK_REJECTED` with `fields.reason` (`NOT_XLSX`, `FILE_TOO_LARGE`, `NO_META`, `UNKNOWN_TEMPLATE`, `WRONG_TEMPLATE`, `WRONG_VERSION`, `NO_SHEET`, `MISSING_COLUMN`, `NO_ROWS`, `TOO_MANY_ROWS`), the expected `template`/`version`, the `column`, and a localized `message`; nothing is stored but an `IMPORT_REJECTED` audit |
+| `GET /imports/:id` | `locale?` | `200 ImportJobView`. The uploader, or Owner/Admin; anyone else `404` |
+| `GET /imports/:id/rows` | `classification?`, `result?`, `offset`, `limit` (≤ 1,000), `locale?` | `200 { items: ImportRowView[], total }`: each row's class, issues (`column`, `code`, `severity`, localized `message`), field `changes` (before/after), batch, and result |
+| `PUT /imports/:id/mode` | `{ mode: ADD_ONLY \| UPDATE }` | `200 ImportJobView`: the preview again in that mode. Writes no record. `409 IMPORT_STATE` once confirmed or expired |
+| `POST /imports/:id/confirm` | `{ mode }` (must be the previewed mode) | `200 ImportJobView` `COMMITTED` or `PARTIALLY_FAILED` with `resultCounts`. Batches of 200 rows (a daily record is never split); each batch re-checks its rows and commits in one transaction. Calling it again on a `PARTIALLY_FAILED` job commits only rows not yet committed. Audited `IMPORT_COMMITTED` (counts only) |
+| `GET /imports/templates/:template` | `locale?` | `200` a blank `.xlsx`: an About sheet (template, version, column guide, examples), the data sheet header, and the hidden `_meta` |
+| `GET /exports/students` | `classId?`, `status=ACTIVE\|INACTIVE\|ALL`, `includeNotes?`, `locale?` | `200` the Students template, in the caller's scope. Notes only with `includeNotes=true`. `422 EXPORT_TOO_LARGE` over 1,000 students |
+| `GET /exports/daily-records` | `from`, `to`, `classId?`, `studentId?`, `audience=STAFF\|FAMILY`, `includeNotes?`, `locale?` | `200` the DailyRecords template, one row per portion (its latest attempt); `ExternalRecordID` is the imported key or the portion id, so the file can be imported back in update mode. `FAMILY` goes through `projectFor('PARENT', 'export_daily_record_row')`: no internal note. `422` over 1,000 rows |
+| `GET /exports/report` | `classId`, `kind=WEEK\|MONTH`, `date?`, `locale?` | `200` the class report rows (as the class summary) with the period, timezone, filters, generation time, and `PendingOfflineChanges=false` on the About and `_meta` sheets |
+
+- **Data only:** formulas are read as their saved value (none saved → `FORMULA_NO_VALUE`); macros never run. Exported text
+  cells starting with `= + - @ \t \r` are prefixed with `'` (read back without it on import).
+- **Students:** identity only by `ExternalStudentID`; a name match without one is `SUSPECTED_DUPLICATE` (never linked).
+  A new student needs `ClassName`; a Teacher's rows for other classes are `INVALID NOT_YOUR_CLASS`. No login accounts.
+  Update mode changes name, admission date, notes, and (Owner/Admin) status; never the class.
+- **DailyRecords:** rows of one student, date, and session form one daily record. New rows are dry-run through the F05
+  sync handlers at preview and written through them at commit (`src/modules/sync/server-apply.ts`): the same scope,
+  enrollment, attendance (Present/Late/Half day must already be marked), class-day, report-mode, Quran-range, and quantity
+  rules as Daily Entry, with the same audits and `change_log` entries (devices pull them). Sabaq needs a range, `TotalLines`,
+  and `LINES` ("Sabaq uses lines"). `MistakeCount` → `mistake_count_summary` (uncategorized). Update mode (key
+  `ExternalRecordID`) corrects only the latest attempt's status, completed, quality, MistakeCount, and TeacherNotes.
+- **Retention:** row values are purged 7 days after upload (NFR-PRV-005); an unconfirmed job then becomes `EXPIRED`.
+
 ## Test control (non-production only)
 
 Enabled when `TEST_CONTROL_SECRET` is set (the E2E server sets `local-e2e-control-secret` unless overridden; E2E
@@ -477,6 +510,10 @@ F10 seeds each Student persona's login link and each Parent persona's links (VER
 assigns the fixture Teachers from the enrollment date, and adds:
 - `POST /__test/reports/seed { scenario: 'PORTAL' }` (with the F09 scenarios): last week with a private and a shared remark.
 - `POST /__test/reports/publish { kind?, date? }`: admin.a publishes that period for class Hifz A1 through the real route.
+
+F14 adds:
+- `POST /__test/import/fail-batch { batch }`: that import commit batch fails after its writes and rolls back (F14-AC15).
+  A reset clears it.
 
 F06 adds:
 - `POST /__test/quran/seed { organizationCode, seed? }`: applies a **synthetic** Quran seed (default: the fixture in
