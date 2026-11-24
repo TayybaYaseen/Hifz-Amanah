@@ -28,6 +28,8 @@ import { DailyRecordScreen } from '../features/daily-entry/DailyRecordScreen.tsx
 import { HomeworkEditScreen, type HomeworkEditParams } from '../features/homework/HomeworkEditScreen.tsx';
 import { HomeworkScreen } from '../features/homework/HomeworkScreen.tsx';
 import { ReportsScreen } from '../features/reports/ReportsScreen.tsx';
+import { AnalyticsScreen, type AnalyticsParams } from '../features/analytics/AnalyticsScreen.tsx';
+import { AiSettingsScreen } from '../features/settings/AiSettingsScreen.tsx';
 import { PortalReportScreen } from '../features/portal/PortalReportScreen.tsx';
 import { PortalScreen } from '../features/portal/PortalScreen.tsx';
 import { FamilyAccessScreen } from '../features/students/FamilyAccessScreen.tsx';
@@ -78,6 +80,9 @@ type AppStack = {
   HomeworkEdit: HomeworkEditParams;
   // F09 weekly/monthly reports and the class summary (Owner, Admin, Teacher; provisional offline)
   Reports: undefined;
+  // F15 analytics (Owner, Admin, Teacher; provisional offline) and AI settings (Owner/Admin).
+  Analytics: AnalyticsParams | undefined;
+  AiSettings: undefined;
   LeaveApprovals: undefined;
   Holidays: undefined;
   Timetable: { klass: ClassResponse };
@@ -276,6 +281,8 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
             onQuran={() => navigation.navigate('QuranMetadata')}
             onQuranReference={() => navigation.navigate('QuranReference')}
             onImportExport={() => navigation.navigate('ImportExport')}
+            onAnalytics={() => navigation.navigate('Analytics', {})}
+            onAiSettings={() => navigation.navigate('AiSettings')}
           />
         )}
       </App.Screen>
@@ -283,7 +290,7 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
         {() => <ProfileScreen me={me} />}
       </App.Screen>
       <App.Screen name="Workspace" options={{ title: t('workspace.title') }}>
-        {() => <WorkspaceScreen />}
+        {({ navigation }) => <WorkspaceScreen {...(staff ? { onAiSettings: () => navigation.navigate('AiSettings') } : {})} />}
       </App.Screen>
       {OFFLINE_ROLES.includes(me.role) ? (
         <>
@@ -338,7 +345,18 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
           </App.Screen>
           {/* F09 · Reports: weekly and monthly, class summary (US-039…043, US-073). */}
           <App.Screen name="Reports" options={{ title: t('reports.title') }}>
-            {({ navigation }) => <ReportsScreen onSyncQueue={() => navigation.navigate('SyncQueue')} />}
+            {({ navigation }) => <ReportsScreen onSyncQueue={() => navigation.navigate('SyncQueue')} onAnalytics={(p) => navigation.navigate('Analytics', p)} />}
+          </App.Screen>
+          {/* F15 · Analytics (US-062, US-063). Never registered for Students or Parents (F15-AC9). */}
+          <App.Screen name="Analytics" options={{ title: t('analytics.title') }}>
+            {({ navigation, route }) => (
+              <AnalyticsScreen
+                me={me}
+                params={route.params ?? {}}
+                onSyncQueue={() => navigation.navigate('SyncQueue')}
+                onOpenAiSettings={() => (staff ? navigation.navigate('AiSettings') : undefined)}
+              />
+            )}
           </App.Screen>
           <App.Screen name="SyncQueue" options={{ title: t('syncQueue.title') }}>
             {({ navigation }) => <SyncQueueScreen onReview={(conflictId) => navigation.navigate('ConflictReview', { conflictId })} />}
@@ -448,6 +466,10 @@ function SignedInNavigator({ me }: { me: MeResponse }) {
       ) : null}
       {staff ? (
         <>
+          {/* F15 · Settings → AI (US-064, US-065). Owner/Admin only; the server enforces it too. */}
+          <App.Screen name="AiSettings" options={{ title: t('aiSettings.title') }}>
+            {() => <AiSettingsScreen role={me.role} />}
+          </App.Screen>
           <App.Screen name="LeaveApprovals" options={{ title: t('leave.title') }}>
             {() => <LeaveApprovalsScreen />}
           </App.Screen>

@@ -50,7 +50,11 @@ interface Summary {
   period: ReportPeriod | StudentReportView['period'];
 }
 
-export function ReportsScreen({ onSyncQueue }: { onSyncQueue: () => void }) {
+export function ReportsScreen({ onSyncQueue, onAnalytics }: {
+  onSyncQueue: () => void;
+  /** F15: "View analytics" for the chosen student and period. */
+  onAnalytics?: (p: { classId: string; studentId: string; kind: PeriodKind; anchor: string }) => void;
+}) {
   const { t } = useTranslation();
   const { session } = useSession();
   const sync = useSync();
@@ -567,6 +571,9 @@ ${t('portal.updatedOn', { time: formatTime(own.updatedAt, true) })}` : ''}
 
       {loading ? <AppText color={colors.textSecondary} testID="reports.loading">{t('common.loading')}</AppText> : null}
       {!loading && shown && mode === 'STUDENT' && report ? studentBody(report.data, report.source) : null}
+      {onAnalytics && mode === 'STUDENT' && classId && studentId ? (
+        <Button testID="reports.viewAnalytics" variant="secondary" label={t('reports.viewAnalytics')} onPress={() => onAnalytics({ classId, studentId, kind, anchor })} />
+      ) : null}
       {!loading && shown && mode === 'CLASS' && summary ? summaryBody(summary.data, summary.source) : null}
       {!loading && shown && classId && (mode === 'CLASS' || studentId) ? publishPanel() : null}
     </AppScreen>

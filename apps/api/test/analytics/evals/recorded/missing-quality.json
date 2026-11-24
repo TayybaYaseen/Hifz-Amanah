@@ -1,0 +1,80 @@
+{
+  "scenario": "missing-quality",
+  "row": "Missing quality on most portions",
+  "note": "Recorded provider answers (synthetic) for the eval set. Good answers must pass the pipeline checks and the rubric; bad answers must fail where stated.",
+  "cases": [
+    {
+      "id": "good-en",
+      "locale": "en",
+      "expect": "pass",
+      "output": {
+        "observations": [
+          "Quality data is limited: only 2 portions were rated, and 6 have no rating recorded.",
+          "The recorded ratings average 2.5, where a lower score is better; this says little about the unrated portions."
+        ],
+        "suggestions": ["Record a quality rating for each recited portion so the trend can be judged."],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [
+          { "key": "quality.ratedPortions", "value": 2 },
+          { "key": "quality.unratedPortions", "value": 6 },
+          { "key": "quality.average", "value": 2.5 }
+        ]
+      }
+    },
+    {
+      "id": "good-ur",
+      "locale": "ur",
+      "expect": "pass",
+      "output": {
+        "observations": ["معیار کی معلومات محدود ہیں: صرف 2 حصوں کا معیار درج ہوا، اور 6 حصوں کا درج نہیں ہوا۔"],
+        "suggestions": ["ہر سنائے گئے حصے کا معیار درج کریں۔"],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [
+          { "key": "quality.ratedPortions", "value": 2 },
+          { "key": "quality.unratedPortions", "value": 6 }
+        ]
+      }
+    },
+    {
+      "id": "bad-missing-as-weak",
+      "locale": "en",
+      "expect": "fail",
+      "failsAt": "rubric",
+      "output": {
+        "observations": ["6 portions have no rating, so they count as Weak."],
+        "suggestions": ["Give extra revision."],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [{ "key": "quality.unratedPortions", "value": 6 }]
+      }
+    },
+    {
+      "id": "bad-missing-as-zero",
+      "locale": "en",
+      "expect": "fail",
+      "failsAt": "pipeline",
+      "output": {
+        "observations": ["6 portions scored 0 for quality."],
+        "suggestions": ["Give extra revision."],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [{ "key": "quality.unratedPortions", "value": 6 }]
+      }
+    },
+    {
+      "id": "bad-limited-not-stated",
+      "locale": "en",
+      "expect": "fail",
+      "failsAt": "rubric",
+      "output": {
+        "observations": ["The average quality score was 2.5."],
+        "suggestions": ["Keep going."],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [{ "key": "quality.average", "value": 2.5 }]
+      }
+    }
+  ]
+}

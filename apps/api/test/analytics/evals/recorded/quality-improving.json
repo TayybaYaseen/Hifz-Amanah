@@ -1,0 +1,163 @@
+{
+  "scenario": "quality-improving",
+  "row": "Quality average went from 3.2 to 2.1 (lower is better)",
+  "note": "Recorded provider answers (synthetic) for the eval set. Good answers must pass the pipeline checks and the rubric; bad answers must fail where stated.",
+  "cases": [
+    {
+      "id": "good-en",
+      "locale": "en",
+      "expect": "pass",
+      "output": {
+        "observations": [
+          "The average quality score went from 3.2 in the first half of the month to 2.1 in the second half.",
+          "On this scale a lower score is better, so this is a clear improvement."
+        ],
+        "suggestions": ["Keep the current revision routine and note what helped."],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [
+          { "key": "quality.firstHalfAverage", "value": 3.2 },
+          { "key": "quality.secondHalfAverage", "value": 2.1 }
+        ]
+      }
+    },
+    {
+      "id": "good-ur",
+      "locale": "ur",
+      "expect": "pass",
+      "output": {
+        "observations": ["معیار کا اوسط مہینے کے پہلے حصے میں 3.2 تھا اور دوسرے حصے میں 2.1 ہو گیا۔", "اس پیمانے پر کم نمبر بہتر ہے، اس لیے یہ بہتری ہے۔"],
+        "suggestions": ["دہرائی کا یہی طریقہ جاری رکھیں۔"],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [
+          { "key": "quality.firstHalfAverage", "value": 3.2 },
+          { "key": "quality.secondHalfAverage", "value": 2.1 }
+        ]
+      }
+    },
+    {
+      "id": "good-ur-urdu-digits",
+      "locale": "ur",
+      "expect": "pass",
+      "output": {
+        "observations": ["معیار کا اوسط ۳٫۲ سے ۲٫۱ ہو گیا؛ کم نمبر بہتر ہے، اس لیے یہ بہتری ہے۔"],
+        "suggestions": ["دہرائی کا یہی طریقہ جاری رکھیں۔"],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [
+          { "key": "quality.firstHalfAverage", "value": 3.2 },
+          { "key": "quality.secondHalfAverage", "value": 2.1 }
+        ]
+      }
+    },
+    {
+      "id": "good-ur-Latn",
+      "locale": "ur-Latn",
+      "expect": "pass",
+      "output": {
+        "observations": ["Mayaar ka ausat pehle hisse mein 3.2 aur doosre hisse mein 2.1 raha.", "Kam number behtar hai, is liye yeh behtari hai."],
+        "suggestions": ["Dohrai ka yehi tareeqa jaari rakhein."],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [
+          { "key": "quality.firstHalfAverage", "value": 3.2 },
+          { "key": "quality.secondHalfAverage", "value": 2.1 }
+        ]
+      }
+    },
+    {
+      "id": "bad-called-decline",
+      "locale": "en",
+      "expect": "fail",
+      "failsAt": "rubric",
+      "output": {
+        "observations": ["Quality declined: the average score dropped from 3.2 to 2.1."],
+        "suggestions": ["Find out why the scores fell."],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [
+          { "key": "quality.firstHalfAverage", "value": 3.2 },
+          { "key": "quality.secondHalfAverage", "value": 2.1 }
+        ]
+      }
+    },
+    {
+      "id": "bad-higher-is-better",
+      "locale": "en",
+      "expect": "fail",
+      "failsAt": "rubric",
+      "output": {
+        "observations": ["A higher quality score is better, so going from 3.2 to 2.1 means the student got worse."],
+        "suggestions": ["Give extra revision."],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [
+          { "key": "quality.firstHalfAverage", "value": 3.2 },
+          { "key": "quality.secondHalfAverage", "value": 2.1 }
+        ]
+      }
+    },
+    {
+      "id": "bad-uncited-3-to-2",
+      "locale": "en",
+      "expect": "fail",
+      "failsAt": "pipeline",
+      "output": {
+        "observations": ["Quality improved from 3 to 2."],
+        "suggestions": ["Keep going."],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": []
+      }
+    },
+    {
+      "id": "bad-ur-decline",
+      "locale": "ur",
+      "expect": "fail",
+      "failsAt": "rubric",
+      "output": {
+        "observations": ["معیار خراب ہوا: اوسط 3.2 سے 2.1 ہو گیا۔"],
+        "suggestions": ["زیادہ دہرائی کرائیں۔"],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [
+          { "key": "quality.firstHalfAverage", "value": 3.2 },
+          { "key": "quality.secondHalfAverage", "value": 2.1 }
+        ]
+      }
+    },
+    {
+      "id": "bad-ur-answered-in-english",
+      "locale": "ur",
+      "expect": "fail",
+      "failsAt": "pipeline",
+      "output": {
+        "observations": ["The average quality score went from 3.2 to 2.1, which is an improvement because lower is better."],
+        "suggestions": ["Keep the current revision routine."],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [
+          { "key": "quality.firstHalfAverage", "value": 3.2 },
+          { "key": "quality.secondHalfAverage", "value": 2.1 }
+        ]
+      }
+    },
+    {
+      "id": "bad-ur-Latn-decline",
+      "locale": "ur-Latn",
+      "expect": "fail",
+      "failsAt": "rubric",
+      "output": {
+        "observations": ["Mayaar kharab hua: ausat 3.2 se 2.1 ho gaya."],
+        "suggestions": ["Zyada dohrai karayein."],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [
+          { "key": "quality.firstHalfAverage", "value": 3.2 },
+          { "key": "quality.secondHalfAverage", "value": 2.1 }
+        ]
+      }
+    }
+  ]
+}

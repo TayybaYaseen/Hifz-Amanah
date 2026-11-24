@@ -1,6 +1,6 @@
 # F15 · Analytics and AI recommendations
 
-**Status:** draft
+**Status:** Approved
 **Brief:** [00-product-brief.md](../00-product-brief.md) · **Flow:** Analytics (design gap; uses [design.md §5.8](../design.md)); Settings → AI (design gap, Admin only)
 **Requirements:** FR-AI-001…012, NFR-AI-001…004, NFR-OFF-008, FR-AI-013/014
 **Stories:** US-062 – US-065 · **Depends on:** F09

@@ -6,7 +6,7 @@
 | **User story** | US-065 |
 | **Feature** | [F15 · Analytics and AI recommendations](15-f15-analytics-ai.md) |
 | **Epic** | EPIC 15 — Analytics and AI ([user-stories.md](../user-stories.md)) |
-| **Status** | draft |
+| **Status** | Approved |
 | **Priority** | Not specified in the source documents (SRS, user-stories.md, feature specs). None is assigned here. |
 | **Split from** | `docs/specs/F15-analytics-ai.md` on 2026-10-30 |
 

@@ -11,7 +11,8 @@ import { AppScreen, AppText, Button, Card, Field, Notice } from '../../component
 import { colors, radius, space, touch } from '../../theme/tokens.ts';
 import { ReportModeControl } from './ReportModeControl.tsx';
 
-export function WorkspaceScreen() {
+/** `onAiSettings` is passed for Owner/Admin only (F15 Settings → AI). */
+export function WorkspaceScreen({ onAiSettings }: { onAiSettings?: () => void } = {}) {
   const { t } = useTranslation();
   const { session } = useSession();
   const [settings, setSettings] = useState<OrganizationSettingsResponse | null>(null);
@@ -136,6 +137,8 @@ export function WorkspaceScreen() {
       </AppText>
       {/* F05 (US-019): its own endpoint and Save, with the conflict list (F05-AC8). Owner/Admin only (F05-AC9). */}
       <ReportModeControl saved={settings.dailyReportMode} onSaved={(mode) => setSettings((s) => (s ? { ...s, dailyReportMode: mode } : s))} />
+      {/* F15 (US-064, US-065): Settings → AI, below Daily reports. */}
+      {onAiSettings ? <Button testID="workspace.aiSettings" variant="secondary" label={t('workspace.aiSettings')} onPress={onAiSettings} /> : null}
       <Button testID="workspace.save" label={t('common.save')} busyLabel={t('common.saving')} busy={busy} onPress={() => void save()} />
     </AppScreen>
   );

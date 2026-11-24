@@ -1,21 +1,164 @@
 # F15 · Analytics and AI recommendations — mobile E2E (docs/specs/15-f15-analytics-ai.md; design.md §13 US-062…063)
 # Covers: F15-AC1, F15-AC2, F15-AC3, F15-AC4, F15-AC5, F15-AC6
-# The API runs with the AI provider stub.
+# The API runs with the AI provider stub (test-stub; the launch provider is Deferred, SRS §17 DEC-B45).
+# SYNTHETIC DATA ONLY: control.js analyticsSeed — S1 last week, Sabqi Para 5 Monday–Saturday, ratings 4, 4, 3, none,
+# 2, 1 (a falling average = improvement; Thursday is a gap), a Tajweed mistake on Monday and Tuesday.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F15 analytics — offline provisional, AI online, AI failure
 tags:
-  - pending
   - F15
   - US-062
   - US-063
 ---
-- launchApp:
-    clearState: true
-# 1. Sign in as teacher.a1; go offline; save one entry for S1 → Analytics S1:
-#    metrics shown, "Provisional", last sync time, 1 pending change.                                   (F15-AC1, F15-AC2)
-# 2. Quality trend: 1 · Excellent at the top, 5 · Weak at the bottom, gaps for missing ratings;
-#    a falling average is described as improvement.                                                    (F15-AC3)
-# 3. AI button says "AI needs a connection"; no AI text shown.                                         (F15-AC5)
-# 4. Go online → Get AI recommendations → area labelled "AI suggestion — review required"
-#    with date range and metrics, styled apart from metrics.                                           (F15-AC4)
-# 5. Stub set to timeout → "AI unavailable — try again later"; save a Daily Entry and open a report → both work. (F15-AC6)
+- runFlow: ../../support/maestro/reset.yaml
+- runFlow: ../../support/maestro/ensure-class-day.yaml
+- runScript: { file: ../../support/maestro/control.js, env: { ACTION: quranSeed } }
+- runScript: { file: ../../support/maestro/control.js, env: { ACTION: analyticsSeed } }
+- runScript: { file: ../../support/maestro/control.js, env: { ACTION: aiSettings, ENABLED: "true" } }
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+# Online first (this also caches the roster the device needs offline): last week's metrics from the source records.  (F15-AC1)
+- runFlow:
+    file: ../../support/maestro/analytics-open.yaml
+    env: { STUDENT: EXT-A-001, PREV: "1" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.range", TEXT: ".*${output.analytics.from}.*${output.analytics.to}.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.progress.SABQI.PARA", TEXT: ".*6.*of.*6.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.mistakes.category.TAJWEED", TEXT: ".*Tajweed.*: .*2.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.attendance" }
+# 2. Quality trend: 1 · Excellent at the top, 5 · Weak at the bottom, a gap for the unrated Thursday; the falling
+#    average (4.0 → 1.5) is described as improvement.                                                  (F15-AC3)
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.quality.average", TEXT: ".*2[.]8.*Average.*5 ratings.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.quality.trend", TEXT: ".*Improving.*4[.]0.*1[.]5.*lower is better.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.quality.axisTop", TEXT: "1 · Excellent" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.quality.axisBottom", TEXT: "5 · Weak" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.quality.gap.${output.analytics.gapIndex}" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.quality.point.1" }
+# The server's figures are authoritative: no "Provisional" label online with nothing waiting.
+- assertNotVisible: { id: "analytics.provisional" }
+- runFlow: ../../support/maestro/back-home.yaml
+# 1. Go offline; save one entry for S1 today → Analytics S1 this week: metrics from local data, "Provisional", the last
+#    sync time, and the pending changes.                                                               (F15-AC1, F15-AC2)
+- runFlow: ../../support/maestro/go-offline.yaml
+- runFlow:
+    file: ../../support/maestro/daily-start.yaml
+    env: { STUDENT: EXT-A-001 }
+- runFlow:
+    file: ../../support/maestro/daily-revision-portion.yaml
+    env: { SECTION: sabqi, N: "1", PARA: "6", UNIT: COMPLETE, STATUS: COMPLETED, COMPLETED: "" }
+- runFlow: ../../support/maestro/daily-save.yaml
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow:
+    file: ../../support/maestro/analytics-open.yaml
+    env: { STUDENT: EXT-A-001, PREV: "" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.provisional" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.provisional.lastSync" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.provisional.pending", TEXT: ".*Changes waiting to sync: [1-9].*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.progress.SABQI" }
+# 3. Offline, the AI button says "AI needs a connection", and no AI text is shown or invented.        (F15-AC5)
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.ai.offline", TEXT: ".*AI needs a connection.*" }
+- assertNotVisible: { id: "analytics.ai.observation.1" }
+- assertNotVisible: { id: "analytics.ai.range" }
+- runFlow: ../../support/maestro/back-home.yaml
+# 4. Online again (the entry syncs) → last week → Get AI recommendations: a separate area labelled "AI suggestion —
+#    review required" with the date range and the metrics used.                                        (F15-AC4)
+- runFlow: ../../support/maestro/go-online.yaml
+- runFlow:
+    file: ../../support/maestro/analytics-open.yaml
+    env: { STUDENT: EXT-A-001, PREV: "1" }
+- assertNotVisible: { id: "analytics.provisional" }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "analytics.ai.button" }
+- extendedWaitUntil:
+    visible: { id: "analytics.ai.range" }
+    timeout: 60000
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.ai.label", TEXT: "AI suggestion — review required" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.ai.range", TEXT: ".*${output.analytics.from}.*${output.analytics.to}.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.ai.metrics" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.ai.observation.1" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.ai.disclaimer" }
+# The AI area is its own panel, apart from the calculated metrics, which stay on screen.
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.ai.panel" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.quality.average", TEXT: ".*2[.]8.*" }
+# 5. Stub set to timeout → "AI unavailable — try again later"; the metrics stay; then a Daily Entry saves and a report
+#    opens.                                                                                            (F15-AC6)
+- runScript: { file: ../../support/maestro/control.js, env: { ACTION: aiStub, MODE: timeout } }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "analytics.ai.button" }
+- extendedWaitUntil:
+    visible: { id: "analytics.ai.unavailable" }
+    timeout: 60000
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.ai.unavailable", TEXT: ".*AI unavailable — try again later.*" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.ai.retry" }
+- assertNotVisible: { id: "analytics.ai.observation.1" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "analytics.quality.trend", TEXT: ".*Improving.*" }
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow:
+    file: ../../support/maestro/daily-start.yaml
+    env: { STUDENT: EXT-A-002 }
+- runFlow:
+    file: ../../support/maestro/daily-revision-portion.yaml
+    env: { SECTION: sabqi, N: "1", PARA: "6", UNIT: COMPLETE, STATUS: COMPLETED, COMPLETED: "" }
+- runFlow: ../../support/maestro/daily-save.yaml
+- runFlow: ../../support/maestro/back-home.yaml
+- extendedWaitUntil:
+    visible: { id: "sync.banner.state.SYNCED" }
+    timeout: 90000
+- runFlow:
+    file: ../../support/maestro/reports-open.yaml
+    env: { STUDENT: EXT-A-001, KIND: week, PREV: "1" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "reports.range", TEXT: ".*${output.analytics.from}.*" }

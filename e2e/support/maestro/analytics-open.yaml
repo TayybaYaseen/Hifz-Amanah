@@ -1,0 +1,29 @@
+# Subflow (F15): Home → More → Analytics → class Hifz A1 → a student → (optionally) the previous week.
+# Usage: runFlow { file: ../../support/maestro/analytics-open.yaml, env: { STUDENT: EXT-A-001, PREV: "1" } }
+# Ends once the metrics (their first card, Progress) or "Not enough data for this period" are shown.
+appId: com.hifzamanah.app
+---
+- runFlow:
+    file: tap.yaml
+    env: { ID: "nav.more" }
+- runFlow:
+    file: tap.yaml
+    env: { ID: "more.analytics" }
+- extendedWaitUntil:
+    visible: { id: "analytics.class.Hifz A1" }
+    timeout: 30000
+- tapOn: { id: "analytics.class.Hifz A1" }
+- extendedWaitUntil:
+    visible: { id: "analytics.student.${STUDENT}" }
+    timeout: 30000
+- tapOn: { id: "analytics.student.${STUDENT}" }
+- runFlow:
+    when:
+      true: ${typeof PREV !== 'undefined' && PREV === '1'}
+    commands:
+      - runFlow:
+          file: tap.yaml
+          env: { ID: "analytics.period.prev" }
+- extendedWaitUntil:
+    visible: { id: "analytics.progress.SABAQ|analytics.notEnough" }
+    timeout: 60000

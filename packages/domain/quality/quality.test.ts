@@ -156,3 +156,17 @@ describe('F07 · overall performance label', () => {
     expect(noScores.overallLabel).toBe('NEEDS_IMPROVEMENT');
   });
 });
+
+describe('F15 · average from totals', () => {
+  it('F15-AC3 (US-062) qualityAverageOf(sum, count) equals qualityAverage of the scores and refuses impossible totals', async () => {
+    const { qualityAverageOf } = await import('./quality.ts');
+    fc.assert(
+      fc.property(fc.array(fc.integer({ min: 1, max: 5 }), { maxLength: 40 }), (scores) => {
+        expect(qualityAverageOf(scores.reduce((s, x) => s + x, 0), scores.length)).toEqual(qualityAverage(scores));
+      }),
+    );
+    expect(() => qualityAverageOf(1, 2)).toThrow(RangeError);
+    expect(() => qualityAverageOf(11, 2)).toThrow(RangeError);
+    expect(() => qualityAverageOf(1.5, 1)).toThrow(RangeError);
+  });
+});
