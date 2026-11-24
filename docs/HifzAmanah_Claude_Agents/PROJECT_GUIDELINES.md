@@ -1,4 +1,6 @@
-# HifzAmanah — Master Project Instructions
+# HifzAmanah — Project Guidelines (agent pack)
+
+> Superseded by `docs/AGENTS.md`, which is loaded into every session. Kept for reference; agent roles are in `.claude/agents/`.
 
 ## Source of truth
 Read and follow, in priority order (highest wins; same order as `docs/AGENTS.md` §2):
@@ -8,7 +10,7 @@ Read and follow, in priority order (highest wins; same order as `docs/AGENTS.md`
 4. `ARCHITECTURE.md` — architecture, data boundaries, security and operating policies (ADR-001…014).
 5. `design.md` — UI/UX, tokens, components, screens.
 6. `docs/specs/` — one spec per story, in implementation order; criteria `F<nn>-AC<k>`.
-7. `docs/AGENTS.md`, this file, and `agents/*.md` — implementation workflow and role guardrails.
+7. `docs/AGENTS.md`, this file, and `.claude/agents/*.md` — implementation workflow and role guardrails.
 
 `OPEN_DECISIONS.md` summarizes what is still open (DEC-B45 and product-owner actions); it is a summary of SRS §17, not a separate authority. `IMPLEMENTATION_PLAN.md` gives the phase order, which follows the spec order.
 
@@ -86,7 +88,7 @@ If documents conflict, or a needed decision is missing or Deferred, stop and rep
 
 ## Agent collaboration
 - Master agent owns task decomposition and integration, not unilateral product decisions.
-- Backend owns API/domain/data contracts; frontend consumes approved contracts.
+- Database owns the schema and migrations; Backend owns API/domain contracts; frontend consumes approved contracts.
 - UI/UX provides flows/specs; frontend implements them.
 - Code Review is independent and must report blockers, not silently fix them unless asked.
 - Testing verifies requirements and reports actual test results.
