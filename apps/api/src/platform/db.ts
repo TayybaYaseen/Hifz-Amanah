@@ -347,9 +347,11 @@ export interface PortionAttemptsTable {
   completed_den: number | null;
   quality: number | null;
   no_mistakes: boolean;
-  /** Internal staff text: never logged, audited by value, or sent to a Student or Parent. */
+  /** Staff text: never logged or audited by value; sent to a Student or Parent only when remarks_visibility is SHARED. */
   remarks: string | null;
-  remarks_visibility: Generated<'INTERNAL'>;
+  remarks_visibility: ColumnType<'INTERNAL' | 'SHARED', 'INTERNAL' | 'SHARED' | undefined, 'INTERNAL' | 'SHARED'>;
+  /** F14 (0017): an imported uncategorized `MistakeCount`; null = none imported (unknown, never 0). */
+  mistake_count_summary: ColumnType<number | null, number | null | undefined, number | null>;
   created_at: Timestamp;
   updated_at: Timestamp;
   updated_by: string;
@@ -434,6 +436,8 @@ export interface ReportStampsTable {
   organization_id: string;
   scope_key: string;
   stamp: ColumnType<string, number | string, number | string>;
+  /** F10 (0016): when the sources last changed. */
+  stamped_at: Generated<Date>;
 }
 
 /** A computed report, valid while its stamps, date, and settings are unchanged. Staff payload: project before sending. */
@@ -449,6 +453,51 @@ export interface ReportCacheTable {
   student_stamp: ColumnType<string, number | string, number | string>;
   payload: ColumnType<unknown, string, string>;
   built_at: Timestamp;
+}
+
+// ---------- F10 · Student and Parent access (0016_portal.sql). Row-level security applies: query through withTenant(). ----------
+
+/** The Student login of one student record (FR-PORT-001); an ended link keeps its row. */
+export interface StudentAccountsTable {
+  id: string;
+  organization_id: string;
+  student_id: string;
+  user_id: string;
+  linked_by: string;
+  linked_at: Timestamp;
+  unlinked_by: string | null;
+  unlinked_at: Timestamp | null;
+}
+
+/** A Parent login linked to a student after offline verification (FR-PORT-007); a revoked row is kept. */
+export interface StudentGuardiansTable {
+  id: string;
+  organization_id: string;
+  student_id: string;
+  guardian_user_id: string;
+  verification_method: 'IN_PERSON' | 'MADRASA_RECORDS';
+  verified_by: string;
+  verified_at: Timestamp;
+  linked_by: string;
+  linked_at: Timestamp;
+  revoked_by: string | null;
+  revoked_at: Timestamp | null;
+}
+
+/** One student's published period (FR-RPT-010). */
+export interface ReportPublishedTable {
+  id: string;
+  organization_id: string;
+  student_id: string;
+  period_kind: 'WEEK' | 'MONTH';
+  period_start: string;
+  period_end: string;
+  published_by: string;
+  published_at: Timestamp;
+  content_hash: string;
+  updated_at: Timestamp | null;
+  unpublished_by: string | null;
+  unpublished_at: Timestamp | null;
 }
 
 // ---------- F06 · Quran reference (0009_quran_ref.sql) ----------
@@ -607,7 +656,70 @@ export interface MushafLayoutLinesTable {
   src_last_word_id: ColumnType<number | null, number | null | undefined, number | null>;
 }
 
+// ---------- Excel import (F14, 0017_import_export.sql). Row-level security applies: query them only through withTenant(). ----------
+
+export type ImportTemplateColumn = 'Students' | 'DailyRecords';
+export type ImportClassificationColumn = 'NEW' | 'EXACT_MATCH' | 'SUSPECTED_DUPLICATE' | 'INVALID' | 'PROPOSED_UPDATE';
+/** Parsed cells by template column, and cells that could not be read (a formula without a saved value). */
+export interface ImportRowValuesColumn {
+  cells: Record<string, string | null>;
+  cellIssues: Record<string, 'FORMULA_NO_VALUE' | 'INVALID'>;
+}
+export type ImportJobStatusColumn = 'PREVIEWED' | 'COMMITTING' | 'COMMITTED' | 'PARTIALLY_FAILED' | 'EXPIRED';
+
+export interface ImportJobsTable {
+  id: string;
+  organization_id: string;
+  template_name: ImportTemplateColumn;
+  template_version: string;
+  mode: ColumnType<'ADD_ONLY' | 'UPDATE', 'ADD_ONLY' | 'UPDATE' | undefined, 'ADD_ONLY' | 'UPDATE'>;
+  status: ImportJobStatusColumn;
+  file_sha256: string;
+  row_count: number;
+  ignored_columns: ColumnType<string[], string | undefined, never>;
+  counts: ColumnType<Record<string, number>, string | undefined, string>;
+  result_counts: ColumnType<Record<string, number> | null, string | null | undefined, string | null>;
+  batch_count: ColumnType<number, number | undefined, number>;
+  created_by: string;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+  confirmed_by: string | null;
+  confirmed_at: Timestamp | null;
+  finished_at: Timestamp | null;
+  values_purge_at: Timestamp;
+  values_purged_at: Timestamp | null;
+}
+
+export interface ImportRowsTable {
+  organization_id: string;
+  job_id: string;
+  row_no: number;
+  /** The parsed cell values (may hold names and private notes): never logged or audited; purged after 7 days. */
+  values: ColumnType<ImportRowValuesColumn | null, string | null, string | null>;
+  classification: ImportClassificationColumn;
+  issues: ColumnType<unknown[], string | undefined, string>;
+  changes: ColumnType<unknown[], string | undefined, string>;
+  group_key: string | null;
+  batch_no: number | null;
+  result: 'COMMITTED' | 'FAILED' | 'SKIPPED' | null;
+  result_issues: ColumnType<unknown[], string | undefined, string>;
+  entity_id: string | null;
+  committed_at: Timestamp | null;
+}
+
+export interface ImportRecordKeysTable {
+  organization_id: string;
+  external_record_id: string;
+  lesson_portion_id: string;
+  attempt_id: string;
+  job_id: string;
+  created_at: Timestamp;
+}
+
 export interface Database {
+  import_jobs: ImportJobsTable;
+  import_rows: ImportRowsTable;
+  import_record_keys: ImportRecordKeysTable;
   daily_records: DailyRecordsTable;
   lesson_portions: LessonPortionsTable;
   portion_attempts: PortionAttemptsTable;
@@ -616,6 +728,9 @@ export interface Database {
   homework_portions: HomeworkPortionsTable;
   report_stamps: ReportStampsTable;
   report_cache: ReportCacheTable;
+  student_accounts: StudentAccountsTable;
+  student_guardians: StudentGuardiansTable;
+  report_published: ReportPublishedTable;
   mushaf_editions: MushafEditionsTable;
   quran_imports: QuranImportsTable;
   quran_sources: QuranSourcesTable;

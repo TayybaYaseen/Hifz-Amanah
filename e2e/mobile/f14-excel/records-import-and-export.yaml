@@ -1,20 +1,136 @@
 # F14 · Excel import and export — mobile E2E (docs/specs/14-f14-excel-import-export.md; design.md §4.15)
 # Covers: F14-AC6, F14-AC7, F14-AC13, F14-AC14, F14-AC16, F14-AC17
+# SYNTHETIC DATA ONLY. Workbooks are pushed by e2e/scripts/push-workbooks.mjs (e2e/fixtures/workbooks.ts):
+# daily-records-s1.xlsx is dated last week's Monday — sheet rows 2–7 are S1's six portions (Sabaq 2:1–10 10 lines,
+# Sabqi Para 3 ×3 with one private TeacherNotes, Manzil Paras 10 and 11), row 8 S2's, row 9 S3's (Hifz A2), and row 10
+# a Madrasa B student. The IMPORT seed scenario marks S1, S2, and S3 Present that Monday (an import never creates
+# attendance). An export's file goes to Android's share sheet, so the flow reads the export's audit summary
+# (row count, audience, private notes included; control.js lastExport) — the file contents are checked by the API
+# tests F14-AC16 and F14-AC17 (e2e/api/f14-excel.spec.ts).
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F14 records import, update mode, and export
 tags:
-  - pending
   - F14
   - US-059
   - US-060
   - US-061
 ---
-- launchApp:
-    clearState: true
+- runFlow: ../../support/maestro/reset.yaml
+- runScript: { file: ../../support/maestro/control.js, env: { ACTION: quranSeed } }
+- runScript: { file: ../../support/maestro/control.js, env: { ACTION: reportSeed, SCENARIO: IMPORT } }
+- runFlow:
+    file: ../../support/maestro/sign-in-staff.yaml
+    env: { USER_ID: admin-a }
 # 1. Sign in as admin.a → Import → DailyRecords → daily-records-s1.xlsx → preview → confirm;
 #    S1's weekly report includes the imported portions.                                                (F14-AC6)
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.importExport" } }
+- extendedWaitUntil:
+    visible: { id: "importExport.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "import.template.DailyRecords" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.templateVersion", TEXT: ".*DailyRecords, version 2.*" } }
+- runFlow: { file: ../../support/maestro/pick-workbook.yaml, env: { FILE: daily-records-s1.xlsx } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.count.NEW", TEXT: ".*: 8" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.count.INVALID", TEXT: ".*: 1" } }
 # 2. A row with an unknown student shows "Student not found in this madrasa".                         (F14-AC7)
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.row.10.issue.0", TEXT: "ExternalStudentID: Student not found in this madrasa" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "import.confirm" } }
+- extendedWaitUntil:
+    visible: { id: "android:id/button1" }
+    timeout: 10000
+- tapOn: { id: "android:id/button1" }
+- extendedWaitUntil:
+    visible: { id: "import.results" }
+    timeout: 120000
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.result.COMMITTED", TEXT: ".*: 8" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.result.FAILED", TEXT: ".*: 0" } }
+- runFlow: ../../support/maestro/back-home.yaml
+# S1's report for last week: one Sabaq (10 lines), three completed Sabqi portions, Manzil Paras 10 and 11.
+- runFlow:
+    file: ../../support/maestro/reports-open.yaml
+    env: { STUDENT: EXT-A-001, KIND: week, PREV: "1" }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "reports.section.SABAQ.assigned", TEXT: ".*10.*lines.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "reports.section.SABQI.statuses", TEXT: ".*Completed.*3.*" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "reports.section.MANZIL.para.10" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "reports.section.MANZIL.para.11" } }
+- runFlow: ../../support/maestro/back-home.yaml
 # 3. Import students-renamed.xlsx in the default mode → S1's name unchanged.                           (F14-AC13)
+#    Add-new-only proposes no change: the keyed row that differs is a suspected duplicate, and with nothing to write
+#    no confirmation is offered.
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.importExport" } }
+- extendedWaitUntil:
+    visible: { id: "importExport.screen" }
+    timeout: 30000
+- runFlow: { file: ../../support/maestro/pick-workbook.yaml, env: { FILE: students-renamed.xlsx } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.count.SUSPECTED_DUPLICATE", TEXT: ".*: 1" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.count.PROPOSED_UPDATE", TEXT: ".*: 0" } }
+- assertNotVisible: { id: "import.row.2.change.StudentName" }
+- assertNotVisible: { id: "import.confirm" }
 # 4. Choose update mode → before/after per field; Cancel → nothing changed; Confirm → changed.        (F14-AC14)
-# 5. Sign in as teacher.a1 → Export daily records for this week → file lists only S1, S2.             (F14-AC16)
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "import.mode.UPDATE" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.count.PROPOSED_UPDATE", TEXT: ".*: 1" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.row.2.change.StudentName", TEXT: "StudentName: Test Student One . Test Student One Renamed" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "import.confirm" } }
+- extendedWaitUntil:
+    visible: { id: "android:id/button2" }
+    timeout: 10000
+- tapOn: { id: "android:id/button2" }
+# Cancelled: still the preview, nothing written. A fresh upload still shows the old name as "before".
+- assertNotVisible: { id: "import.results" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "import.another" } }
+- runFlow: { file: ../../support/maestro/pick-workbook.yaml, env: { FILE: students-renamed.xlsx } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "import.mode.UPDATE" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.row.2.change.StudentName", TEXT: "StudentName: Test Student One . Test Student One Renamed" } }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "import.confirm" } }
+- extendedWaitUntil:
+    visible: { id: "android:id/button1" }
+    timeout: 10000
+- tapOn: { id: "android:id/button1" }
+- extendedWaitUntil:
+    visible: { id: "import.results" }
+    timeout: 120000
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.result.COMMITTED", TEXT: ".*: 1" } }
+# Changed: the same file is now an exact match.
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "import.another" } }
+- runFlow: { file: ../../support/maestro/pick-workbook.yaml, env: { FILE: students-renamed.xlsx } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.count.EXACT_MATCH", TEXT: ".*: 1" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "import.count.SUSPECTED_DUPLICATE", TEXT: ".*: 0" } }
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow: ../../support/maestro/sign-out.yaml
+# 5. Sign in as teacher.a1 → Export daily records for the imported week → file lists only S1, S2.     (F14-AC16)
+#    S1's six portions and S2's one are 7 rows; S3 (Hifz A2, not teacher.a1's) would make 8.
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+- tapOn: { id: "nav.more" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "more.importExport" } }
+- extendedWaitUntil:
+    visible: { id: "importExport.screen" }
+    timeout: 30000
+- tapOn: { id: "importExport.tab.export" }
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "export.kind.daily-records" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "export.from", TEXT: "${output.report.date}" } }
+- runFlow: { file: ../../support/maestro/type.yaml, env: { ID: "export.to", TEXT: "${output.report.date}" } }
+- runFlow: ../../support/maestro/export-run.yaml
+- assertTrue: ${output.exported.kind === 'DAILY_RECORDS' && output.exported.rows === 7 && output.exported.audience === 'STAFF' && output.exported.includesPrivate === false}
 # 6. Export with private notes → a warning appears first; a guardian-audience export has no private notes. (F14-AC17)
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "export.includeNotes" } }
+- extendedWaitUntil:
+    visible: { id: "android:id/button1" }
+    timeout: 10000
+# The warning (Android's dialog: title and message) comes before notes are included.
+- assertVisible: { id: ".*:id/alert_title" }
+- assertVisible: { id: "android:id/message" }
+- tapOn: { id: "android:id/button1" }
+- assertVisible: { id: "export.includeNotes", checked: true }
+- runFlow: ../../support/maestro/export-run.yaml
+- assertTrue: ${output.exported.rows === 7 && output.exported.audience === 'STAFF' && output.exported.includesPrivate === true}
+# The student/guardian file never carries private notes: the option is not offered, and the server leaves them out.
+- runFlow: { file: ../../support/maestro/tap.yaml, env: { ID: "export.audience.FAMILY" } }
+- runFlow: { file: ../../support/maestro/see.yaml, env: { ID: "export.familyNote" } }
+- assertNotVisible: { id: "export.includeNotes" }
+- runFlow: ../../support/maestro/export-run.yaml
+- assertTrue: ${output.exported.rows === 7 && output.exported.audience === 'FAMILY' && output.exported.includesPrivate === false}
+- runFlow: ../../support/maestro/back-home.yaml

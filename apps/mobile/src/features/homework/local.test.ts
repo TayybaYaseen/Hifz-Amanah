@@ -59,7 +59,7 @@ async function setup(clock = new FakeClock()) {
 
 const lines = (n: number) => ({ unit: 'LINES' as const, numerator: n, denominator: 1 });
 const para = (n: number, d: number) => ({ unit: 'PARA' as const, numerator: n, denominator: d });
-const attempt = (over: Partial<AttemptWrite> = {}): AttemptWrite => ({ status: 'COMPLETED', completed: null, quality: null, noMistakes: false, mistakes: [], remarks: null, ...over });
+const attempt = (over: Partial<AttemptWrite> = {}): AttemptWrite => ({ status: 'COMPLETED', completed: null, quality: null, noMistakes: false, mistakes: [], remarks: null, remarksVisibility: 'INTERNAL', ...over });
 const sabaq: PortionWrite = { section: 'SABAQ', position: 1, isExtra: false, paraNumber: 1, range: { surahStart: 2, ayahStart: 1, surahEnd: 2, ayahEnd: 10 }, assigned: lines(10), totalLines: 10, totalLinesSource: 'MANUAL' };
 const rev = (section: 'SABQI' | 'MANZIL', position: number, paraNumber: number, assigned = para(1, 1)): PortionWrite => ({ section, position, isExtra: false, paraNumber, range: null, assigned, totalLines: null, totalLinesSource: null });
 

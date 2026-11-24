@@ -6,7 +6,7 @@
 | **User story** | US-046 |
 | **Feature** | [F10 · Student and Parent access](13-f10-student-parent-access.md) |
 | **Epic** | EPIC 10 — Student and Parent Access ([user-stories.md](../user-stories.md)) |
-| **Status** | draft |
+| **Status** | Approved |
 | **Priority** | Not specified in the source documents (SRS, user-stories.md, feature specs). None is assigned here. |
 | **Split from** | `docs/specs/F10-student-parent-access.md` on 2026-10-30 |
 

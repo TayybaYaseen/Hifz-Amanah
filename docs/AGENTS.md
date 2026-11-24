@@ -59,7 +59,7 @@ Do not guess commands that don't exist. Mobile-only commands (`npm start`, `npm 
 | Feature gate (every story in a feature) | `npm run e2e:gate -- F05` |
 | Release gate (app-wide E2E) | `npm run e2e:gate -- APP` |
 | API E2E (Playwright Test; start `npm run api:e2e-server` first, or set `E2E_API_URL`) | `npm run e2e:api` |
-| Mobile E2E (Maestro; needs the Maestro CLI and an emulator) | `npm run e2e:mobile` |
+| Mobile E2E (Maestro; needs the Maestro CLI and an emulator; first pushes the F14 workbooks with `adb`) | `npm run e2e:mobile` |
 | Docs traceability (one story per spec, verbatim criteria, requirement IDs, links) | `npm run docs:check` |
 
 **Specs are one per user story,** all directly in `docs/specs/` (no subfolders), indexed in `docs/specs/README.md`. Sorted by name, they list in implementation order:

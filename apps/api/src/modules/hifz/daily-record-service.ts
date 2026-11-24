@@ -32,7 +32,7 @@ import {
   type AttemptLike,
   type SummaryPortion,
 } from '@hifz/domain/hifz';
-import { mistakeCounts } from '@hifz/domain/mistakes';
+import { attemptMistakeCount, mistakeCounts } from '@hifz/domain/mistakes';
 import { attemptsQualityAverage } from '@hifz/domain/quality';
 import { SECTIONS } from '@hifz/domain/quantity';
 import { addDays, isCalendarDate } from '@hifz/domain/roster';
@@ -202,7 +202,9 @@ export class DailyRecordService {
               'a.completed_den',
               'a.quality',
               'a.no_mistakes',
+              'a.mistake_count_summary',
               'a.remarks',
+              'a.remarks_visibility',
               'a.row_version',
             ])
             .where('a.organization_id', '=', org)
@@ -227,10 +229,12 @@ export class DailyRecordService {
           completed: quantityOf(a.completed_unit, a.completed_num, a.completed_den),
           quality: a.quality,
           noMistakes: a.no_mistakes,
-          mistakeCount: mistakeCount({ noMistakes: a.no_mistakes, mistakes: list }),
+          mistakeCount: a.mistake_count_summary === null ? mistakeCount({ noMistakes: a.no_mistakes, mistakes: list }) : countOf(attemptMistakeCount({ noMistakes: a.no_mistakes, mistakes: list, uncategorizedCount: a.mistake_count_summary })),
+          uncategorizedMistakes: a.mistake_count_summary,
           mistakes: list.map((m, i) => ({ ...m, position: i + 1 })),
           // Internal staff text: this route is staff-only (daily.write); Students and Parents never reach it.
           remarks: a.remarks,
+          remarksVisibility: a.remarks_visibility,
           rowVersion: Number(a.row_version),
         };
         attemptsOf.set(a.lesson_portion_id, [...(attemptsOf.get(a.lesson_portion_id) ?? []), view]);
@@ -342,14 +346,14 @@ export class DailyRecordService {
         ? await tx
             .selectFrom('portion_attempts as a')
             .innerJoin('lesson_portions as p', (j) => j.onRef('p.id', '=', 'a.lesson_portion_id').onRef('p.organization_id', '=', 'a.organization_id'))
-            .select(['a.id', 'a.status', 'a.quality', 'a.no_mistakes'])
+            .select(['a.id', 'a.status', 'a.quality', 'a.no_mistakes', 'a.mistake_count_summary'])
             .where('a.organization_id', '=', org)
             .where('p.daily_record_id', 'in', recordIds)
             .where('p.removed_at', 'is', null)
             .execute()
         : [];
       const mistakes = await currentMistakes(tx, org, attempts.map((a) => a.id));
-      const counts = mistakeCounts(attempts.map((a) => ({ noMistakes: a.no_mistakes, mistakes: mistakes.get(a.id) ?? [] })));
+      const counts = mistakeCounts(attempts.map((a) => ({ noMistakes: a.no_mistakes, mistakes: mistakes.get(a.id) ?? [], uncategorizedCount: a.mistake_count_summary })));
       const quality = attemptsQualityAverage(attempts.map((a) => ({ status: a.status, quality: a.quality })));
       const overallLabels = { EXCELLENT: 0, GOOD: 0, AVERAGE: 0, NEEDS_IMPROVEMENT: 0, notChosen: 0 } satisfies Record<OverallLabel | 'notChosen', number>;
       for (const r of records) overallLabels[r.overall_label ?? 'notChosen'] += 1;
@@ -418,3 +422,6 @@ export class DailyRecordService {
     });
   }
 }
+
+/** A mistake-count state as the view's number (null = not recorded). */
+const countOf = (state: { kind: 'COUNT'; count: number } | { kind: 'NOT_RECORDED' }): number | null => (state.kind === 'COUNT' ? state.count : null);

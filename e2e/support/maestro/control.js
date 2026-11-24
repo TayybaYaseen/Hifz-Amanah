@@ -16,8 +16,15 @@
 // reportSeed (F09): SCENARIO (WEEK | MONTH | SUMMARY) writes a synthetic report scenario through the real API
 // (apps/api/src/testing/report-seed.ts); sets output.report (from, to, and the scenario's named dates).
 // reportCorrect (F09-AC3): another device corrects the WEEK scenario's Tuesday rating 3 → 5.
-// Results go to `output`: output.otp, output.totp, output.classDay, output.attendance, output.report.
-/* global http, json, output, ACTION, LOGIN_ID, ADVANCE_MS, ORG_CODE, CLASS_NAME, CONTROL_URL, CONTROL_SECRET, STUDENT, SECTION, PARA, STATUS, UNIT, AMOUNT, COUNT, DATE, SCENARIO */
+// reportSeed SCENARIO=PORTAL (F10): S1 last week with a "Private to staff" and a "Visible to student/guardian" remark.
+// reportPublish (F10-AC13): KIND (WEEK | MONTH, default WEEK), DATE (default a week ago); admin.a publishes that period
+// for class Hifz A1 through the real API; sets output.published (count, from, to).
+// reportSeed SCENARIO=IMPORT (F14): S1, S2 (Hifz A1) and S3 (Hifz A2) Present last week's Monday (output.report.date),
+// the RecordDate of the pushed daily-records-s1.xlsx (e2e/scripts/push-workbooks.mjs).
+// lastExport (F14-AC16, F14-AC17): sets output.exported to the newest EXPORT_CREATED audit summary (kind, rows,
+// audience, includesPrivate; never student details), or null when there is none.
+// Results go to `output`: output.otp, output.totp, output.classDay, output.attendance, output.report, output.exported.
+/* global http, json, output, ACTION, LOGIN_ID, ADVANCE_MS, ORG_CODE, CLASS_NAME, CONTROL_URL, CONTROL_SECRET, STUDENT, SECTION, PARA, STATUS, UNIT, AMOUNT, COUNT, DATE, SCENARIO, KIND */
 var base = (typeof CONTROL_URL !== 'undefined' && CONTROL_URL ? CONTROL_URL : 'http://localhost:3000') + '/__test/';
 var secret = typeof CONTROL_SECRET !== 'undefined' && CONTROL_SECRET ? CONTROL_SECRET : 'local-e2e-control-secret';
 var headers = { 'x-test-control-secret': secret, 'Content-Type': 'application/json' };
@@ -55,4 +62,13 @@ else if (ACTION === 'attendanceRecords') {
 }
 else if (ACTION === 'reportSeed') output.report = call('POST', 'reports/seed', { scenario: SCENARIO });
 else if (ACTION === 'reportCorrect') call('POST', 'reports/correct');
+else if (ACTION === 'reportPublish') {
+  var publishBody = { kind: typeof KIND !== 'undefined' && KIND ? KIND : 'WEEK' };
+  if (typeof DATE !== 'undefined' && DATE) publishBody.date = DATE;
+  output.published = call('POST', 'reports/publish', publishBody);
+}
+else if (ACTION === 'lastExport') {
+  var exportAudits = call('GET', 'audit-action/EXPORT_CREATED').items;
+  output.exported = exportAudits.length ? exportAudits[exportAudits.length - 1].summary : null;
+}
 else throw new Error('Unknown ACTION ' + ACTION);

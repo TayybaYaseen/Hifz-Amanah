@@ -102,6 +102,10 @@ if (apiTests.length) {
 
 // 4. Mobile E2E — flows carry one tag per story they cover.
 if (mobileFlows.length) {
+  // F14 flows pick workbooks in the device's file picker; Maestro cannot copy files, so they are pushed first.
+  if (mobileFlows.some((t) => t.file.replaceAll('\\', '/').includes('f14-excel/')) && node(['e2e/scripts/push-workbooks.mjs']).status !== 0) {
+    stop('BLOCKED', 'could not push the F14 workbooks to the device (adb)');
+  }
   const tags = arg === 'APP' ? 'APP' : stories.join(',');
   const mobile = run('maestro', ['test', 'e2e/mobile', '--include-tags', tags]);
   if (mobile.status !== 0) stop('FAIL', 'mobile E2E flows failed');

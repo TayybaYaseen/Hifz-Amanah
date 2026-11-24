@@ -1,16 +1,89 @@
 # F10 · Student and Parent access — mobile E2E (docs/specs/13-f10-student-parent-access.md; design.md §4.6, §5.4)
 # Covers: F10-AC9, F10-AC10, F10-AC11, F10-AC12
+# SYNTHETIC DATA ONLY. The Teacher records today (class Hifz A1 meets today, ensure-class-day.yaml) two Sabqi portions
+# for S1, each with a remark: A stays "Private to staff", B is set "Visible to student/guardian". The Admin then
+# publishes this week (test control, through the real API). The audit of the visibility change (F10-AC12) is checked in
+# e2e/api/f10-portal.spec.ts; here the saved record shows each remark's visibility label.
 appId: com.hifzamanah.app # Android application ID (SRS §17 DEC-B55, decided 2026-11-08)
 name: F10 notes — private by default; Parent and Student see only shared notes
 tags:
-  - pending
   - F10
   - US-046
 ---
-- launchApp:
-    clearState: true
-# 1. Sign in as teacher.a1 → S1 record → write note A; visibility shows "Private to staff".             (F10-AC9)
-# 2. Write note B; set "Visible to student/guardian"; save.                                            (F10-AC12)
-# 3. Admin publishes the period (test control).
-# 4. Sign in as parent.p1 → S1 report shows note B, not note A.                                        (F10-AC10, F10-AC11)
-# 5. Sign in as student.s1 → the same.                                                                 (F10-AC10, F10-AC11)
+- runFlow: ../../support/maestro/reset.yaml
+- runScript: { file: ../../support/maestro/control.js, env: { ACTION: quranSeed } }
+- runFlow: ../../support/maestro/ensure-class-day.yaml
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: teacher-a1 }
+# 1. teacher.a1 → S1 today → Sabqi portion 1 with note A; its visibility reads "Private to staff".        (F10-AC9)
+- runFlow:
+    file: ../../support/maestro/daily-start.yaml
+    env: { STUDENT: EXT-A-001 }
+- runFlow:
+    file: ../../support/maestro/daily-revision-portion.yaml
+    env: { SECTION: sabqi, N: "1", PARA: "4", UNIT: COMPLETE, STATUS: COMPLETED, COMPLETED: "" }
+- runFlow:
+    file: ../../support/maestro/type.yaml
+    env: { ID: "daily.sabqi.portion.1.remarks", TEXT: "Synthetic note A private" }
+- runFlow: ../../support/maestro/dismiss-keyboard.yaml
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "daily.sabqi.portion.1.remarksVisibility.INTERNAL" }
+- assertVisible: { id: "daily.sabqi.portion.1.remarksVisibility.INTERNAL", selected: true }
+- assertVisible: { id: "daily.sabqi.portion.1.remarksVisibility.SHARED", selected: false }
+# 2. Sabqi portion 2 with note B, set "Visible to student/guardian"; save.                                  (F10-AC12)
+- runFlow:
+    file: ../../support/maestro/daily-revision-portion.yaml
+    env: { SECTION: sabqi, N: "2", PARA: "5", UNIT: COMPLETE, STATUS: COMPLETED, COMPLETED: "" }
+- runFlow:
+    file: ../../support/maestro/type.yaml
+    env: { ID: "daily.sabqi.portion.2.remarks", TEXT: "Synthetic note B shared" }
+- runFlow: ../../support/maestro/dismiss-keyboard.yaml
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "daily.sabqi.portion.2.remarksVisibility.SHARED" }
+- runFlow: ../../support/maestro/daily-save.yaml
+# The saved record labels each remark, and both reach the server.
+- extendedWaitUntil:
+    visible: { id: "record.sync.SYNCED" }
+    timeout: 120000
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow: ../../support/maestro/sign-out.yaml
+# 3. The Admin publishes this week (test control → POST /reports/publish).
+- runScript: { file: ../../support/maestro/control.js, env: { ACTION: reportPublish, KIND: WEEK, DATE: "${output.today}" } }
+# 4. parent.p1 → S1's report shows note B, not note A.                                                       (F10-AC10, F10-AC11)
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: parent-p1 }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "nav.portal" }
+- extendedWaitUntil:
+    visible: { id: "portal.child.1" }
+    timeout: 30000
+- tapOn: { id: "portal.child.1" }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "portal.report.WEEK.${output.published.from}" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "portalReport.day.${output.today}.portion.2.remarks", TEXT: ".*Synthetic note B shared.*" }
+- assertNotVisible: { text: ".*Synthetic note A private.*" }
+- assertNotVisible: { id: "portalReport.day.${output.today}.portion.1.remarks" }
+- runFlow: ../../support/maestro/back-home.yaml
+- runFlow: ../../support/maestro/sign-out.yaml
+# 5. student.s1 → the same.                                                                                  (F10-AC10, F10-AC11)
+- runFlow:
+    file: ../../support/maestro/sign-in.yaml
+    env: { USER_ID: student-s1 }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "nav.portal" }
+- runFlow:
+    file: ../../support/maestro/tap.yaml
+    env: { ID: "portal.report.WEEK.${output.published.from}" }
+- runFlow:
+    file: ../../support/maestro/see.yaml
+    env: { ID: "portalReport.day.${output.today}.portion.2.remarks", TEXT: ".*Synthetic note B shared.*" }
+- assertNotVisible: { text: ".*Synthetic note A private.*" }

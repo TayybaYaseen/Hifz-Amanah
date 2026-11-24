@@ -224,7 +224,7 @@ describe('F12 · local database upgrades', () => {
     await db.run("UPDATE sync_meta SET last_pull_cursor = 'cursor-8' WHERE id = 1");
     const before = await outboxSnapshot(db);
     expect(before).toHaveLength(5);
-    expect(await runMigrations(db, WORKSPACE_MIGRATIONS)).toEqual([9]);
+    expect(await runMigrations(db, WORKSPACE_MIGRATIONS.slice(0, 9))).toEqual([9]);
     // Every outbox row and value is byte-identical; nothing else in sync_meta or the caches moved.
     expect(await outboxSnapshot(db)).toEqual(before);
     expect(await db.get('SELECT cache_epoch, allowed_seq, last_pull_cursor FROM sync_meta')).toEqual({ cache_epoch: 0, allowed_seq: 0, last_pull_cursor: 'cursor-8' });
@@ -233,6 +233,30 @@ describe('F12 · local database upgrades', () => {
     const items = await makeOutbox(db, new FakeClock(), dailyRegistry()).list();
     expect(items.map((i) => i.status.state)).toEqual(states);
     expect(items[0]!.fields.note).toBe('نوٹ — Arabic/Urdu text stays intact');
+    await db.close();
+  });
+
+  it('F12-AC16 (US-051) the version 9 → 10 upgrade (F10 remark visibility) keeps every queued operation and saved attempt', async () => {
+    const db = openNodeDriver();
+    await runMigrations(db, WORKSPACE_MIGRATIONS.slice(0, 9));
+    const outbox = makeOutbox(db, new FakeClock(), dailyRegistry());
+    const states = ['PENDING', 'SYNCING', 'FAILED', 'ACTION_REQUIRED'];
+    for (const [i, state] of states.entries()) {
+      const attemptId = outbox.newEntityId();
+      const { opIds } = await outbox.saveWithOp(
+        async (tx) => {
+          await tx.run("INSERT INTO portion_attempts (id, row_version, lesson_portion_id, attempt_no, status, remarks) VALUES (?, NULL, 'p', 1, 'COMPLETED', 'نوٹ — staff remark')", [attemptId]);
+        },
+        { entity: 'portion_attempt', entityId: attemptId, opType: 'CREATE', baseVersion: null, fields: { lessonPortionId: 'p', remarks: 'نوٹ — staff remark' }, label: `attempt ${i}` },
+      );
+      for (const op of opIds) await db.run('UPDATE outbox SET state = ?, attempts = ? WHERE op_id = ?', [state, i, op]);
+    }
+    const before = await outboxSnapshot(db);
+    expect(await runMigrations(db, WORKSPACE_MIGRATIONS)).toEqual([10]);
+    expect(await outboxSnapshot(db)).toEqual(before);
+    // Remarks saved before the upgrade are "Private to staff" (F10-AC9), never opened to families by the upgrade.
+    expect(await db.all('SELECT DISTINCT remarks_visibility FROM portion_attempts')).toEqual([{ remarks_visibility: 'INTERNAL' }]);
+    expect((await makeOutbox(db, new FakeClock(), dailyRegistry()).list()).map((i) => i.status.state)).toEqual(states);
     await db.close();
   });
 

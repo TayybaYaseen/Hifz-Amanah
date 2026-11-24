@@ -11,6 +11,8 @@ import {
   attemptWrite,
   newMistake,
   newPortion,
+  portionDiff,
+  portionFromSaved,
   portionIssues,
   portionWrite,
   qualityBlocked,
@@ -189,5 +191,49 @@ describe('F07 · mistakes and quality in the form', () => {
     expect(ur.quality.name['1']).toBe('ممتاز');
     expect(urLatn.quality.name['5']).toBe('Kamzor');
     for (const m of [en, ur, urLatn]) expect(Object.keys(m.overall).sort()).toEqual(Object.keys(en.overall).sort());
+  });
+});
+
+describe('F10 · remark visibility (US-046)', () => {
+  it('F10-AC9 (US-046) a new portion\'s remark is "Private to staff" until the Teacher changes it', () => {
+    for (const section of ['SABAQ', 'SABQI', 'MANZIL'] as const) expect(newPortion('n', section).perf.remarksVisibility).toBe('INTERNAL');
+    const form = sabqi({ para: '4', perf: { ...newPortion('x', 'SABQI').perf, status: 'COMPLETED', remarks: 'Synthetic remark' } });
+    expect(attemptWrite(form, index).remarksVisibility).toBe('INTERNAL');
+    expect(attemptWrite({ ...form, perf: { ...form.perf, remarksVisibility: 'SHARED' } }, index).remarksVisibility).toBe('SHARED');
+  });
+
+  it('F10-AC12 (US-046) changing only the visibility is a remarks change (queued as a correction)', () => {
+    const form = sabqi({ para: '4', perf: { ...newPortion('x', 'SABQI').perf, status: 'COMPLETED', remarks: 'Synthetic remark' } });
+    const write = portionWrite(form, 1, index);
+    const attempt = attemptWrite(form, index);
+    const saved = {
+      id: 'p1',
+      rowVersion: 1,
+      dailyRecordId: 'r1',
+      section: 'SABQI' as const,
+      position: 1,
+      isExtra: false,
+      paraNumber: write.paraNumber,
+      range: null,
+      assigned: write.assigned,
+      totalLines: null,
+      totalLinesSource: null,
+      lineCountEdition: null,
+      removed: false,
+      homeworkPortionId: null,
+      attempts: [{ id: 'a1', rowVersion: 1, lessonPortionId: 'p1', attemptNo: 1, attemptedAt: '2026-11-02T06:00:00.000Z', recordedBy: null, recordedByName: null, ...attempt }],
+    };
+    expect(portionDiff(saved, write, attempt).remarksChanged).toBe(false);
+    expect(portionDiff(saved, write, { ...attempt, remarksVisibility: 'SHARED' })).toMatchObject({ remarksChanged: true, outcomeChanged: false });
+    // A saved attempt read back into the form keeps its visibility.
+    expect(portionFromSaved({ ...saved, attempts: [{ ...saved.attempts[0]!, remarksVisibility: 'SHARED' }] }).perf.remarksVisibility).toBe('SHARED');
+  });
+
+  it('F10 unit: the visibility labels exist in all three locales', () => {
+    for (const cat of [en, ur, urLatn] as const) {
+      const v = (cat as unknown as { visibility: Record<string, string> }).visibility;
+      expect(Object.keys(v).sort()).toEqual(['INTERNAL', 'SHARED', 'label']);
+    }
+    expect((en as unknown as { visibility: Record<string, string> }).visibility).toMatchObject({ INTERNAL: 'Private to staff', SHARED: 'Visible to student/guardian' });
   });
 });

@@ -33,6 +33,12 @@ const STATUS: Record<ErrorCode, number> = {
   LEAVE_NOT_AWAITING: 409,
   // Daily Hifz entry (F05).
   MODE_CONFLICTS: 409,
+  // Student and Parent access (F10).
+  PUBLISH_REFUSED: 409,
+  // Excel import and export (F14).
+  WORKBOOK_REJECTED: 422,
+  EXPORT_TOO_LARGE: 422,
+  IMPORT_STATE: 409,
 };
 
 const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
@@ -62,6 +68,10 @@ const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
   RECORDS_EXIST: 'Records already exist for this date. Confirm to continue',
   LEAVE_NOT_AWAITING: 'This leave is no longer waiting for a decision',
   MODE_CONFLICTS: 'Some students have more than one record on a date. Resolve them before switching to one report per day',
+  PUBLISH_REFUSED: 'These reports cannot be published yet',
+  WORKBOOK_REJECTED: 'This workbook cannot be imported',
+  EXPORT_TOO_LARGE: 'Maximum 1,000 rows per file. Narrow the filters and export again',
+  IMPORT_STATE: 'This import cannot be changed now',
 };
 
 export class AppError extends Error {
@@ -70,8 +80,9 @@ export class AppError extends Error {
   /** MODE_CONFLICTS only: the conflict list returned with the error (F05-AC8). */
   readonly conflicts: unknown[] | undefined;
 
-  constructor(code: ErrorCode, fields?: Record<string, string>, conflicts?: unknown[]) {
-    super(DEFAULT_MESSAGE[code]);
+  /** `message` replaces the default text, e.g. a localized workbook rejection (F14, NFR-XLS-003). */
+  constructor(code: ErrorCode, fields?: Record<string, string>, conflicts?: unknown[], message?: string) {
+    super(message ?? DEFAULT_MESSAGE[code]);
     this.code = code;
     this.fields = fields;
     this.conflicts = conflicts;

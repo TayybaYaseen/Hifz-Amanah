@@ -1,0 +1,26 @@
+# Subflow (F14): Export → run → close Android's share sheet → "The file is ready" → read what the server exported.
+# Sets output.exported to the newest EXPORT_CREATED audit summary (kind, rows, audience, includesPrivate; control.js
+# lastExport). The file goes to the share sheet, which a flow cannot read, so the audit is how a flow sees the export.
+appId: com.hifzamanah.app
+---
+- runFlow:
+    file: tap.yaml
+    env: { ID: "export.run" }
+# The share sheet is Android's (it opens once the file is built); Back closes it without sharing, and then the screen
+# reports the file ready.
+- extendedWaitUntil:
+    visible: { id: "export.success" }
+    timeout: 20000
+    optional: true
+- runFlow:
+    when:
+      notVisible: { id: "export.success" }
+    commands:
+      - back
+- extendedWaitUntil:
+    visible: { id: "export.success" }
+    timeout: 60000
+- runScript:
+    file: control.js
+    env:
+      ACTION: lastExport

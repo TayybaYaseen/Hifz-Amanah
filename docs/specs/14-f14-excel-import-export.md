@@ -1,6 +1,6 @@
 # F14 · Excel import and export
 
-**Status:** draft
+**Status:** Approved
 **Brief:** [00-product-brief.md](../00-product-brief.md) · **Flow:** Excel import/export ([design.md §4.15](../design.md))
 **Requirements:** FR-XLS-001…017, NFR-XLS-001…004, SRS §15.1–15.2, FR-XLS-018
 **Stories:** US-058 – US-061 · **Depends on:** F03, F05, F09

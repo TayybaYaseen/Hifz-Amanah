@@ -332,9 +332,9 @@ Contract: [`packages/contracts/src/reports.ts`](../../packages/contracts/src/rep
 [ADR-020](../../docs/adr/ADR-020-report-cache-source-stamps.md).
 
 Read-only: every report is built from the source records (attendance, daily records, portions, attempts, mistakes,
-homework, timetable, exceptions, enrollments) and nothing is editable (FR-RPT-001). Staff only in F09: Owner, Admin,
-assigned Teacher. A Student or Parent gets `403` before anything is loaded; their published view is F10's portal
-(FR-RPT-010). A Teacher reaches a student enrolled at any time in one of their classes, and the report then holds only
+homework, timetable, exceptions, enrollments) and nothing is editable (FR-RPT-001). Staff only: Owner, Admin,
+assigned Teacher. A Student or Parent gets `403` before anything is loaded; they read published reports through the F10
+portal (below). A Teacher reaches a student enrolled at any time in one of their classes, and the report then holds only
 the days in those classes; a student or class out of reach, or another madrasa's id, is `404`.
 
 | Route | Query | Result |
@@ -358,6 +358,53 @@ madrasa's timezone and week start. Triggers bump a per-student stamp (records, p
 attendance, homework, enrollments, the student row) or the madrasa stamp (timetables, exceptions) in the same
 transaction as the change, so the next read after any correction rebuilds from source. `ReportService.verifyCache`
 recomputes a sample and lists mismatches (the nightly job waits for a worker entrypoint).
+
+## Portal, publishing, and family access routes (F10)
+
+Contract: [`packages/contracts/src/portal.ts`](../../packages/contracts/src/portal.ts); rules in
+`packages/domain/reports/publish.ts` and `src/modules/access/projection.ts`; code in
+[`src/modules/portal`](src/modules/portal), [`src/modules/reporting/published.ts`](src/modules/reporting/published.ts),
+and [`src/modules/roster/family-access-service.ts`](src/modules/roster/family-access-service.ts); tables in
+`migrations/0016_portal.sql` (`student_accounts`, `student_guardians`, `report_published`, `report_stamps.stamped_at`,
+`portion_attempts.remarks_visibility` opened to `SHARED`; RLS forced, no DELETE). Plan:
+[F10-plan](../../docs/handover/F10-plan.md); "Updated on" design [ADR-021](../../docs/adr/ADR-021-published-report-updated-on.md).
+
+**Portal (Student, Parent; online, read-only; `cache-control: no-store`).** A Student follows the student record their
+login is linked to; a Parent, the students with an active (verified, not revoked) link. The set is read on every
+request, so a revoked link is refused on the next one. Anything else (another student, an unpublished or unknown
+report, another madrasa's id) is the same `404`. Staff get `403`. There is no write route and no search.
+
+| Route | Query | Result |
+|---|---|---|
+| `GET /portal/students` | — | `200 { items: [{ id, name }] }` (the Parent's switcher) |
+| `GET /portal/reports` | `studentId`, `kind?`, `cursor?` | `200 { items: [{ id, kind, from, to, publishedAt, updatedAt }], nextCursor }`, published periods only, newest first, 25 a page |
+| `GET /portal/reports/:id` | — | `200 { id, publishedAt, updatedAt, teachers: [{ name }], report: FamilyReportView, generatedAt }`: the FR-PORT-006 field set through `projectFor(STUDENT\|PARENT, 'published_report')`; remarks and mistake notes only when SHARED; no draft homework, Leave reason, provisional state, or excluded-record list |
+
+**Publishing (Teacher for assigned classes, Owner, Admin; `reports.publish`).** Exactly one of `classId` (every student
+enrolled in the class during the period) or `studentId`.
+
+| Route | Body / query | Result |
+|---|---|---|
+| `POST /reports/publish` | `{ kind, date, classId \| studentId, pendingChanges }` | `200 { period, count }`, audited `REPORT_PUBLISHED`. `409 PUBLISH_REFUSED { fields: { reason } }`: `UNSYNCED_CHANGES` (the device reports pending changes, or a sync conflict is open for those students on a date in the period) or `PERIOD_NOT_STARTED` |
+| `POST /reports/unpublish` | `{ kind, date, classId \| studentId }` | `200 { period, count }`, audited `REPORT_UNPUBLISHED`; the period leaves the portal on the next request |
+| `GET /reports/publication` | `kind`, `date?`, `classId \| studentId` | `200 { period, items: [{ studentId, studentName, publishedAt, updatedAt }] }` |
+
+**Family access (Owner, Admin; `guardians.manage`; a Teacher gets `403`).** Every change is audited in the same
+transaction, with ids and the method only.
+
+| Route | Body / query | Result |
+|---|---|---|
+| `GET /students/:id/access` | — | `200 StudentAccessResponse`: the linked Student login and every Parent link (active first, revoked kept) |
+| `GET /family-accounts` | `role=STUDENT\|PARENT`, `page?` | `200 { items: [{ userId, loginId, displayName }], page, pageSize, total }`: the madrasa's active logins of that role |
+| `POST /students/:id/student-account` | `{ userId }` | Links a Student login (`STUDENT_ACCOUNT_LINKED`). `400` `NOT_A_STUDENT_ACCOUNT`, `STUDENT_ALREADY_LINKED`, `ACCOUNT_ALREADY_LINKED` |
+| `POST /students/:id/student-account/unlink` | — | `STUDENT_ACCOUNT_UNLINKED` |
+| `POST /students/:id/guardians` | `{ parentUserId, verificationMethod: IN_PERSON\|MADRASA_RECORDS }` | Links a Parent after offline verification; the method is required (`GUARDIAN_LINKED`). `400` `NOT_A_PARENT_ACCOUNT`, `ALREADY_LINKED` |
+| `POST /guardian-links/:id/verify` | `{ verificationMethod }` | Records a new verification (`GUARDIAN_VERIFIED`); `400 LINK_REVOKED` on a revoked link |
+| `POST /guardian-links/:id/revoke` | — | Ends the link (`GUARDIAN_LINK_REVOKED`); revoking twice is a no-op |
+
+**Remark visibility.** `portion_attempt` sync operations carry `remarksVisibility` (`INTERNAL`, the default, "Private to
+staff"; or `SHARED`, "Visible to student/guardian"). A change is audited `NOTE_VISIBILITY_CHANGED { from, to }`, never
+with the text.
 
 ## Sync routes (F12)
 
@@ -400,6 +447,39 @@ session with `401 SESSION_EXPIRED`.
   ([`src/modules/sync/change-log.ts`](src/modules/sync/change-log.ts)).
 - Request bodies are never logged, so operation fields and note bodies never reach the logs.
 
+## Import and export routes (F14)
+
+Contract: [`packages/contracts/src/import-export.ts`](../../packages/contracts/src/import-export.ts); code in
+[`src/modules/import-export`](src/modules/import-export); tables in `migrations/0017_import_export.sql` (`import_jobs`,
+`import_rows`, `import_record_keys`, and `portion_attempts.mistake_count_summary`; RLS forced, no DELETE). Plan:
+[F14-plan](../../docs/handover/F14-plan.md). Online only, staff only (Owner, Admin, Teacher for assigned classes); the
+tenant is always the caller's membership and any organization column in a workbook is ignored (FR-XLS-015).
+
+| Route | Body / query | Result |
+|---|---|---|
+| `POST /imports` | `?template=Students\|DailyRecords&locale?`; body: the `.xlsx` bytes (`Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` or `application/octet-stream`, at most 5 MB) | `201 ImportJobView` in `PREVIEWED`, mode `ADD_ONLY`, with counts per class (`NEW`, `EXACT_MATCH`, `SUSPECTED_DUPLICATE`, `INVALID`, `PROPOSED_UPDATE`) and `ignoredColumns`. `422 WORKBOOK_REJECTED` with `fields.reason` (`NOT_XLSX`, `FILE_TOO_LARGE`, `NO_META`, `UNKNOWN_TEMPLATE`, `WRONG_TEMPLATE`, `WRONG_VERSION`, `NO_SHEET`, `MISSING_COLUMN`, `NO_ROWS`, `TOO_MANY_ROWS`), the expected `template`/`version`, the `column`, and a localized `message`; nothing is stored but an `IMPORT_REJECTED` audit |
+| `GET /imports/:id` | `locale?` | `200 ImportJobView`. The uploader, or Owner/Admin; anyone else `404` |
+| `GET /imports/:id/rows` | `classification?`, `result?`, `offset`, `limit` (≤ 1,000), `locale?` | `200 { items: ImportRowView[], total }`: each row's class, issues (`column`, `code`, `severity`, localized `message`), field `changes` (before/after), batch, and result |
+| `PUT /imports/:id/mode` | `{ mode: ADD_ONLY \| UPDATE }` | `200 ImportJobView`: the preview again in that mode. Writes no record. `409 IMPORT_STATE` once confirmed or expired |
+| `POST /imports/:id/confirm` | `{ mode }` (must be the previewed mode) | `200 ImportJobView` `COMMITTED` or `PARTIALLY_FAILED` with `resultCounts`. Batches of 200 rows (a daily record is never split); each batch re-checks its rows and commits in one transaction. Calling it again on a `PARTIALLY_FAILED` job commits only rows not yet committed. Audited `IMPORT_COMMITTED` (counts only) |
+| `GET /imports/templates/:template` | `locale?` | `200` a blank `.xlsx`: an About sheet (template, version, column guide, examples), the data sheet header, and the hidden `_meta` |
+| `GET /exports/students` | `classId?`, `status=ACTIVE\|INACTIVE\|ALL`, `includeNotes?`, `locale?` | `200` the Students template, in the caller's scope. Notes only with `includeNotes=true`. `422 EXPORT_TOO_LARGE` over 1,000 students |
+| `GET /exports/daily-records` | `from`, `to`, `classId?`, `studentId?`, `audience=STAFF\|FAMILY`, `includeNotes?`, `locale?` | `200` the DailyRecords template, one row per portion (its latest attempt); `ExternalRecordID` is the imported key or the portion id, so the file can be imported back in update mode. `FAMILY` goes through `projectFor('PARENT', 'export_daily_record_row')`: no internal note. `422` over 1,000 rows |
+| `GET /exports/report` | `classId`, `kind=WEEK\|MONTH`, `date?`, `locale?` | `200` the class report rows (as the class summary) with the period, timezone, filters, generation time, and `PendingOfflineChanges=false` on the About and `_meta` sheets |
+
+- **Data only:** formulas are read as their saved value (none saved → `FORMULA_NO_VALUE`); macros never run. Exported text
+  cells starting with `= + - @ \t \r` are prefixed with `'` (read back without it on import).
+- **Students:** identity only by `ExternalStudentID`; a name match without one is `SUSPECTED_DUPLICATE` (never linked).
+  A new student needs `ClassName`; a Teacher's rows for other classes are `INVALID NOT_YOUR_CLASS`. No login accounts.
+  Update mode changes name, admission date, notes, and (Owner/Admin) status; never the class.
+- **DailyRecords:** rows of one student, date, and session form one daily record. New rows are dry-run through the F05
+  sync handlers at preview and written through them at commit (`src/modules/sync/server-apply.ts`): the same scope,
+  enrollment, attendance (Present/Late/Half day must already be marked), class-day, report-mode, Quran-range, and quantity
+  rules as Daily Entry, with the same audits and `change_log` entries (devices pull them). Sabaq needs a range, `TotalLines`,
+  and `LINES` ("Sabaq uses lines"). `MistakeCount` → `mistake_count_summary` (uncategorized). Update mode (key
+  `ExternalRecordID`) corrects only the latest attempt's status, completed, quality, MistakeCount, and TeacherNotes.
+- **Retention:** row values are purged 7 days after upload (NFR-PRV-005); an unconfirmed job then becomes `EXPIRED`.
+
 ## Test control (non-production only)
 
 Enabled when `TEST_CONTROL_SECRET` is set (the E2E server sets `local-e2e-control-secret` unless overridden; E2E
@@ -426,6 +506,15 @@ F03 seeds the fixture classes, Teachers, and students of `e2e/fixtures/personas.
 from 90 days before today) and adds:
 - `GET /__test/roster/ids`: `{ classes: { A1, A2, B1 }, students: { S1, S2, S3, SB1 } }` ids of the seeded fixtures.
 
+F10 seeds each Student persona's login link and each Parent persona's links (VERIFIED, or REVOKED) on every reset,
+assigns the fixture Teachers from the enrollment date, and adds:
+- `POST /__test/reports/seed { scenario: 'PORTAL' }` (with the F09 scenarios): last week with a private and a shared remark.
+- `POST /__test/reports/publish { kind?, date? }`: admin.a publishes that period for class Hifz A1 through the real route.
+
+F14 adds:
+- `POST /__test/import/fail-batch { batch }`: that import commit batch fails after its writes and rolls back (F14-AC15).
+  A reset clears it.
+
 F06 adds:
 - `POST /__test/quran/seed { organizationCode, seed? }`: applies a **synthetic** Quran seed (default: the fixture in
   `packages/domain/quran-ref/synthetic-fixture.ts`, which matches no real Mushaf) to that madrasa. `400 { issues }` if
@@ -433,7 +522,10 @@ F06 adds:
 
 ## Not yet built
 
-- F09: the published Student/Parent report view and publishing (F10, FR-RPT-010); the madrasa's PDF template, stored
+- F10: family PDF and Excel exports (F13, F14) and the "Report published" push (F16): each adds its own internal-note
+  leak test. The mobile portal has no component-test harness (screen rules are unit-tested in `view.ts`).
+
+- F09: the madrasa's PDF template, stored
   files behind signed URLs, and the other exports (F13, F14; the class-summary export is minimal and synchronous);
   scheduling the nightly report-cache verification (needs the pg-boss worker entrypoint).
 

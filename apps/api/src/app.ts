@@ -30,6 +30,10 @@ import { HomeworkService } from './modules/homework/homework-service.ts';
 import { homeworkHooks } from './modules/homework/hooks.ts';
 import { registerHomeworkRoutes } from './modules/homework/routes.ts';
 import { ReportService } from './modules/reporting/report-service.ts';
+import { PublishedReports } from './modules/reporting/published.ts';
+import { PortalService } from './modules/portal/portal-service.ts';
+import { registerPortalRoutes } from './modules/portal/routes.ts';
+import { FamilyAccessService } from './modules/roster/family-access-service.ts';
 import { registerReportRoutes } from './modules/reporting/routes.ts';
 import { QuranReferenceService } from './modules/quran-ref/reference-service.ts';
 import { registerQuranRoutes } from './modules/quran-ref/routes.ts';
@@ -47,6 +51,9 @@ import { registerSyncRoutes } from './modules/sync/routes.ts';
 import type { SyncScopeProvider } from './modules/sync/scope.ts';
 import { SyncService } from './modules/sync/sync-service.ts';
 import { registerTestControl, type LogSink } from './testing/control.ts';
+import { ExportService } from './modules/import-export/export-service.ts';
+import { ImportService } from './modules/import-export/import-service.ts';
+import { registerImportExportRoutes } from './modules/import-export/routes.ts';
 
 export interface AppDeps {
   config: Config;
@@ -119,6 +126,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     authenticate: (request) => auth.authenticate(bearer(request)),
     classes: new ClassService(deps.db, deps.clock),
     students: new StudentService(deps.db, deps.clock),
+    family: new FamilyAccessService(deps.db, deps.clock),
   });
 
   // ---------- Calendar and attendance (F04) ----------
@@ -148,7 +156,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   // ---------- Weekly and monthly reports (F09) ----------
   // Staff only; derived from source records on read, with a stamp-checked cache (ADR-020).
-  registerReportRoutes(app, { authenticate: (request) => auth.authenticate(bearer(request)), reports: new ReportService(deps.db, deps.clock, homeworkService) });
+  const reportService = new ReportService(deps.db, deps.clock, homeworkService);
+  // F10: publishing (staff) and the read-only Student/Parent portal; both leave through projectFor (ARCHITECTURE §7.4).
+  const publishedReports = new PublishedReports(deps.db, deps.clock, reportService);
+  registerReportRoutes(app, { authenticate: (request) => auth.authenticate(bearer(request)), reports: reportService, published: publishedReports });
+  registerPortalRoutes(app, { authenticate: (request) => auth.authenticate(bearer(request)), portal: new PortalService(deps.db, deps.clock, publishedReports) });
   // Source changes rebuild drafts and say when confirmed homework was left unchanged (FR-HW-011, F08-AC14).
   const homework = homeworkHooks();
 
@@ -170,6 +182,14 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     sync: new SyncService({ ...syncDeps, control: syncControl }),
     conflicts: new ConflictService(syncDeps),
     control: syncControl,
+  });
+
+  // ---------- Excel import and export (F14) ----------
+  // Imports write through the same entity handlers as sync (validation, audit, change_log, homework hooks).
+  registerImportExportRoutes(app, {
+    authenticate: (request) => auth.authenticate(bearer(request)),
+    imports: new ImportService({ db: deps.db, clock: deps.clock, registry: syncRegistry, quran: quranMetadata }),
+    exports: new ExportService(deps.db, deps.clock, reportService),
   });
 
   if (deps.config.testControlSecret) {

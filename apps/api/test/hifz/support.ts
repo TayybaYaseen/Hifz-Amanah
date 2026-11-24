@@ -90,6 +90,8 @@ export interface AttemptInput {
   noMistakes?: boolean;
   mistakes?: { category: string; severity: string; repeated: boolean }[];
   remarks?: string | null;
+  /** F10: omitted, the server saves the remark "Private to staff" (INTERNAL). */
+  remarksVisibility?: 'INTERNAL' | 'SHARED';
 }
 
 export function attemptOp(portionId: string, a: AttemptInput, id = uuidv7()) {
@@ -107,6 +109,7 @@ export function attemptOp(portionId: string, a: AttemptInput, id = uuidv7()) {
       noMistakes: a.noMistakes ?? false,
       mistakes: a.mistakes ?? [],
       remarks: a.remarks ?? null,
+      ...(a.remarksVisibility ? { remarksVisibility: a.remarksVisibility } : {}),
     },
     null,
   );

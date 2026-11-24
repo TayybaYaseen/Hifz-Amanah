@@ -10,7 +10,9 @@ appId: com.hifzamanah.app
       notVisible: { id: "${ID}" }
     commands:
       - scrollUntilVisible: { element: { id: "${ID}" }, direction: DOWN, timeout: 30000, centerElement: true, optional: true }
-- scrollUntilVisible: { element: { id: "${ID}" }, direction: UP, timeout: 30000, centerElement: true }
+# Up to 120 s, as in tap.yaml: on a slow emulator each scroll step takes about 10 s, and three upward steps are not
+# always enough to come back after the downward search. It ends as soon as the field is on screen.
+- scrollUntilVisible: { element: { id: "${ID}" }, direction: UP, timeout: 120000, centerElement: true }
 - tapOn: { id: "${ID}" }
 # Type only once the field has input focus (see focus-type.yaml): typing earlier can drop the first characters.
 - extendedWaitUntil:

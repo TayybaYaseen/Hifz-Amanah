@@ -1,0 +1,23 @@
+# Subflow (F14): Import → choose a file → pick a pushed workbook in Android's system file picker (DocumentsUI), then
+# wait for the server's answer: the preview (import.jobTitle) or a rejection (importExport.error).
+# Usage: runFlow { file: ../../support/maestro/pick-workbook.yaml, env: { FILE: students-50.xlsx } }
+# The workbooks are put on the device by e2e/scripts/push-workbooks.mjs (run by `npm run e2e:mobile` and the gate).
+# The picker is Android's, not the app's, so the file is chosen by its name (a file name, the same in every locale).
+appId: com.hifzamanah.app
+---
+- runFlow:
+    file: tap.yaml
+    env: { ID: "import.pickFile" }
+# The picker opens on Recent (or the last folder used); both list the pushed workbooks.
+- extendedWaitUntil:
+    visible: { id: "com.google.android.documentsui:id/dir_list" }
+    timeout: 30000
+- scrollUntilVisible:
+    element: { text: "${FILE}" }
+    direction: DOWN
+    timeout: 30000
+- tapOn: { text: "${FILE}" }
+# Uploading and classifying up to 1,001 rows can take a while on a slow emulator.
+- extendedWaitUntil:
+    visible: { id: "import.jobTitle|importExport.error" }
+    timeout: 120000
