@@ -18,6 +18,7 @@ import { decryptSecret, encryptSecret } from '../modules/identity/secrets.ts';
 import type { OrganizationService } from '../modules/organization/organization-service.ts';
 import type { SyncControl } from '../modules/sync/control-state.ts';
 import type { SyncRegistry } from '../modules/sync/handler.ts';
+import { STUB_MODES, type StubProvider } from '../modules/analytics/providers.ts';
 import { newTotpSecret, totpForStep, totpStep } from '../modules/identity/totp.ts';
 import { TEST_PASSWORD, classes as fixtureClasses, madaris, students as fixtureStudents } from '../../../../e2e/fixtures/personas.ts';
 import { seedPersonas } from './seed.ts';
@@ -60,6 +61,8 @@ interface ControlDeps {
   /** F06: applies synthetic Quran seeds to a test madrasa (never real Quran data). */
   quranSeeds: QuranSeedLoader;
   sync: { control: SyncControl; registry: SyncRegistry };
+  /** F15: the AI StubProvider (test builds only); null when the app was built without it. */
+  aiStub?: StubProvider | null;
 }
 
 /** Test-only control routes that carry a whole synthetic seed and report (F06). */
@@ -84,6 +87,10 @@ const NewWorkspaceInput = z.strictObject({
 });
 
 const TABLES = [
+  // F15 AI gateway (they reference organizations and users).
+  'ai_requests',
+  'ai_usage_monthly',
+  'org_ai_settings',
   // F14 import jobs (they reference organizations, users, and lesson portions).
   'import_record_keys',
   'import_rows',
@@ -178,6 +185,7 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
         auditFaults.failNext = false;
         importFaults.failBatch = null;
         reportSeeder.forget();
+        deps.aiStub?.reset();
         await seedPersonas(deps.db, deps.clock, deps.totpKey);
         return { status: 'reset' };
       });
@@ -638,6 +646,45 @@ export function registerTestControl(app: FastifyInstance, deps: ControlDeps): vo
             serverVersion: Number(r.server_version),
           })),
         };
+      });
+
+      // ---------- F15 · AI stub provider (registered only in test builds) ----------
+
+      const stub = (): StubProvider => {
+        if (!deps.aiStub) throw new AppError('NOT_FOUND');
+        return deps.aiStub;
+      };
+
+      // Sets how the stub answers, what each call costs, whether it reports a configured key, and an optional short
+      // gateway timeout for timeout tests. Every field is optional; omitted fields keep their value. Cleared by /reset.
+      scope.post('/ai/stub', async (request) => {
+        const input = parse(
+          z.strictObject({
+            mode: z.enum(STUB_MODES).optional(),
+            costMicroUsd: z.number().int().min(0).max(10_000_000).optional(),
+            configured: z.boolean().optional(),
+            timeoutMs: z.number().int().min(10).max(120_000).nullable().optional(),
+          }),
+          request.body,
+        );
+        const s = stub();
+        if (input.mode !== undefined) s.mode = input.mode;
+        if (input.costMicroUsd !== undefined) s.costMicroUsd = input.costMicroUsd;
+        if (input.configured !== undefined) s.ready = input.configured;
+        if (input.timeoutMs !== undefined) s.timeoutMs = input.timeoutMs;
+        return { mode: s.mode, costMicroUsd: s.costMicroUsd, configured: s.ready, timeoutMs: s.timeoutMs, providerId: s.id };
+      });
+
+      // How often the stub was called, and the last minimized payload and prompt language it received (F15-AC12, AC13).
+      scope.get('/ai/stub', async () => {
+        const s = stub();
+        return { providerId: s.id, mode: s.mode, calls: s.calls, lastPayload: s.lastPayload, lastPromptLocale: s.lastPrompt?.locale ?? null, lastPromptRestated: s.lastPrompt?.languageRestated ?? null };
+      });
+
+      // Resets the stub only (mode ok, cost 1000 micro-USD, configured, no calls, no payload, configured timeout).
+      scope.post('/ai/stub/reset', async () => {
+        stub().reset();
+        return { status: 'reset' };
       });
 
       // Counts occurrences of a string in every table and in the captured logs (F01-AC15).

@@ -121,6 +121,17 @@ export function qualityAverage(scores: readonly (number | null | undefined)[]): 
     sum += s;
     count += 1;
   }
+  return qualityAverageOf(sum, count);
+}
+
+/**
+ * The same average from an already-validated sum and count of ratings (F15 analytics combines days' averages without
+ * re-reading every score). The rounding is exactly that of `qualityAverage`.
+ */
+export function qualityAverageOf(sum: number, count: number): QualityAverage {
+  if (!Number.isInteger(sum) || !Number.isInteger(count) || count < 0 || sum < count * QUALITY_MIN || sum > count * QUALITY_MAX) {
+    throw new RangeError('qualityAverageOf: sum and count must come from ratings 1–5');
+  }
   if (count === 0) return { count: 0, sum: 0, value: null, display: null, nearestScore: null };
   // Half up to a whole score: floor((2·sum + count) / (2·count)).
   const nearest = Math.floor((2 * sum + count) / (2 * count));

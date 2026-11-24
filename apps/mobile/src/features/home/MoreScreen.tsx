@@ -10,7 +10,7 @@ import type { MeResponse } from '@hifz/contracts';
 import { AppScreen, Button } from '../../components/ui.tsx';
 import { useSync } from '../../sync/SyncContext.tsx';
 
-export function MoreScreen({ me, onProfile, onAccounts, onWorkspace, onClasses, onStudents, onSyncQueue, onLeave, onHolidays, onQuran, onQuranReference, onImportExport }: {
+export function MoreScreen({ me, onProfile, onAccounts, onWorkspace, onClasses, onStudents, onSyncQueue, onLeave, onHolidays, onQuran, onQuranReference, onImportExport, onAnalytics, onAiSettings }: {
   me: MeResponse;
   onProfile: () => void;
   onAccounts: () => void;
@@ -23,6 +23,8 @@ export function MoreScreen({ me, onProfile, onAccounts, onWorkspace, onClasses, 
   onQuran: () => void;
   onQuranReference: () => void;
   onImportExport: () => void;
+  onAnalytics: () => void;
+  onAiSettings: () => void;
 }) {
   const { t } = useTranslation();
   const sync = useSync();
@@ -40,6 +42,9 @@ export function MoreScreen({ me, onProfile, onAccounts, onWorkspace, onClasses, 
       {/* F06: the offline reference snapshot exists only where F12 opened a workspace (staff; ADR-018). */}
       {roster && sync.enabled ? <Button testID="more.quranRef" variant="secondary" label={t('more.quranRef')} onPress={onQuranReference} /> : null}
       {roster ? <Button testID="more.importExport" variant="secondary" label={t('more.importExport')} onPress={onImportExport} /> : null}
+      {/* F15: Analytics for Owner/Admin/Teacher; AI settings for Owner/Admin. Never for Students or Parents (F15-AC9). */}
+      {roster ? <Button testID="more.analytics" variant="secondary" label={t('more.analytics')} onPress={onAnalytics} /> : null}
+      {staff ? <Button testID="more.aiSettings" variant="secondary" label={t('more.aiSettings')} onPress={onAiSettings} /> : null}
       <Button testID="more.workspace" variant="secondary" label={t('more.workspace')} onPress={onWorkspace} />
       {staff ? <Button testID="more.accounts" variant="secondary" label={t('more.accounts')} onPress={onAccounts} /> : null}
       {sync.enabled ? <Button testID="more.syncQueue" variant="secondary" label={t('more.syncQueue')} onPress={onSyncQueue} /> : null}

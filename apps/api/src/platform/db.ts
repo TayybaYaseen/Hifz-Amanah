@@ -716,7 +716,66 @@ export interface ImportRecordKeysTable {
   created_at: Timestamp;
 }
 
+// ---------- AI gateway (F15, 0018_analytics_ai.sql). Row-level security applies: query them only through withTenant(). ----------
+
+/** One madrasa's AI settings (FR-AI-011…013). No row means the defaults. Money is integer micro-USD. */
+export interface OrgAiSettingsTable {
+  organization_id: string;
+  enabled: Generated<boolean>;
+  /** Adapter id; the vendor is Deferred (DEC-B45). Required when enabled. */
+  provider: string | null;
+  monthly_request_cap: number | null;
+  teacher_daily_cap: Generated<number>;
+  /** bigint, returned as a string by pg. Default 10 000 000 (USD 10); at most that, never raised (FR-AI-012). */
+  monthly_budget_micro_usd: ColumnType<string, string | number | undefined, string | number>;
+  share_attendance: Generated<boolean>;
+  share_progress: Generated<boolean>;
+  share_mistakes: Generated<boolean>;
+  share_quality: Generated<boolean>;
+  share_homework: Generated<boolean>;
+  updated_by: string | null;
+  updated_at: Generated<Timestamp>;
+}
+
+export type AiRequestOutcomeColumn = 'OK' | 'INVALID_OUTPUT' | 'WRONG_LANGUAGE' | 'TIMEOUT' | 'PROVIDER_ERROR';
+
+/** One AI call (usage and audit trail; insert-only, pruned after 90 days, DEC-B44). No student id, no names. */
+export interface AiRequestsTable {
+  id: string;
+  organization_id: string;
+  requested_by: string;
+  provider: string;
+  locale: 'en' | 'ur' | 'ur-Latn';
+  period_from: string | null;
+  period_to: string | null;
+  /** The minimized, pseudonymous payload exactly as sent (a JSON object). */
+  payload: ColumnType<Record<string, unknown>, string, never>;
+  /** SHA-256 hex of the payload. */
+  input_hash: string;
+  output: ColumnType<unknown, string | null | undefined, never>;
+  outcome: AiRequestOutcomeColumn;
+  provider_attempts: ColumnType<number, number | undefined, never>;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  /** bigint, returned as a string by pg. */
+  cost_micro_usd: ColumnType<string, string | number | undefined, never>;
+  latency_ms: number | null;
+  created_at: ColumnType<Timestamp, Timestamp | undefined, never>;
+}
+
+/** Requests and cost per madrasa and month (first day, madrasa timezone); kept 1 year (DEC-B44). */
+export interface AiUsageMonthlyTable {
+  organization_id: string;
+  month: string;
+  requests: ColumnType<number, number | undefined, number>;
+  /** bigint, returned as a string by pg. */
+  cost_micro_usd: ColumnType<string, string | number | undefined, string | number>;
+}
+
 export interface Database {
+  org_ai_settings: OrgAiSettingsTable;
+  ai_requests: AiRequestsTable;
+  ai_usage_monthly: AiUsageMonthlyTable;
   import_jobs: ImportJobsTable;
   import_rows: ImportRowsTable;
   import_record_keys: ImportRecordKeysTable;

@@ -1,0 +1,69 @@
+{
+  "scenario": "two-records",
+  "row": "Only 2 records in the month",
+  "note": "Recorded provider answers (synthetic) for the eval set. Good answers must pass the pipeline checks and the rubric; bad answers must fail where stated.",
+  "cases": [
+    {
+      "id": "good-en",
+      "locale": "en",
+      "expect": "pass",
+      "output": {
+        "observations": ["There is not enough data in this period to describe a trend: work was recorded on only 2 days."],
+        "suggestions": [],
+        "data_insufficient": true,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [{ "key": "recordedDays", "value": 2 }]
+      }
+    },
+    {
+      "id": "good-ur",
+      "locale": "ur",
+      "expect": "pass",
+      "output": {
+        "observations": ["اس مدت میں رجحان بتانے کے لیے کافی معلومات نہیں ہیں۔"],
+        "suggestions": [],
+        "data_insufficient": true,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": []
+      }
+    },
+    {
+      "id": "good-ur-Latn",
+      "locale": "ur-Latn",
+      "expect": "pass",
+      "output": {
+        "observations": ["Is muddat mein rujhan batane ke liye kaafi maloomat nahin hain."],
+        "suggestions": [],
+        "data_insufficient": true,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": []
+      }
+    },
+    {
+      "id": "bad-trend-from-two-points",
+      "locale": "en",
+      "expect": "fail",
+      "failsAt": "pipeline",
+      "output": {
+        "observations": ["Quality is declining: the average score is 2.5 this month."],
+        "suggestions": ["Give extra revision."],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [{ "key": "quality.average", "value": 2.5 }]
+      }
+    },
+    {
+      "id": "bad-flagged-but-still-a-trend",
+      "locale": "en",
+      "expect": "fail",
+      "failsAt": "rubric",
+      "output": {
+        "observations": ["Only 2 days were recorded, but quality is clearly declining."],
+        "suggestions": [],
+        "data_insufficient": true,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [{ "key": "recordedDays", "value": 2 }]
+      }
+    }
+  ]
+}

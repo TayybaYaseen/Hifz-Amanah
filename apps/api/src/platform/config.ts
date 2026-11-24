@@ -1,6 +1,6 @@
 // Runtime configuration from the environment. Secrets come from the platform secret store in
 // production (NFR-SEC-004) and are never committed or logged.
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 
 const Env = z.object({
@@ -34,6 +34,13 @@ const Env = z.object({
    * without it; its SHA-256 must be the one the seed was signed with. Unset until a dataset is approved.
    */
   QURAN_SEED_REPORT_FILE: z.string().min(1).optional(),
+  /**
+   * F15: HMAC key for the per-student pseudonym sent to an AI provider instead of a name or id (FR-AI-002). Unset means
+   * a key derived from HASH_PEPPER, so no new secret is required to deploy.
+   */
+  AI_PSEUDONYM_SECRET: z.string().min(32).optional(),
+  /** F15: provider call timeout. DEFERRED: DEC-B45 starting default (20 s), to be confirmed when the provider is chosen. */
+  AI_TIMEOUT_MS: z.coerce.number().int().min(100).max(120_000).default(20_000),
 });
 
 export interface Config {
@@ -52,6 +59,8 @@ export interface Config {
   quranSeedFile: string | undefined;
   /** The signed validation report for the seed file (DEC-B78), or undefined. */
   quranSeedReportFile: string | undefined;
+  /** F15 AI gateway: pseudonym HMAC key and provider timeout. No provider key lives here or in the database. */
+  ai: { pseudonymSecret: string; timeoutMs: number };
 }
 
 export function loadConfig(source: NodeJS.ProcessEnv = process.env): Config {
@@ -68,6 +77,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): Config {
   }
   if (production && env.MAIL_TRANSPORT !== 'ses') throw new Error('Production must send email through SES (DEC-B06)');
 
+  const hashPepper = required('HASH_PEPPER', env.HASH_PEPPER);
   const totpKey = Buffer.from(required('TOTP_ENCRYPTION_KEY', env.TOTP_ENCRYPTION_KEY), 'base64');
   if (totpKey.length !== 32) throw new Error('TOTP_ENCRYPTION_KEY must be 32 bytes, base64-encoded');
 
@@ -77,7 +87,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): Config {
     host: env.HOST,
     databaseUrl: env.DATABASE_URL,
     jwtSecret: new TextEncoder().encode(required('JWT_SECRET', env.JWT_SECRET)),
-    hashPepper: required('HASH_PEPPER', env.HASH_PEPPER),
+    hashPepper,
     totpKey,
     mail: { transport: env.MAIL_TRANSPORT, from: env.MAIL_FROM, awsRegion: env.AWS_REGION },
     testControlSecret: env.TEST_CONTROL_SECRET,
@@ -85,5 +95,9 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): Config {
     syncMinProtocolVersion: env.SYNC_MIN_PROTOCOL_VERSION,
     quranSeedFile: env.QURAN_SEED_FILE,
     quranSeedReportFile: env.QURAN_SEED_REPORT_FILE,
+    ai: {
+      pseudonymSecret: env.AI_PSEUDONYM_SECRET ?? createHmac('sha256', hashPepper).update('hifz-ai-pseudonym-v1').digest('base64'),
+      timeoutMs: env.AI_TIMEOUT_MS, // DEFERRED: DEC-B45 starting default
+    },
   };
 }

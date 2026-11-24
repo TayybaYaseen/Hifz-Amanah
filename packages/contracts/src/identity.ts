@@ -105,6 +105,15 @@ export const ERROR_CODES = [
   'EXPORT_TOO_LARGE',
   /** 409: the import job is not in a state that allows this (already committing, or its values were purged). */
   'IMPORT_STATE',
+  // Analytics and AI (F15). AI_ERROR_CODES in analytics.ts.
+  /** 403: AI is turned off for the madrasa (F15-AC11); the app hides the button. */
+  'AI_DISABLED',
+  /** 503: no provider set, or its server-side key is missing ("AI provider not set up" / "AI unavailable"). */
+  'AI_NOT_CONFIGURED',
+  /** 503: provider error or timeout, or an answer that failed the checks (F15-AC6, AC7). */
+  'AI_UNAVAILABLE',
+  /** 429: a request cap or the monthly money cap is used up (F15-AC12, AC18). No provider call was made. */
+  'AI_LIMIT_REACHED',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

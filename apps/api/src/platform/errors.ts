@@ -39,6 +39,11 @@ const STATUS: Record<ErrorCode, number> = {
   WORKBOOK_REJECTED: 422,
   EXPORT_TOO_LARGE: 422,
   IMPORT_STATE: 409,
+  // Analytics and AI (F15).
+  AI_DISABLED: 403,
+  AI_NOT_CONFIGURED: 503,
+  AI_UNAVAILABLE: 503,
+  AI_LIMIT_REACHED: 429,
 };
 
 const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
@@ -72,6 +77,10 @@ const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
   WORKBOOK_REJECTED: 'This workbook cannot be imported',
   EXPORT_TOO_LARGE: 'Maximum 1,000 rows per file. Narrow the filters and export again',
   IMPORT_STATE: 'This import cannot be changed now',
+  AI_DISABLED: 'AI is turned off for this madrasa',
+  AI_NOT_CONFIGURED: 'AI provider not set up',
+  AI_UNAVAILABLE: 'AI unavailable — try again later',
+  AI_LIMIT_REACHED: 'AI limit reached for this period',
 };
 
 export class AppError extends Error {

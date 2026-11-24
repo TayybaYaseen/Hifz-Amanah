@@ -249,12 +249,13 @@ Report test results honestly. If something was not run, say so.
 - Keep `main` stable and free from incomplete or untested changes.
 - Do not merge or push changes without the user's approval.
 
-## Activate HifzAmanah Master Agent & Specialist Team
-Activate my existing HifzAmanah agent team. Do not recreate existing agents or modify their responsibilities. Include the newly added `security-agent.md` in `.claude/agents/`.
+## HifzAmanah agent team
 
-Configure Master Agent as the central orchestrator. Whenever I give an implementation command using `/dal`, Master Agent must analyze the task, automatically delegate work to relevant specialist agents using actual Claude Code subagents, coordinate their work, integrate results, perform code review and testing, and report the final outcome to me.
+The team is registered in `.claude/agents/`, one self-contained file per role: `master-agent`, `database-agent`, `backend-agent`, `frontend-agent`, `ui-ux-agent`, `testing-agent`, `code-review-agent`, `security-agent`, `documentation-agent`. Do not create, duplicate, or re-verify agents during normal work.
 
-Verify that all existing agents are properly configured and callable, and that `/dal` invokes Master Agent correctly. Fix any missing configuration without duplicating files.
+- `/dal <task>` (`.claude/skills/dal/SKILL.md`) makes the main session the Master Agent: it plans, delegates to the specialists with real Claude Code subagents, integrates, reviews, tests, and reports. The routing and delegation policy is in `.claude/agents/master-agent.md`.
+- When the user asks the Master Agent to implement something without `/dal`, follow the same policy in the main session. Spawn the `master-agent` subagent only for a planning-only request; it cannot delegate.
+- Delegate only to the registered specialists, and only those the task needs. Never use generic agent types (`general-purpose`, `Explore`, `Plan`, `claude`, `fork`) for HifzAmanah work, and never create new agent definitions.
 
 Working with the agent team:
 - The Master Agent and all registered specialist agents in `.claude/agents/` are available for development tasks.

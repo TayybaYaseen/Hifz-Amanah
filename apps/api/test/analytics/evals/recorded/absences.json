@@ -1,0 +1,82 @@
+{
+  "scenario": "absences",
+  "row": "Absences on 5 days, recitation fine on attended days",
+  "note": "Recorded provider answers (synthetic) for the eval set. Good answers must pass the pipeline checks and the rubric; bad answers must fail where stated.",
+  "cases": [
+    {
+      "id": "good-en",
+      "locale": "en",
+      "expect": "pass",
+      "output": {
+        "observations": [
+          "The student was absent on 5 class days this month.",
+          "That is an attendance matter and says nothing about recitation.",
+          "On the 8 days the student attended, the average quality score was 1.5, where a lower score is better, and no mistakes were recorded."
+        ],
+        "suggestions": ["Talk with the family about attendance; recitation itself needs no change."],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [
+          { "key": "attendance.absent", "value": 5 },
+          { "key": "attendance.attended", "value": 8 },
+          { "key": "quality.average", "value": 1.5 }
+        ]
+      }
+    },
+    {
+      "id": "good-ur-Latn",
+      "locale": "ur-Latn",
+      "expect": "pass",
+      "output": {
+        "observations": ["Talib e ilm 5 din ghair haazir raha.", "Yeh haazri ka maamla hai, tilawat ka nahin.", "Haazri ke 8 dinon mein mayaar ka ausat 1.5 raha, aur kam number behtar hai."],
+        "suggestions": ["Haazri ke baare mein ghar walon se baat karein."],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [
+          { "key": "attendance.absent", "value": 5 },
+          { "key": "attendance.attended", "value": 8 },
+          { "key": "quality.average", "value": 1.5 }
+        ]
+      }
+    },
+    {
+      "id": "bad-absence-as-poor-recitation",
+      "locale": "en",
+      "expect": "fail",
+      "failsAt": "rubric",
+      "output": {
+        "observations": ["Because the student was absent on 5 days, the recitation is weak."],
+        "suggestions": ["Give extra recitation practice."],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [{ "key": "attendance.absent", "value": 5 }]
+      }
+    },
+    {
+      "id": "bad-absences-not-separated",
+      "locale": "en",
+      "expect": "fail",
+      "failsAt": "rubric",
+      "output": {
+        "observations": ["The average quality score was 1.5."],
+        "suggestions": ["Keep going."],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [{ "key": "quality.average", "value": 1.5 }]
+      }
+    },
+    {
+      "id": "bad-ur-Latn-absence-as-weak",
+      "locale": "ur-Latn",
+      "expect": "fail",
+      "failsAt": "rubric",
+      "output": {
+        "observations": ["Talib e ilm 5 din ghair haazir raha, is liye tilawat kamzor hai."],
+        "suggestions": ["Zyada dohrai karayein."],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [{ "key": "attendance.absent", "value": 5 }]
+      }
+    }
+  ]
+}

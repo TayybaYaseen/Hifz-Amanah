@@ -1,0 +1,100 @@
+{
+  "scenario": "tajweed-rising",
+  "row": "Rising Tajweed mistakes in Manzil Paras 10–12 over 4 weeks",
+  "note": "Recorded provider answers (synthetic) for the eval set. Good answers must pass the pipeline checks and the rubric; bad answers must fail where stated.",
+  "cases": [
+    {
+      "id": "good-en",
+      "locale": "en",
+      "expect": "pass",
+      "output": {
+        "observations": [
+          "Tajweed mistakes in Manzil rose every week: 1, then 2, then 3, then 4.",
+          "These mistakes were in Manzil Paras 10, 11 and 12, with 10 Tajweed mistakes in the month."
+        ],
+        "suggestions": ["Plan focused Tajweed revision of Manzil Paras 10–12 before moving on."],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [
+          { "key": "mistakes.weeks.1.byCategory.TAJWEED", "value": 1 },
+          { "key": "mistakes.weeks.2.byCategory.TAJWEED", "value": 2 },
+          { "key": "mistakes.weeks.3.byCategory.TAJWEED", "value": 3 },
+          { "key": "mistakes.weeks.4.byCategory.TAJWEED", "value": 4 },
+          { "key": "progress.MANZIL.paras.0", "value": 10 },
+          { "key": "progress.MANZIL.paras.1", "value": 11 },
+          { "key": "progress.MANZIL.paras.2", "value": 12 },
+          { "key": "mistakes.totals.byCategory.TAJWEED", "value": 10 }
+        ]
+      }
+    },
+    {
+      "id": "good-ur",
+      "locale": "ur",
+      "expect": "pass",
+      "output": {
+        "observations": ["منزل میں تجوید کی غلطیاں ہر ہفتے بڑھیں: 1، پھر 2، پھر 3، پھر 4۔ یہ غلطیاں پارہ 10، 11 اور 12 میں تھیں۔"],
+        "suggestions": ["پارہ 10 تا 12 کی تجوید پر توجہ کے ساتھ دہرائی کرائیں۔"],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [
+          { "key": "mistakes.weeks.1.byCategory.TAJWEED", "value": 1 },
+          { "key": "mistakes.weeks.2.byCategory.TAJWEED", "value": 2 },
+          { "key": "mistakes.weeks.3.byCategory.TAJWEED", "value": 3 },
+          { "key": "mistakes.weeks.4.byCategory.TAJWEED", "value": 4 },
+          { "key": "progress.MANZIL.paras.0", "value": 10 },
+          { "key": "progress.MANZIL.paras.1", "value": 11 },
+          { "key": "progress.MANZIL.paras.2", "value": 12 }
+        ]
+      }
+    },
+    {
+      "id": "bad-invented-category",
+      "locale": "en",
+      "expect": "fail",
+      "failsAt": "rubric",
+      "output": {
+        "observations": ["Tajweed and Lafzi mistakes in Manzil rose every week: 1, then 2, then 3, then 4, in Paras 10–12."],
+        "suggestions": ["Revise Paras 10–12."],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [
+          { "key": "mistakes.weeks.1.byCategory.TAJWEED", "value": 1 },
+          { "key": "mistakes.weeks.2.byCategory.TAJWEED", "value": 2 },
+          { "key": "mistakes.weeks.3.byCategory.TAJWEED", "value": 3 },
+          { "key": "mistakes.weeks.4.byCategory.TAJWEED", "value": 4 },
+          { "key": "progress.MANZIL.paras.0", "value": 10 },
+          { "key": "progress.MANZIL.paras.2", "value": 12 }
+        ]
+      }
+    },
+    {
+      "id": "bad-invented-para",
+      "locale": "en",
+      "expect": "fail",
+      "failsAt": "pipeline",
+      "output": {
+        "observations": ["Tajweed mistakes were highest in Manzil Para 14, rising to 4 in the last week."],
+        "suggestions": ["Revise Para 14."],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [{ "key": "mistakes.weeks.4.byCategory.TAJWEED", "value": 4 }]
+      }
+    },
+    {
+      "id": "bad-no-counts",
+      "locale": "en",
+      "expect": "fail",
+      "failsAt": "rubric",
+      "output": {
+        "observations": ["Tajweed mistakes in Manzil Paras 10–12 kept rising over the month."],
+        "suggestions": ["Plan focused revision of those Paras."],
+        "data_insufficient": false,
+        "period": { "from": "2026-11-01", "to": "2026-11-30" },
+        "cited_metrics": [
+          { "key": "progress.MANZIL.paras.0", "value": 10 },
+          { "key": "progress.MANZIL.paras.2", "value": 12 }
+        ]
+      }
+    }
+  ]
+}

@@ -54,6 +54,9 @@ import { registerTestControl, type LogSink } from './testing/control.ts';
 import { ExportService } from './modules/import-export/export-service.ts';
 import { ImportService } from './modules/import-export/import-service.ts';
 import { registerImportExportRoutes } from './modules/import-export/routes.ts';
+import { AnalyticsService } from './modules/analytics/analytics-service.ts';
+import { ProviderRegistry, StubProvider } from './modules/analytics/providers.ts';
+import { registerAnalyticsRoutes } from './modules/analytics/routes.ts';
 
 export interface AppDeps {
   config: Config;
@@ -192,6 +195,24 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     exports: new ExportService(deps.db, deps.clock, reportService),
   });
 
+  // ---------- Analytics and AI recommendations (F15) ----------
+  // DEFERRED: DEC-B45 — no vendor adapter exists, so the production registry is empty ("AI provider not set up"). Test
+  // builds with the test-control API register the StubProvider, whose behaviour the control API sets.
+  const aiStub = deps.config.testControlSecret && deps.config.env === 'test' ? new StubProvider() : null;
+  const aiProviders = new ProviderRegistry(aiStub ? [aiStub] : []);
+  registerAnalyticsRoutes(app, {
+    authenticate: (request) => auth.authenticate(bearer(request)),
+    analytics: new AnalyticsService({
+      db: deps.db,
+      clock: deps.clock,
+      reports: reportService,
+      homework: homeworkService,
+      providers: aiProviders,
+      runtime: { pseudonymSecret: deps.config.ai.pseudonymSecret, timeoutMs: deps.config.ai.timeoutMs, timeoutOverride: () => aiStub?.timeoutMs ?? null },
+      log: app.log,
+    }),
+  });
+
   if (deps.config.testControlSecret) {
     if (deps.config.env !== 'test') throw new Error('The test-control API is enabled only when NODE_ENV=test');
     registerTestControl(app, {
@@ -204,6 +225,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       organization,
       quranSeeds,
       sync: { control: syncControl, registry: syncRegistry },
+      aiStub,
     });
   }
   return app;

@@ -86,7 +86,9 @@ export type AuditAction =
   | 'IMPORT_REJECTED'
   | 'IMPORT_PREVIEWED'
   | 'IMPORT_COMMITTED'
-  | 'EXPORT_CREATED';
+  | 'EXPORT_CREATED'
+  // F15 · AI settings changed (FR-AI-011…013; F15-AC10). Target ORGANIZATION; field names with old and new values.
+  | 'AI_SETTINGS_UPDATED';
 
 export interface AuditEvent {
   organizationId: string | null;

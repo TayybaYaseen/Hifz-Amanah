@@ -11,7 +11,17 @@ export interface PushMessage {
   deepLink: string;
 }
 
-export type AiProviderMode = 'ok' | 'timeout' | 'error' | 'invalid-schema' | 'uncited-number';
+export type AiProviderMode = 'ok' | 'timeout' | 'error' | 'invalid-schema' | 'uncited-number' | 'wrong-language' | 'wrong-language-once' | 'insufficient';
+
+/** F15: what the AI provider stub received (test-stub, registered only in test builds; the vendor is Deferred, DEC-B45). */
+export interface AiStubState {
+  providerId: string;
+  mode: AiProviderMode;
+  calls: number;
+  lastPayload: Record<string, unknown> | null;
+  lastPromptLocale: string | null;
+  lastPromptRestated: boolean | null;
+}
 
 /** A persona key ('teacher.a1') or a raw User ID ('no-such-user'). */
 export type Who = PersonaKey | string;
@@ -19,15 +29,18 @@ export type Who = PersonaKey | string;
 // Test control (NFR-MNT-005): a test-only API, enabled only in local and staging with a secret
 // (apps/api/src/testing/control.ts). It provides seed reset, the OTP mail sink, clock control, audit and
 // text search, TOTP codes for the seeded Owner/Admin personas (FR-AUTH-016), operator workspace creation, an
-// audit-failure switch (F02), and the seeded roster ids (F03). AI and push stubs arrive with F15 and F16.
+// audit-failure switch (F02), the seeded roster ids (F03), and the AI provider stub (F15). Push stubs arrive with F16.
 export interface TestControl {
   reset(): Promise<void>;
   latestOtp(who: Who): Promise<string | null>;
   sentEmails(who: Who): Promise<number>;
   emailRecipients(who: Who): Promise<string[]>;
   advanceClock(ms: number): Promise<void>;
-  setAiProvider(mode: AiProviderMode): Promise<void>;
+  /** F15: the stub's mode; the timeout mode also shortens the gateway timeout to `timeoutMs` (default 50 ms). */
+  setAiProvider(mode: AiProviderMode, options?: { costMicroUsd?: number; configured?: boolean; timeoutMs?: number | null }): Promise<void>;
   aiProviderCalls(): Promise<number>;
+  /** F15: the stub's calls, the last minimized payload, and the last prompt language. */
+  aiStub(): Promise<AiStubState>;
   setPushProviderFailing(failing: boolean): Promise<void>;
   pushesFor(userId: string): Promise<PushMessage[]>;
   auditFor(who: Who): Promise<Array<Record<string, unknown>>>;
@@ -170,8 +183,10 @@ export const test = base.extend<Fixtures>({
       registerQuranSource: async (source) => (await json(await ctx.post('quran/sources', { data: source }))) as unknown as { id: string },
       recordQuranLicence: async (sourceId, licence) =>
         (await json(await ctx.post(`quran/sources/${sourceId}/licence`, { data: { licenceName: null, attributionText: null, ...licence } }))) as unknown as { revokedVersions: number },
-      setAiProvider: async () => notYet('AI provider stub (F15)'),
-      aiProviderCalls: async () => notYet('AI provider stub (F15)'),
+      setAiProvider: async (mode, options = {}) =>
+        void (await json(await ctx.post('ai/stub', { data: { mode, ...(mode === 'timeout' && options.timeoutMs === undefined ? { timeoutMs: 50 } : {}), ...options } }))),
+      aiProviderCalls: async () => (await json(await ctx.get('ai/stub'))).calls,
+      aiStub: async () => (await json(await ctx.get('ai/stub'))) as AiStubState,
       setPushProviderFailing: async () => notYet('push stub (F16)'),
       pushesFor: async () => notYet('push stub (F16)'),
     };
